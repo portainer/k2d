@@ -1,40 +1,12 @@
-# k2d (k2d)
+# k2d 
 
-WIP
+## What is k2d?
+k2d is a container that runs on a Docker Host, which listens on port 6443 for Kubernetes API calls. When the container receives Kubernetes API calls, k2d parses and translates them into Docker API instructions, which it executes on the underlying Docker Host.
 
-# Development
+This allows Linux enabled devices to run JUST the docker engine (or podman) and the translator container (which uses just 20MB of RAM) to enable the Docker instance to understand and act upon Kubernetes API calls.
 
-Install air:
+For example, you can request a pod's deployment, and k2d will parse it into the corresponding docker run command. You can request a deployment, and k2d will parse this into multiple docker run commands. You can request the publishing of a service, and k2d will create a docker network and publish the container on that network. Even request the list of all running pods, and k2d will be able to translate appropriately.
 
-```
-go install github.com/cosmtrek/air@latest
-```
+*‍‍*‍Note that not all API commands are implemented**. If k2d does not support a command, it will silently fail not to break Kubernetes tools that might interfere with the translator.
 
-# Run it
-
-Deploy it:
-```
-docker run -d --network host -e ADVERTISE_ADDR=10.114.0.2 -v /var/run/docker.sock:/var/run/docker.sock -v /var/lib/k2d:/var/lib/k2d portainer/k2d
-```
-
-Get the kubeconfig:
-```
-mkdir -pv  ~/.kube/
-curl --insecure https://localhost:6443/k2d/kubeconfig > ~/.kube/config
-```
-
-Use it:
-```
-kubectl get pods
-```
-
-# How it works
-
-## Configmaps and secrets
-
-Stored under /var/lib/k2d/configmaps and /var/lib/k2d/secrets
-
-# Limitations
-
-* ConfigMaps can only hold data, not binary data (however not restricted to 1MB max size anymore, tbc)
-* Only supported secret type is Opaque
+For more information, see the [k2d documentation](https://portainer-1.gitbook.io/0.1.0-alpha/).
