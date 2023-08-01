@@ -17,6 +17,81 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core"
 )
 
+func (adapter *KubeDockerAdapter) DeleteService(ctx context.Context, serviceName string) error {
+	containers, err := adapter.cli.ContainerList(ctx, types.ContainerListOptions{All: true})
+	if err != nil {
+		return fmt.Errorf("unable to list containers: %w", err)
+	}
+
+	logger := logging.LoggerFromContext(ctx)
+
+	for _, cntr := range containers {
+		if cntr.Labels[k2dtypes.ServiceNameLabelKey] == serviceName {
+
+			logger.Infow("found the container with the associated service. The container will be re-created with the new service configuration",
+				"container_id", cntr.ID,
+				"service_name", serviceName,
+			)
+
+			containerDetails, err := adapter.cli.ContainerInspect(ctx, cntr.ID)
+			if err != nil {
+				return fmt.Errorf("unable to inspect container: %w", err)
+			}
+
+			containerStopTimeout := 3
+			err = adapter.cli.ContainerStop(ctx, cntr.ID, container.StopOptions{Timeout: &containerStopTimeout})
+			if err != nil {
+				return fmt.Errorf("unable to stop existing container: %w", err)
+			}
+
+			containerConfig := &container.Config{
+				Image:        containerDetails.Image,
+				Labels:       containerDetails.Config.Labels,
+				ExposedPorts: nat.PortSet{},
+				Env:          containerDetails.Config.Env,
+				User:         containerDetails.Config.User,
+			}
+
+			delete(containerConfig.Labels, k2dtypes.ServiceNameLabelKey)
+			delete(containerConfig.Labels, k2dtypes.ServiceLastAppliedConfigLabelKey)
+
+			hostConfig := &container.HostConfig{
+				PortBindings:  nat.PortMap{},
+				RestartPolicy: containerDetails.HostConfig.RestartPolicy,
+				Binds:         containerDetails.HostConfig.Binds,
+				ExtraHosts:    containerDetails.HostConfig.ExtraHosts,
+				Privileged:    containerDetails.HostConfig.Privileged,
+			}
+
+			networkConfig := &network.NetworkingConfig{
+				EndpointsConfig: map[string]*network.EndpointSettings{
+					k2dtypes.K2DNetworkName: {},
+				},
+			}
+
+			err = adapter.cli.ContainerRemove(ctx, cntr.ID, types.ContainerRemoveOptions{})
+			if err != nil {
+				return err
+			}
+
+			// TODO: should only remove previous container if no error during create/start
+			// otherwise rollback to old container
+			containerCreateResponse, err := adapter.cli.ContainerCreate(ctx, containerConfig, hostConfig, networkConfig, nil, cntr.Names[0])
+			if err != nil {
+				return fmt.Errorf("unable to create container: %w", err)
+			}
+
+			return adapter.cli.ContainerStart(ctx, containerCreateResponse.ID, types.ContainerStartOptions{})
+		}
+	}
+
+	logger.Infow("no container was found with the associated service.",
+		"service_name", serviceName,
+	)
+
+	return nil
+}
+
 func (adapter *KubeDockerAdapter) CreateContainerFromService(ctx context.Context, service *corev1.Service) error {
 	// TODO: headless service should be ignored
 	// should return immediately

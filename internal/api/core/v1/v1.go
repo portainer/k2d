@@ -81,7 +81,7 @@ func (svc V1Service) ListAPIResources(r *restful.Request, w *restful.Response) {
 				Kind:         "Service",
 				SingularName: "",
 				Name:         "services",
-				Verbs:        []string{"create", "list", "get"},
+				Verbs:        []string{"create", "list", "delete", "get", "patch"},
 				Namespaced:   true,
 				ShortNames:   []string{"svc"},
 			},
