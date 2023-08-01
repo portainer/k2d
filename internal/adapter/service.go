@@ -34,7 +34,15 @@ func (adapter *KubeDockerAdapter) CreateContainerFromService(ctx context.Context
 
 	logger := logging.LoggerFromContext(ctx)
 
-	logger.Debugw("container found matching the service selector. The container will be re-created",
+	if service.ObjectMeta.Annotations["kubectl.kubernetes.io/last-applied-configuration"] == matchingContainer.Labels[k2dtypes.ServiceLastAppliedConfigLabelKey] {
+		logger.Infow("the container matching the service selector already exists with the same service configuration. The update will be skipped",
+			"container_id", matchingContainer.ID,
+			"service_name", service.Name,
+		)
+		return nil
+	}
+
+	logger.Infow("container found matching the service selector with a different service configuration. The container will be re-created",
 		"container_id", matchingContainer.ID,
 	)
 
@@ -58,6 +66,9 @@ func (adapter *KubeDockerAdapter) CreateContainerFromService(ctx context.Context
 		Env:          containerDetails.Config.Env,
 		User:         containerDetails.Config.User,
 	}
+
+	containerConfig.Labels[k2dtypes.ServiceNameLabelKey] = service.Name
+	containerConfig.Labels[k2dtypes.ServiceLastAppliedConfigLabelKey] = service.ObjectMeta.Annotations["kubectl.kubernetes.io/last-applied-configuration"]
 
 	hostConfig := &container.HostConfig{
 		PortBindings:  nat.PortMap{},
@@ -115,7 +126,7 @@ func (adapter *KubeDockerAdapter) GetService(ctx context.Context, serviceName st
 	}
 
 	for _, container := range containers {
-		if container.Names[0] == "/"+serviceName {
+		if container.Labels[k2dtypes.ServiceNameLabelKey] == serviceName {
 			pod := adapter.converter.ConvertContainerToService(container)
 
 			versionedService := corev1.Service{

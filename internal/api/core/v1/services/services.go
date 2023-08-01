@@ -3,7 +3,6 @@ package services
 import (
 	"github.com/emicklei/go-restful/v3"
 	"github.com/portainer/k2d/internal/adapter"
-	"github.com/portainer/k2d/internal/api/utils"
 	"github.com/portainer/k2d/internal/controller"
 )
 
@@ -49,13 +48,13 @@ func (svc ServiceService) RegisterServiceAPI(ws *restful.WebService) {
 		Param(ws.PathParameter("name", "name of the service").DataType("string")))
 
 	ws.Route(ws.PATCH("/v1/services/{name}").
-		To(utils.UnsupportedOperation).
+		To(svc.PatchService).
 		Param(ws.QueryParameter("dryRun", "when present, indicates that modifications should not be persisted").DataType("string")).
 		AddExtension("x-kubernetes-group-version-kind", serviceGVKExtension).
 		Param(ws.PathParameter("name", "name of the service").DataType("string")))
 
 	ws.Route(ws.PATCH("/v1/namespaces/{namespace}/services/{name}").
-		To(utils.UnsupportedOperation).
+		To(svc.PatchService).
 		Param(ws.QueryParameter("dryRun", "when present, indicates that modifications should not be persisted").DataType("string")).
 		AddExtension("x-kubernetes-group-version-kind", serviceGVKExtension).
 		Param(ws.PathParameter("name", "name of the service").DataType("string")))

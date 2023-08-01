@@ -2,7 +2,6 @@ package converter
 
 import (
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/docker/docker/api/types"
@@ -14,17 +13,18 @@ import (
 )
 
 func (converter *DockerAPIConverter) ConvertContainerToService(container types.Container) core.Service {
-	containerName := strings.TrimPrefix(container.Names[0], "/")
-
 	service := core.Service{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Service",
 			APIVersion: "v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:              containerName,
+			Name:              container.Labels[k2dtypes.ServiceNameLabelKey],
 			CreationTimestamp: metav1.NewTime(time.Unix(container.Created, 0)),
 			Namespace:         "default",
+			Annotations: map[string]string{
+				"kubectl.kubernetes.io/last-applied-configuration": container.Labels[k2dtypes.ServiceLastAppliedConfigLabelKey],
+			},
 		},
 		Spec: core.ServiceSpec{
 			Type:  core.ServiceTypeClusterIP,
@@ -65,6 +65,10 @@ func (converter *DockerAPIConverter) ConvertContainersToServices(containers []ty
 	services := []core.Service{}
 
 	for _, container := range containers {
+		if container.Labels[k2dtypes.ServiceNameLabelKey] == "" {
+			continue
+		}
+
 		service := converter.ConvertContainerToService(container)
 		services = append(services, service)
 	}
