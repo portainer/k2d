@@ -2,6 +2,8 @@
 package converter
 
 import (
+	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/network"
 	"github.com/portainer/k2d/internal/adapter/filesystem"
 	"github.com/portainer/k2d/internal/types"
 )
@@ -12,6 +14,14 @@ import (
 type DockerAPIConverter struct {
 	store                  *filesystem.FileSystemStore
 	k2dServerConfiguration *types.K2DServerConfiguration
+}
+
+// ContainerConfiguration is a wrapper around the Docker API container configuration
+type ContainerConfiguration struct {
+	ContainerName   string
+	ContainerConfig *container.Config
+	HostConfig      *container.HostConfig
+	NetworkConfig   *network.NetworkingConfig
 }
 
 // NewDockerAPIConverter creates and returns a new DockerAPIConverter.

@@ -2,15 +2,42 @@ package converter
 
 import (
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/docker/docker/api/types"
+	"github.com/docker/go-connections/nat"
 	k2dtypes "github.com/portainer/k2d/internal/adapter/types"
 	"github.com/portainer/k2d/pkg/network"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/apis/core"
 )
+
+func (converter *DockerAPIConverter) ConvertServiceSpecIntoContainerConfiguration(serviceSpec corev1.ServiceSpec, containerCfg *ContainerConfiguration) error {
+	for _, port := range serviceSpec.Ports {
+		containerPort, err := nat.NewPort(string(port.Protocol), port.TargetPort.String())
+		if err != nil {
+			return fmt.Errorf("invalid container port: %w", err)
+		}
+
+		hostBinding := nat.PortBinding{
+			HostIP: "0.0.0.0",
+		}
+
+		if port.NodePort != 0 {
+			hostBinding.HostPort = strconv.Itoa(int(port.NodePort))
+		} else {
+			hostBinding.HostPort = strconv.Itoa(int(port.Port))
+		}
+
+		containerCfg.HostConfig.PortBindings[containerPort] = []nat.PortBinding{hostBinding}
+		containerCfg.ContainerConfig.ExposedPorts[containerPort] = struct{}{}
+	}
+
+	return nil
+}
 
 func (converter *DockerAPIConverter) ConvertContainerToService(container types.Container) core.Service {
 	service := core.Service{
