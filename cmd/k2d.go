@@ -117,6 +117,7 @@ func main() {
 
 	operations := make(chan controller.Operation)
 	go controller.NewOperationController(logger, kubeDockerAdapter, cfg.OperationBatchMaxSize).StartControlLoop(operations)
+	defer close(operations)
 
 	container := restful.NewContainer()
 

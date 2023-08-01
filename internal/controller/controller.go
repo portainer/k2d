@@ -70,8 +70,8 @@ func NewOperationController(logger *zap.SugaredLogger, adapter *adapter.KubeDock
 }
 
 // StartControlLoop initializes and controls a loop to handle incoming operations.
-// It creates a queue with a maximum size of 25 and then processes these operations
-// in a separate goroutine every 3 seconds.
+// It creates a queue with a maximum size defined by the controller.maxBatchSize property
+// and then processes these operations in a separate goroutine every 3 seconds.
 // If the queue is full, it will wait until the current batch of operations is processed
 // before creating a new queue and continuing to process incoming operations.
 // The function uses a mutex to ensure thread-safety when creating the queue and
@@ -79,37 +79,91 @@ func NewOperationController(logger *zap.SugaredLogger, adapter *adapter.KubeDock
 // It ensures that all operations received from the input channel will be processed
 // and none will be missed.
 // The loop continues until the ops channel is closed and all operations have been processed.
+// func (controller *OperationController) StartControlLoop(ops chan Operation) {
+// 	var queue chan Operation
+// 	var mu sync.Mutex
+
+// 	for num := range ops {
+// 		mu.Lock()
+// 		if queue == nil {
+// 			queue = make(chan Operation, controller.maxBatchSize)
+// 			go func(q chan Operation) {
+// 				time.AfterFunc(3*time.Second, func() {
+// 					mu.Lock()
+// 					close(q)
+// 					controller.processOperationQueue(q)
+// 					queue = nil
+// 					mu.Unlock()
+// 				})
+// 			}(queue)
+// 		}
+
+// 		if len(queue) < cap(queue) {
+// 			queue <- num
+// 		} else {
+// 			// The queue is full. Wait for it to empty and create a new one.
+// 			mu.Unlock()
+// 			time.Sleep(3 * time.Second)
+// 			mu.Lock()
+// 			queue = make(chan Operation, controller.maxBatchSize)
+// 			queue <- num
+// 		}
+// 		mu.Unlock()
+// 	}
+// }
+
+// StartControlLoop initializes and controls a loop to handle incoming operations. This function creates and
+// processes batches of operations, with each batch either being a collection of operations up to the maximum batch size
+// or all operations received within a 3 second period, whichever condition is met first. It processes these batches
+// in parallel, ensuring the handling of incoming operations is non-blocking. This function continues running until
+// the input channel is closed and all operations have been processed.
+//
+// Parameters:
+// ops - A channel from which operations are received.
 func (controller *OperationController) StartControlLoop(ops chan Operation) {
-	var queue chan Operation
-	var mu sync.Mutex
+	var queue []Operation // holds the current batch of operations
+	var mu sync.Mutex     // ensures safe concurrent access to the queue
+	var timer *time.Timer // timer to trigger processing of the queue after 3 seconds
 
-	for num := range ops {
-		mu.Lock()
-		if queue == nil {
-			queue = make(chan Operation, controller.maxBatchSize)
-			go func(q chan Operation) {
-				time.AfterFunc(3*time.Second, func() {
-					mu.Lock()
-					close(q)
-					controller.processOperationQueue(q)
-					queue = nil
-					mu.Unlock()
-				})
-			}(queue)
+	// processQueue processes the current queue and resets it.
+	// It also stops the timer.
+	// Processing the queue is done in a separate goroutine to ensure
+	// that the loop can continue to receive operations while the queue is processed.
+	processQueue := func() {
+		if len(queue) > 0 {
+			q := queue
+			queue = nil
+			go controller.processOperationQueue(q)
 		}
+		if timer != nil {
+			timer.Stop()
+			timer = nil
+		}
+	}
 
-		if len(queue) < cap(queue) {
-			queue <- num
-		} else {
-			// The queue is full. Wait for it to empty and create a new one.
-			mu.Unlock()
-			time.Sleep(3 * time.Second)
-			mu.Lock()
-			queue = make(chan Operation, 25)
-			queue <- num
+	// Continually read from ops channel until it's closed
+	for op := range ops {
+		mu.Lock()
+		queue = append(queue, op)
+
+		// If the queue is full, process the queue
+		if len(queue) >= controller.maxBatchSize {
+			processQueue()
+		} else if timer == nil {
+			// If the timer doesn't exist, create one to process the queue after 3 seconds
+			timer = time.AfterFunc(3*time.Second, func() {
+				mu.Lock()
+				processQueue()
+				mu.Unlock()
+			})
 		}
 		mu.Unlock()
 	}
+
+	// Process any remaining operations in the queue after ops channel is closed
+	mu.Lock()
+	processQueue()
+	mu.Unlock()
 }
 
 func newOperationBatch(operations []Operation) OperationBatch {
@@ -132,9 +186,7 @@ func filterOperationsByPriority(operations []Operation, priority OperationPriori
 	return filteredOperations
 }
 
-func (controller *OperationController) processOperationQueue(queue chan Operation) {
-	operations := collectOperations(queue)
-
+func (controller *OperationController) processOperationQueue(operations []Operation) {
 	controller.logger.Debugw("processing operation batch",
 		"batch_size", len(operations),
 	)
@@ -144,14 +196,6 @@ func (controller *OperationController) processOperationQueue(queue chan Operatio
 	controller.processPriorityOperations(batch.HighPriorityOperations, HighPriorityOperation)
 	controller.processPriorityOperations(batch.MediumPriorityOperations, MediumPriorityOperation)
 	controller.processPriorityOperations(batch.LowPriorityOperations, LowPriorityOperation)
-}
-
-func collectOperations(queue chan Operation) []Operation {
-	operations := []Operation{}
-	for op := range queue {
-		operations = append(operations, op)
-	}
-	return operations
 }
 
 func (controller *OperationController) processPriorityOperations(ops []Operation, priority OperationPriority) {
