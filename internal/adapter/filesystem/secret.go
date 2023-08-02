@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path"
 	"strings"
 
 	"github.com/portainer/k2d/pkg/filesystem"
@@ -40,7 +41,7 @@ func (store *FileSystemStore) DeleteSecret(secretName string) error {
 
 	for _, file := range files {
 		if strings.HasPrefix(file.Name(), filePrefix) {
-			err := os.Remove(fmt.Sprintf("%s/%s", store.secretPath, file.Name()))
+			err := os.Remove(path.Join(store.secretPath, file.Name()))
 			if err != nil {
 				return fmt.Errorf("unable to remove file %s: %w", file.Name(), err)
 			}
@@ -88,18 +89,18 @@ func (store *FileSystemStore) GetSecret(secretName string) (*core.Secret, error)
 
 	for _, file := range files {
 		if strings.HasPrefix(file.Name(), filePrefix) {
-			data, err := os.ReadFile(fmt.Sprintf("%s/%s", store.secretPath, file.Name()))
+			data, err := os.ReadFile(path.Join(store.secretPath, file.Name()))
 			if err != nil {
 				return &core.Secret{}, fmt.Errorf("unable to read file %s: %w", file.Name(), err)
 			}
 
 			secret.Data[strings.TrimPrefix(file.Name(), secretName+SECRET_SEPARATOR)] = bytes.TrimSuffix(data, []byte("\n"))
-			info, err := os.Stat(fmt.Sprintf("%s/%s", store.secretPath, file.Name()))
+			info, err := os.Stat(path.Join(store.secretPath, file.Name()))
 			if err != nil {
 				return &core.Secret{}, fmt.Errorf("unable to get file info for %s: %w", file.Name(), err)
 			}
 			secret.ObjectMeta.CreationTimestamp = metav1.NewTime(info.ModTime())
-			secret.ObjectMeta.Annotations[fmt.Sprintf("secret.k2d.io/%s", file.Name())] = fmt.Sprintf("%s/%s", store.secretPath, file.Name())
+			secret.ObjectMeta.Annotations[fmt.Sprintf("secret.k2d.io/%s", file.Name())] = path.Join(store.secretPath, file.Name())
 		}
 	}
 
@@ -140,13 +141,13 @@ func (store *FileSystemStore) GetSecrets() (core.SecretList, error) {
 
 		for _, file := range files {
 			if strings.HasPrefix(file.Name(), fmt.Sprintf("%s%s", name, SECRET_SEPARATOR)) {
-				data, err := os.ReadFile(fmt.Sprintf("%s/%s", store.secretPath, file.Name()))
+				data, err := os.ReadFile(path.Join(store.secretPath, file.Name()))
 				if err != nil {
 					return core.SecretList{}, fmt.Errorf("unable to read file %s: %w", file.Name(), err)
 				}
 
 				secret.Data[strings.TrimPrefix(file.Name(), name+SECRET_SEPARATOR)] = data
-				info, err := os.Stat(fmt.Sprintf("%s/%s", store.secretPath, file.Name()))
+				info, err := os.Stat(path.Join(store.secretPath, file.Name()))
 				if err != nil {
 					return core.SecretList{}, fmt.Errorf("unable to get file info for %s: %w", file.Name(), err)
 				}

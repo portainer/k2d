@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path"
 	"strings"
 
 	"github.com/portainer/k2d/pkg/filesystem"
@@ -41,7 +42,7 @@ func (store *FileSystemStore) DeleteConfigMap(configMapName string) error {
 
 	for _, file := range files {
 		if strings.HasPrefix(file.Name(), filePrefix) {
-			err := os.Remove(fmt.Sprintf("%s/%s", store.configMapPath, file.Name()))
+			err := os.Remove(path.Join(store.configMapPath, file.Name()))
 			if err != nil {
 				return fmt.Errorf("unable to remove file %s: %w", file.Name(), err)
 			}
@@ -88,19 +89,19 @@ func (store *FileSystemStore) GetConfigMap(configMapName string) (*core.ConfigMa
 
 	for _, file := range files {
 		if strings.HasPrefix(file.Name(), filePrefix) {
-			data, err := os.ReadFile(fmt.Sprintf("%s/%s", store.configMapPath, file.Name()))
+			data, err := os.ReadFile(path.Join(store.configMapPath, file.Name()))
 			if err != nil {
 				return &core.ConfigMap{}, fmt.Errorf("unable to read file %s: %w", file.Name(), err)
 			}
 
 			configMap.Data[strings.TrimPrefix(file.Name(), configMapName+CONFIGMAP_SEPARATOR)] = strings.TrimSuffix(string(data), "\n")
-			info, err := os.Stat(fmt.Sprintf("%s/%s", store.configMapPath, file.Name()))
+			info, err := os.Stat(path.Join(store.configMapPath, file.Name()))
 			if err != nil {
 				return &core.ConfigMap{}, fmt.Errorf("unable to get file info for %s: %w", file.Name(), err)
 			}
 
 			configMap.ObjectMeta.CreationTimestamp = metav1.NewTime(info.ModTime())
-			configMap.ObjectMeta.Annotations[fmt.Sprintf("configmap.k2d.io/%s", file.Name())] = fmt.Sprintf("%s/%s", store.configMapPath, file.Name())
+			configMap.ObjectMeta.Annotations[fmt.Sprintf("configmap.k2d.io/%s", file.Name())] = path.Join(store.configMapPath, file.Name())
 		}
 	}
 
@@ -139,13 +140,13 @@ func (store *FileSystemStore) GetConfigMaps() (core.ConfigMapList, error) {
 
 		for _, file := range files {
 			if strings.HasPrefix(file.Name(), fmt.Sprintf("%s%s", name, CONFIGMAP_SEPARATOR)) {
-				data, err := os.ReadFile(fmt.Sprintf("%s/%s", store.configMapPath, file.Name()))
+				data, err := os.ReadFile(path.Join(store.configMapPath, file.Name()))
 				if err != nil {
 					return core.ConfigMapList{}, fmt.Errorf("unable to read file %s: %w", file.Name(), err)
 				}
 
 				configMap.Data[strings.TrimPrefix(file.Name(), name+CONFIGMAP_SEPARATOR)] = string(data)
-				info, err := os.Stat(fmt.Sprintf("%s/%s", store.configMapPath, file.Name()))
+				info, err := os.Stat(path.Join(store.configMapPath, file.Name()))
 				if err != nil {
 					return core.ConfigMapList{}, fmt.Errorf("unable to get file info for %s: %w", file.Name(), err)
 				}

@@ -6,6 +6,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"path"
 
 	restfulspec "github.com/emicklei/go-restful-openapi/v2"
 	restful "github.com/emicklei/go-restful/v3"
@@ -68,7 +69,7 @@ func main() {
 	}
 
 	// We generate the token file that will be mounted into all containers
-	tokenPath := fmt.Sprintf("%s/%s", cfg.DataPath, "token")
+	tokenPath := path.Join(cfg.DataPath, "token")
 	err = fs.CreateFileWithDirectories(tokenPath, []byte("fake-token"))
 	if err != nil {
 		logger.Fatalf("unable to create token file: %s", err)
