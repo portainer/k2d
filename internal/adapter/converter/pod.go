@@ -7,17 +7,12 @@ import (
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/network"
 	k2dtypes "github.com/portainer/k2d/internal/adapter/types"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/apis/core"
 )
-
-// Container is a wrapper around the Docker API container configuration
-type Container struct {
-	ContainerConfig *container.Config
-	HostConfig      *container.HostConfig
-}
 
 func (converter *DockerAPIConverter) ConvertContainerToPod(container types.Container) core.Pod {
 	containerName := strings.TrimPrefix(container.Names[0], "/")
@@ -90,10 +85,10 @@ func (converter *DockerAPIConverter) ConvertContainersToPods(containers []types.
 	}
 }
 
-// ConvertPodToContainer converts a Kubernetes PodSpec into a Docker Container.
+// ConvertPodSpecToContainerConfiguration converts a Kubernetes PodSpec into a Docker container configuration.
 // It receives a Kubernetes PodSpec and a map of labels.
-// It returns a Container struct, or an error if the conversion fails.
-func (converter *DockerAPIConverter) ConvertPodToContainer(spec corev1.PodSpec, labels map[string]string) (Container, error) {
+// It returns a ContainerConfiguration struct, or an error if the conversion fails.
+func (converter *DockerAPIConverter) ConvertPodSpecToContainerConfiguration(spec corev1.PodSpec, labels map[string]string) (ContainerConfiguration, error) {
 	containerSpec := spec.Containers[0]
 
 	containerConfig := &container.Config{
@@ -106,7 +101,7 @@ func (converter *DockerAPIConverter) ConvertPodToContainer(spec corev1.PodSpec, 
 	}
 
 	if err := converter.setEnvVars(containerConfig, containerSpec.Env, containerSpec.EnvFrom); err != nil {
-		return Container{}, err
+		return ContainerConfiguration{}, err
 	}
 
 	hostConfig := &container.HostConfig{
@@ -123,12 +118,17 @@ func (converter *DockerAPIConverter) ConvertPodToContainer(spec corev1.PodSpec, 
 	setSecurityContext(containerConfig, hostConfig, spec.SecurityContext, containerSpec.SecurityContext)
 
 	if err := converter.setVolumeMounts(hostConfig, spec.Volumes, containerSpec.VolumeMounts); err != nil {
-		return Container{}, err
+		return ContainerConfiguration{}, err
 	}
 
-	return Container{
+	return ContainerConfiguration{
 		ContainerConfig: containerConfig,
 		HostConfig:      hostConfig,
+		NetworkConfig: &network.NetworkingConfig{
+			EndpointsConfig: map[string]*network.EndpointSettings{
+				k2dtypes.K2DNetworkName: {},
+			},
+		},
 	}, nil
 }
 

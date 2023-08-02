@@ -4,12 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strconv"
 
 	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/network"
-	"github.com/docker/go-connections/nat"
 	k2dtypes "github.com/portainer/k2d/internal/adapter/types"
 	"github.com/portainer/k2d/internal/logging"
 	corev1 "k8s.io/api/core/v1"
@@ -17,95 +13,89 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core"
 )
 
+func (adapter *KubeDockerAdapter) DeleteService(ctx context.Context, serviceName string) error {
+	containers, err := adapter.cli.ContainerList(ctx, types.ContainerListOptions{All: true})
+	if err != nil {
+		return fmt.Errorf("unable to list containers: %w", err)
+	}
+
+	logger := logging.LoggerFromContext(ctx)
+
+	for _, cntr := range containers {
+		if cntr.Labels[k2dtypes.ServiceNameLabelKey] == serviceName {
+
+			logger.Infow("found the container with the associated service. The container will be re-created and the associated service configuration will be removed.",
+				"container_id", cntr.ID,
+				"service_name", serviceName,
+			)
+
+			cfg, err := adapter.buildContainerConfigurationFromExistingContainer(ctx, cntr.ID)
+			if err != nil {
+				return fmt.Errorf("unable to build container configuration from existing container: %w", err)
+			}
+
+			delete(cfg.ContainerConfig.Labels, k2dtypes.ServiceNameLabelKey)
+			delete(cfg.ContainerConfig.Labels, k2dtypes.ServiceLastAppliedConfigLabelKey)
+
+			return adapter.reCreateContainerWithNewConfiguration(ctx, cntr.ID, cfg)
+		}
+	}
+
+	logger.Infow("no container was found with the associated service.",
+		"service_name", serviceName,
+	)
+
+	return nil
+}
+
 func (adapter *KubeDockerAdapter) CreateContainerFromService(ctx context.Context, service *corev1.Service) error {
-	// TODO: headless service should be ignored
-	// should return immediately
+	logger := logging.LoggerFromContext(ctx)
+
+	// headless services are not supported
+	if service.Spec.ClusterIP == "None" {
+		logger.Infow("headless service detected. The service will be ignored",
+			"service_name", service.Name,
+		)
+		return nil
+	}
 
 	containers, err := adapter.cli.ContainerList(ctx, types.ContainerListOptions{})
 	if err != nil {
 		return fmt.Errorf("unable to list containers: %w", err)
 	}
 
-	matchingContainer := findMatchingContainer(containers, service.Spec.Selector)
+	matchingContainer := findContainerMatchingSelector(containers, service.Spec.Selector)
 
 	if matchingContainer == nil {
 		return errors.New("no container was found matching the service selector")
 	}
 
-	logger := logging.LoggerFromContext(ctx)
+	if service.ObjectMeta.Annotations["kubectl.kubernetes.io/last-applied-configuration"] == matchingContainer.Labels[k2dtypes.ServiceLastAppliedConfigLabelKey] {
+		logger.Infow("the container matching the service selector already exists with the same service configuration. The update will be skipped",
+			"container_id", matchingContainer.ID,
+			"service_name", service.Name,
+		)
+		return nil
+	}
 
-	logger.Debugw("container found matching the service selector. The container will be re-created",
+	logger.Infow("container found matching the service selector with a different service configuration. The container will be re-created",
 		"container_id", matchingContainer.ID,
 	)
 
-	containerDetails, err := adapter.cli.ContainerInspect(ctx, matchingContainer.ID)
+	cfg, err := adapter.buildContainerConfigurationFromExistingContainer(ctx, matchingContainer.ID)
 	if err != nil {
-		return fmt.Errorf("unable to inspect container: %w", err)
+		return fmt.Errorf("unable to build container configuration from existing container: %w", err)
 	}
 
-	containerStopTimeout := 3
-	err = adapter.cli.ContainerStop(ctx, matchingContainer.ID, container.StopOptions{Timeout: &containerStopTimeout})
+	cfg.ContainerConfig.Labels[k2dtypes.ServiceNameLabelKey] = service.Name
+	cfg.ContainerConfig.Labels[k2dtypes.ServiceLastAppliedConfigLabelKey] = service.ObjectMeta.Annotations["kubectl.kubernetes.io/last-applied-configuration"]
+
+	err = adapter.converter.ConvertServiceSpecIntoContainerConfiguration(service.Spec, &cfg)
 	if err != nil {
-		return fmt.Errorf("unable to stop existing container: %w", err)
+		return fmt.Errorf("unable to convert service spec into container configuration: %w", err)
 	}
 
-	// TODO: should have a converter that takes a service spec and an existing container configuration
-
-	containerConfig := &container.Config{
-		Image:        containerDetails.Image,
-		Labels:       containerDetails.Config.Labels,
-		ExposedPorts: nat.PortSet{},
-		Env:          containerDetails.Config.Env,
-		User:         containerDetails.Config.User,
-	}
-
-	hostConfig := &container.HostConfig{
-		PortBindings:  nat.PortMap{},
-		RestartPolicy: containerDetails.HostConfig.RestartPolicy,
-		Binds:         containerDetails.HostConfig.Binds,
-		ExtraHosts:    containerDetails.HostConfig.ExtraHosts,
-		Privileged:    containerDetails.HostConfig.Privileged,
-	}
-
-	networkConfig := &network.NetworkingConfig{
-		EndpointsConfig: map[string]*network.EndpointSettings{
-			k2dtypes.K2DNetworkName: {},
-		},
-	}
-
-	for _, port := range service.Spec.Ports {
-		containerPort, err := nat.NewPort(string(port.Protocol), port.TargetPort.String())
-		if err != nil {
-			return fmt.Errorf("invalid container port: %w", err)
-		}
-
-		hostBinding := nat.PortBinding{
-			HostIP: "0.0.0.0",
-		}
-
-		if port.NodePort != 0 {
-			hostBinding.HostPort = strconv.Itoa(int(port.NodePort))
-		} else {
-			hostBinding.HostPort = strconv.Itoa(int(port.Port))
-		}
-
-		hostConfig.PortBindings[containerPort] = []nat.PortBinding{hostBinding}
-		containerConfig.ExposedPorts[containerPort] = struct{}{}
-	}
-
-	err = adapter.cli.ContainerRemove(ctx, matchingContainer.ID, types.ContainerRemoveOptions{})
-	if err != nil {
-		return err
-	}
-
-	// TODO: should only remove previous container if no error during create/start
-	// otherwise rollback to old container
-	containerCreateResponse, err := adapter.cli.ContainerCreate(ctx, containerConfig, hostConfig, networkConfig, nil, matchingContainer.Names[0])
-	if err != nil {
-		return fmt.Errorf("unable to create container: %w", err)
-	}
-
-	return adapter.cli.ContainerStart(ctx, containerCreateResponse.ID, types.ContainerStartOptions{})
+	return adapter.reCreateContainerWithNewConfiguration(ctx, matchingContainer.ID, cfg)
 }
 
 func (adapter *KubeDockerAdapter) GetService(ctx context.Context, serviceName string) (*corev1.Service, error) {
@@ -115,7 +105,7 @@ func (adapter *KubeDockerAdapter) GetService(ctx context.Context, serviceName st
 	}
 
 	for _, container := range containers {
-		if container.Names[0] == "/"+serviceName {
+		if container.Labels[k2dtypes.ServiceNameLabelKey] == serviceName {
 			pod := adapter.converter.ConvertContainerToService(container)
 
 			versionedService := corev1.Service{
