@@ -21,7 +21,7 @@ func (svc StatefulSetService) ListStatefulSets(r *restful.Request, w *restful.Re
 	utils.WriteListBasedOnAcceptHeader(r, w, &statefulSetList, func() runtime.Object {
 		return &appsv1.StatefulSetList{
 			TypeMeta: metav1.TypeMeta{
-				Kind:       "DeploymentList",
+				Kind:       "StatefulSetList",
 				APIVersion: "apps/v1",
 			},
 		}

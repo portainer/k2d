@@ -21,7 +21,7 @@ func (svc DaemonSetService) ListDaemonSets(r *restful.Request, w *restful.Respon
 	utils.WriteListBasedOnAcceptHeader(r, w, &daemonSetList, func() runtime.Object {
 		return &appsv1.DaemonSetList{
 			TypeMeta: metav1.TypeMeta{
-				Kind:       "DeploymentList",
+				Kind:       "DaemonSetList",
 				APIVersion: "apps/v1",
 			},
 		}
