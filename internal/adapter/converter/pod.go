@@ -2,6 +2,7 @@ package converter
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -280,10 +281,11 @@ func (converter *DockerAPIConverter) handleVolumeSource(hostConfig *container.Ho
 	if volume.VolumeSource.ConfigMap != nil {
 		configMap, err := converter.store.GetConfigMap(volume.VolumeSource.ConfigMap.Name)
 		if err != nil {
-			return fmt.Errorf("unable to get configmap %s: %w", volume.VolumeSource.ConfigMap.Name, err)
+			return fmt.Errorf("unable to get configmap %s: %w", configMap.Name, err)
 		}
 
 		converter.setBindsFromAnnotations(hostConfig, configMap.Annotations, volumeMount, "configmap.k2d.io/")
+		// converter.setVolumesFromName(hostConfig, volume.VolumeSource.ConfigMap.Name, volumeMount)
 	} else if volume.VolumeSource.Secret != nil {
 		secret, err := converter.store.GetSecret(volume.VolumeSource.Secret.SecretName)
 		if err != nil {
@@ -291,6 +293,7 @@ func (converter *DockerAPIConverter) handleVolumeSource(hostConfig *container.Ho
 		}
 
 		converter.setBindsFromAnnotations(hostConfig, secret.Annotations, volumeMount, "secret.k2d.io/")
+		// converter.setVolumesFromName(hostConfig, secret.Name, volumeMount)
 	} else if volume.HostPath != nil {
 		bind := fmt.Sprintf("%s:%s", volume.HostPath.Path, volumeMount.MountPath)
 		hostConfig.Binds = append(hostConfig.Binds, bind)
@@ -301,9 +304,10 @@ func (converter *DockerAPIConverter) handleVolumeSource(hostConfig *container.Ho
 // setBindsFromAnnotations manages volume annotations for Docker containers.
 // It receives a pointer to the host configuration, a map of annotations, a Kubernetes volume mount, and an annotation prefix.
 func (converter *DockerAPIConverter) setBindsFromAnnotations(hostConfig *container.HostConfig, annotations map[string]string, volumeMount corev1.VolumeMount, prefix string) {
+	// if annotations contains prefix, then mount the volume from the Docker volume called value
 	for key, value := range annotations {
 		if strings.HasPrefix(key, prefix) {
-			bind := fmt.Sprintf("%s:%s", value, volumeMount.MountPath)
+			bind := fmt.Sprintf("%s:%s", value, filepath.Dir(volumeMount.MountPath))
 			hostConfig.Binds = append(hostConfig.Binds, bind)
 		}
 	}

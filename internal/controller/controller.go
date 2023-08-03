@@ -302,10 +302,10 @@ func (controller *OperationController) createService(op Operation) error {
 
 func (controller *OperationController) createConfigMap(op Operation) error {
 	configMap := op.Operation.(*corev1.ConfigMap)
-	return controller.adapter.CreateConfigMap(configMap)
+	return controller.adapter.CreateConfigMap(context.TODO(), configMap)
 }
 
 func (controller *OperationController) createSecret(op Operation) error {
 	secret := op.Operation.(*corev1.Secret)
-	return controller.adapter.CreateSecret(secret)
+	return controller.adapter.CreateSecret(context.TODO(), secret)
 }

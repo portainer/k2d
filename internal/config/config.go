@@ -15,6 +15,11 @@ type Config struct {
 	// the default value is set to /var/lib/k2d.
 	DataPath string `env:"K2D_DATA_PATH,default=/var/lib/k2d"`
 
+	// VolumePath represents the path for Docker volume storage.
+	// If not provided through an environment variable named K2D_VOLUME_PATH,
+	// the default value is set to /var/lib/docker/volumes.
+	VolumePath string `env:"K2D_VOLUME_PATH,default=/var/lib/docker/volumes"`
+
 	// DockerClientTimeout represents the timeout duration for Docker client operations.
 	// If not provided through an environment variable named K2D_DOCKER_CLIENT_TIMEOUT,
 	// the default value is set to 10 minutes (10m).

@@ -1,19 +1,56 @@
 package adapter
 
 import (
+	"context"
 	"fmt"
 
+	"github.com/docker/docker/api/types/filters"
+	"github.com/docker/docker/api/types/volume"
+	k2dtypes "github.com/portainer/k2d/internal/adapter/types"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/apis/core"
 )
 
-func (adapter *KubeDockerAdapter) CreateConfigMap(configMap *corev1.ConfigMap) error {
-	return adapter.fileSystemStore.StoreConfigMap(configMap)
+func (adapter *KubeDockerAdapter) CreateConfigMap(ctx context.Context, configMap *corev1.ConfigMap) error {
+	_, err := adapter.CreateVolume(ctx, VolumeOptions{
+		VolumeName: configMap.Name,
+		Labels: map[string]string{
+			k2dtypes.GenericLabelKey: "configmap",
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("unable to create volume: %w", err)
+	}
+
+	err = adapter.fileSystemStore.StoreConfigMap(configMap)
+	if err != nil {
+		return fmt.Errorf("unable to store configmap: %w", err)
+	}
+
+	return nil
 }
 
 func (adapter *KubeDockerAdapter) DeleteConfigMap(configMapName string) error {
-	return adapter.fileSystemStore.DeleteConfigMap(configMapName)
+	filter := filters.NewArgs()
+	filter.Add("label", fmt.Sprintf("%s=%s", k2dtypes.GenericLabelKey, "configmap"))
+	filter.Add("name", configMapName)
+
+	volume, err := adapter.cli.VolumeList(context.Background(), volume.ListOptions{
+		Filters: filter,
+	})
+	if err != nil {
+		return fmt.Errorf("unable to get the requested volume: %w", err)
+	}
+
+	if len(volume.Volumes) != 0 {
+		err = adapter.cli.VolumeRemove(context.Background(), volume.Volumes[0].Name, true)
+		if err != nil {
+			return fmt.Errorf("unable to remove volume: %w", err)
+		}
+	}
+
+	return nil
 }
 
 func (adapter *KubeDockerAdapter) GetConfigMap(configMapName string) (*corev1.ConfigMap, error) {
@@ -40,5 +77,21 @@ func (adapter *KubeDockerAdapter) GetConfigMap(configMapName string) (*corev1.Co
 }
 
 func (adapter *KubeDockerAdapter) ListConfigMaps() (core.ConfigMapList, error) {
-	return adapter.fileSystemStore.GetConfigMaps()
+	labelFilter := filters.NewArgs()
+	labelFilter.Add("label", fmt.Sprintf("%s=%s", k2dtypes.GenericLabelKey, "configmap"))
+
+	volume, err := adapter.cli.VolumeList(context.Background(), volume.ListOptions{
+		Filters: labelFilter,
+	})
+
+	if err != nil {
+		return core.ConfigMapList{}, fmt.Errorf("unable to list volumes: %w", err)
+	}
+
+	mountPoints := []string{}
+	for _, v := range volume.Volumes {
+		mountPoints = append(mountPoints, v.Mountpoint)
+	}
+
+	return adapter.fileSystemStore.GetConfigMaps(mountPoints)
 }
