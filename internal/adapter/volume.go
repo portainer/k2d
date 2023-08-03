@@ -32,7 +32,7 @@ func (adapter *KubeDockerAdapter) ListVolume(ctx context.Context, options Volume
 	})
 
 	if err != nil {
-		return volume.Volume{}, fmt.Errorf("unable to create the %s docker volume: %w", options.VolumeName, err)
+		return volume.Volume{}, fmt.Errorf("unable to list %s docker volumes: %w", options.VolumeName, err)
 	}
 
 	return out, nil
@@ -45,7 +45,7 @@ func (adapter *KubeDockerAdapter) GetVolume(ctx context.Context, options VolumeO
 	})
 
 	if err != nil {
-		return volume.Volume{}, fmt.Errorf("unable to create the %s docker volume: %w", options.VolumeName, err)
+		return volume.Volume{}, fmt.Errorf("unable to get the %s docker volume: %w", options.VolumeName, err)
 	}
 
 	return out, nil
@@ -58,7 +58,7 @@ func (adapter *KubeDockerAdapter) DeleteVolume(ctx context.Context, options Volu
 	})
 
 	if err != nil {
-		return volume.Volume{}, fmt.Errorf("unable to create the %s docker volume: %w", options.VolumeName, err)
+		return volume.Volume{}, fmt.Errorf("unable to delete the %s docker volume: %w", options.VolumeName, err)
 	}
 
 	return out, nil
