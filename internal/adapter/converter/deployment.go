@@ -22,6 +22,8 @@ func (converter *DockerAPIConverter) UpdateDeploymentFromContainerInfo(deploymen
 
 	containerState := container.State
 
+	deployment.Status.Replicas = 1
+
 	if containerState == "running" {
 		deployment.Status.UpdatedReplicas = 1
 		deployment.Status.ReadyReplicas = 1
