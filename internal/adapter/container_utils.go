@@ -2,6 +2,7 @@ package adapter
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"strings"
@@ -16,6 +17,7 @@ import (
 	"github.com/portainer/k2d/pkg/maputils"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/kubernetes/pkg/apis/core"
 )
 
 // findContainerMatchingSelector iterates over a slice of Container types, looking for a Container
@@ -174,7 +176,19 @@ func (adapter *KubeDockerAdapter) createContainerFromPodSpec(ctx context.Context
 		options.labels[k2dtypes.WorkloadLastAppliedConfigLabelKey] = options.lastAppliedConfiguration
 	}
 
-	containerCfg, err := adapter.converter.ConvertPodSpecToContainerConfiguration(options.podSpec, options.labels)
+	internalPodSpec := core.PodSpec{}
+	err := adapter.ConvertK8SResource(&options.podSpec, &internalPodSpec)
+	if err != nil {
+		return fmt.Errorf("unable to convert versioned pod spec to internal pod spec: %w", err)
+	}
+
+	internalPodSpecData, err := json.Marshal(internalPodSpec)
+	if err != nil {
+		return fmt.Errorf("unable to marshal internal pod spec: %w", err)
+	}
+	options.labels[k2dtypes.PodLastAppliedConfigLabelKey] = string(internalPodSpecData)
+
+	containerCfg, err := adapter.converter.ConvertPodSpecToContainerConfiguration(internalPodSpec, options.labels)
 	if err != nil {
 		return fmt.Errorf("unable to build container configuration from pod spec: %w", err)
 	}

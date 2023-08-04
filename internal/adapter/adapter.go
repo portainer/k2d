@@ -10,7 +10,6 @@ import (
 	"github.com/portainer/k2d/internal/types"
 	"go.uber.org/zap"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	appsv1 "k8s.io/kubernetes/pkg/apis/apps/v1"
 	"k8s.io/kubernetes/pkg/apis/core"
@@ -82,39 +81,17 @@ func NewKubeDockerAdapter(options *KubeDockerAdapterOptions) (*KubeDockerAdapter
 	}, nil
 }
 
-// ConvertObjectToVersionedObject is used to convert Kubernetes objects from one version to another.
+// ConvertK8SResource is used to convert Kubernetes objects from versioned to internal and vice-versa.
 // The conversion is necessary because different versions of the Kubernetes API have
 // different representations for the same object, and some operations may require
 // a specific version of an object.
 //
-// This function is specifically designed to handle the conversion of generic
-// runtime.Object types, which are used to represent Kubernetes objects in a version-agnostic manner.
-// The source object (src) is expected to be of this type.
-//
-// It first asserts that the source object is indeed a runtime.Object.
-// If this assertion fails, an error is returned.
-//
-// Then, it determines the GroupVersion of the source object by calling its GetObjectKind
-// method and extracting the GroupVersionKind. A GroupVersioner is then constructed
-// from this GroupVersion.
-//
-// Finally, the conversion is performed using the conversionScheme of the KubeDockerAdapter,
-// and the result is stored in the destination object (dest).
+// The conversion is performed using the conversionScheme of the KubeDockerAdapter,
+// using the source object (src) as model and the result is stored in the destination object (dest).
 //
 // Parameters:
-// src: The source object to be converted, expected to be a runtime.Object.
-// dest: The target object, into which the converted object will be stored. Should also be a runtime.Object.
-//
-// Returns:
-// An error if the conversion fails or if the source object is not a runtime.Object.
-// If the conversion is successful, returns nil.
-func (adapter *KubeDockerAdapter) ConvertObjectToVersionedObject(src, dest interface{}) error {
-	k8sObject, ok := src.(runtime.Object)
-	if !ok {
-		return fmt.Errorf("unable to convert src to runtime.Object")
-	}
-
-	gvs := runtime.GroupVersioner(schema.GroupVersions([]schema.GroupVersion{k8sObject.GetObjectKind().GroupVersionKind().GroupVersion()}))
-
-	return adapter.conversionScheme.Convert(src, dest, gvs)
+// src: The source object to be converted
+// dest: The target object, into which the converted object will be stored
+func (adapter *KubeDockerAdapter) ConvertK8SResource(src, dest interface{}) error {
+	return adapter.conversionScheme.Convert(src, dest, nil)
 }

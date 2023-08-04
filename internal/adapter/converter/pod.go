@@ -9,11 +9,12 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/network"
 	k2dtypes "github.com/portainer/k2d/internal/adapter/types"
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/apis/core"
 )
 
+// ConvertContainerToPod tries to convert a Docker container into a Kubernetes Pod.
+// It only implements partial conversion at the moment.
 func (converter *DockerAPIConverter) ConvertContainerToPod(container types.Container) core.Pod {
 	containerName := strings.TrimPrefix(container.Names[0], "/")
 	containerState := container.State
@@ -68,27 +69,10 @@ func (converter *DockerAPIConverter) ConvertContainerToPod(container types.Conta
 	return pod
 }
 
-func (converter *DockerAPIConverter) ConvertContainersToPods(containers []types.Container) core.PodList {
-	pods := []core.Pod{}
-
-	for _, container := range containers {
-		pod := converter.ConvertContainerToPod(container)
-		pods = append(pods, pod)
-	}
-
-	return core.PodList{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "PodList",
-			APIVersion: "v1",
-		},
-		Items: pods,
-	}
-}
-
 // ConvertPodSpecToContainerConfiguration converts a Kubernetes PodSpec into a Docker container configuration.
 // It receives a Kubernetes PodSpec and a map of labels.
 // It returns a ContainerConfiguration struct, or an error if the conversion fails.
-func (converter *DockerAPIConverter) ConvertPodSpecToContainerConfiguration(spec corev1.PodSpec, labels map[string]string) (ContainerConfiguration, error) {
+func (converter *DockerAPIConverter) ConvertPodSpecToContainerConfiguration(spec core.PodSpec, labels map[string]string) (ContainerConfiguration, error) {
 	containerSpec := spec.Containers[0]
 
 	containerConfig := &container.Config{
@@ -135,7 +119,7 @@ func (converter *DockerAPIConverter) ConvertPodSpecToContainerConfiguration(spec
 // setEnvVars handles setting the environment variables for the Docker container configuration.
 // It receives a pointer to the container configuration and an array of Kubernetes environment variables.
 // It returns an error if the setting of environment variables fails.
-func (converter *DockerAPIConverter) setEnvVars(containerConfig *container.Config, envs []corev1.EnvVar, envFrom []corev1.EnvFromSource) error {
+func (converter *DockerAPIConverter) setEnvVars(containerConfig *container.Config, envs []core.EnvVar, envFrom []core.EnvFromSource) error {
 	for _, env := range envs {
 
 		if env.ValueFrom != nil {
@@ -166,7 +150,7 @@ func (converter *DockerAPIConverter) setEnvVars(containerConfig *container.Confi
 // If the EnvFromSource object points to a ConfigMap, the function retrieves the ConfigMap and adds its data as
 // environment variables to the Docker container configuration. Similarly, if the EnvFromSource points to a Secret,
 // the function retrieves the Secret and adds its data as environment variables.
-func (converter *DockerAPIConverter) handleValueFromEnvFromSource(containerConfig *container.Config, env corev1.EnvFromSource) error {
+func (converter *DockerAPIConverter) handleValueFromEnvFromSource(containerConfig *container.Config, env core.EnvFromSource) error {
 	if env.ConfigMapRef != nil {
 		configMap, err := converter.store.GetConfigMap(env.ConfigMapRef.Name)
 		if err != nil {
@@ -193,7 +177,7 @@ func (converter *DockerAPIConverter) handleValueFromEnvFromSource(containerConfi
 // handleValueFromEnvVars manages environment variables that are defined through ConfigMap or Secret references.
 // It receives a pointer to the container configuration and a Kubernetes environment variable.
 // It returns an error if the sourcing of the environment variables fails.
-func (converter *DockerAPIConverter) handleValueFromEnvVars(containerConfig *container.Config, env corev1.EnvVar) error {
+func (converter *DockerAPIConverter) handleValueFromEnvVars(containerConfig *container.Config, env core.EnvVar) error {
 	if env.ValueFrom.ConfigMapKeyRef != nil {
 		configMap, err := converter.store.GetConfigMap(env.ValueFrom.ConfigMapKeyRef.Name)
 		if err != nil {
@@ -214,7 +198,7 @@ func (converter *DockerAPIConverter) handleValueFromEnvVars(containerConfig *con
 
 // setRestartPolicy sets the Docker container's restart policy according to the Kubernetes pod's restart policy.
 // It receives a pointer to the host configuration and the Kubernetes pod's restart policy.
-func setRestartPolicy(hostConfig *container.HostConfig, restartPolicy corev1.RestartPolicy) {
+func setRestartPolicy(hostConfig *container.HostConfig, restartPolicy core.RestartPolicy) {
 	switch restartPolicy {
 	case "OnFailure":
 		hostConfig.RestartPolicy = container.RestartPolicy{Name: "on-failure"}
@@ -228,7 +212,7 @@ func setRestartPolicy(hostConfig *container.HostConfig, restartPolicy corev1.Res
 // setSecurityContext sets the user and group ID in the Docker container configuration based on the provided
 // Kubernetes PodSecurityContext.
 // If no security context is provided, the function does not modify the container configuration.
-func setSecurityContext(config *container.Config, hostConfig *container.HostConfig, podSecurityContext *corev1.PodSecurityContext, containerSecurityContext *corev1.SecurityContext) {
+func setSecurityContext(config *container.Config, hostConfig *container.HostConfig, podSecurityContext *core.PodSecurityContext, containerSecurityContext *core.SecurityContext) {
 	if podSecurityContext == nil {
 		return
 	}
@@ -249,7 +233,7 @@ func setSecurityContext(config *container.Config, hostConfig *container.HostConf
 // setVolumeMounts manages volume mounts for the Docker container.
 // It receives a pointer to the host configuration, an array of Kubernetes volumes, and an array of Kubernetes volume mounts.
 // It returns an error if the handling of volume mounts fails.
-func (converter *DockerAPIConverter) setVolumeMounts(hostConfig *container.HostConfig, volumes []corev1.Volume, volumeMounts []corev1.VolumeMount) error {
+func (converter *DockerAPIConverter) setVolumeMounts(hostConfig *container.HostConfig, volumes []core.Volume, volumeMounts []core.VolumeMount) error {
 	for _, volume := range volumes {
 		for _, volumeMount := range volumeMounts {
 			if volumeMount.Name == volume.Name {
@@ -276,7 +260,7 @@ func (converter *DockerAPIConverter) setVolumeMounts(hostConfig *container.HostC
 //
 // Returns:
 // An error if it's unable to fetch the ConfigMap or Secret from the store, otherwise returns nil.
-func (converter *DockerAPIConverter) handleVolumeSource(hostConfig *container.HostConfig, volume corev1.Volume, volumeMount corev1.VolumeMount) error {
+func (converter *DockerAPIConverter) handleVolumeSource(hostConfig *container.HostConfig, volume core.Volume, volumeMount core.VolumeMount) error {
 	if volume.VolumeSource.ConfigMap != nil {
 		configMap, err := converter.store.GetConfigMap(volume.VolumeSource.ConfigMap.Name)
 		if err != nil {
@@ -300,7 +284,7 @@ func (converter *DockerAPIConverter) handleVolumeSource(hostConfig *container.Ho
 
 // setBindsFromAnnotations manages volume annotations for Docker containers.
 // It receives a pointer to the host configuration, a map of annotations, a Kubernetes volume mount, and an annotation prefix.
-func (converter *DockerAPIConverter) setBindsFromAnnotations(hostConfig *container.HostConfig, annotations map[string]string, volumeMount corev1.VolumeMount, prefix string) {
+func (converter *DockerAPIConverter) setBindsFromAnnotations(hostConfig *container.HostConfig, annotations map[string]string, volumeMount core.VolumeMount, prefix string) {
 	for key, value := range annotations {
 		if strings.HasPrefix(key, prefix) {
 			bind := fmt.Sprintf("%s:%s", value, volumeMount.MountPath)

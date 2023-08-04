@@ -3,6 +3,7 @@ package adapter
 import (
 	"fmt"
 
+	"github.com/portainer/k2d/internal/k8s"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/apis/core"
@@ -29,9 +30,9 @@ func (adapter *KubeDockerAdapter) GetSecret(secretName string) (*corev1.Secret, 
 		},
 	}
 
-	err = adapter.ConvertObjectToVersionedObject(secret, &versionedSecret)
+	err = adapter.ConvertK8SResource(secret, &versionedSecret)
 	if err != nil {
-		return nil, fmt.Errorf("unable to convert object to versioned object: %w", err)
+		return nil, fmt.Errorf("unable to convert internal object to versioned object: %w", err)
 	}
 
 	versionedSecret.ObjectMeta.Annotations["kubectl.kubernetes.io/last-applied-configuration"] = ""
@@ -39,6 +40,36 @@ func (adapter *KubeDockerAdapter) GetSecret(secretName string) (*corev1.Secret, 
 	return &versionedSecret, nil
 }
 
-func (adapter *KubeDockerAdapter) ListSecrets() (core.SecretList, error) {
+func (adapter *KubeDockerAdapter) ListSecrets() (corev1.SecretList, error) {
+	secretList, err := adapter.listSecrets()
+	if err != nil {
+		return corev1.SecretList{}, fmt.Errorf("unable to list secrets: %w", err)
+	}
+
+	versionedSecretList := corev1.SecretList{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "SecretList",
+			APIVersion: "v1",
+		},
+	}
+
+	err = adapter.ConvertK8SResource(&secretList, &versionedSecretList)
+	if err != nil {
+		return corev1.SecretList{}, fmt.Errorf("unable to convert internal SecretList to versioned SecretList: %w", err)
+	}
+
+	return versionedSecretList, nil
+}
+
+func (adapter *KubeDockerAdapter) GetSecretTable() (*metav1.Table, error) {
+	secretList, err := adapter.listSecrets()
+	if err != nil {
+		return &metav1.Table{}, fmt.Errorf("unable to list secrets: %w", err)
+	}
+
+	return k8s.GenerateTable(&secretList)
+}
+
+func (adapter *KubeDockerAdapter) listSecrets() (core.SecretList, error) {
 	return adapter.fileSystemStore.GetSecrets()
 }
