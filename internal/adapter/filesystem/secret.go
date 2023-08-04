@@ -74,7 +74,6 @@ func (store *FileSystemStore) GetSecret(secretName string) (*core.Secret, error)
 				return &core.Secret{}, fmt.Errorf("unable to get file info for %s: %w", file.Name(), err)
 			}
 			secret.ObjectMeta.CreationTimestamp = metav1.NewTime(info.ModTime())
-			// secret.ObjectMeta.Annotations[fmt.Sprintf("secret.k2d.io/%s", file.Name())] = path.Join(store.path+"/"+secretName+"/_data/", file.Name())
 			secret.ObjectMeta.Annotations[fmt.Sprintf("secret.k2d.io/%s", file.Name())] = secretName
 		}
 	}

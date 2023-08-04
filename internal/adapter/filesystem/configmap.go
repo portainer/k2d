@@ -76,7 +76,6 @@ func (store *FileSystemStore) GetConfigMap(configMapName string) (*core.ConfigMa
 			}
 
 			configMap.ObjectMeta.CreationTimestamp = metav1.NewTime(info.ModTime())
-			// configMap.ObjectMeta.Annotations[fmt.Sprintf("configmap.k2d.io/%s", file.Name())] = path.Join(store.path+"/"+configMapName+"/_data/", file.Name())
 			configMap.ObjectMeta.Annotations[fmt.Sprintf("configmap.k2d.io/%s", file.Name())] = configMapName
 		}
 	}

@@ -285,7 +285,6 @@ func (converter *DockerAPIConverter) handleVolumeSource(hostConfig *container.Ho
 		}
 
 		converter.setBindsFromAnnotations(hostConfig, configMap.Annotations, volumeMount, "configmap.k2d.io/")
-		// converter.setVolumesFromName(hostConfig, volume.VolumeSource.ConfigMap.Name, volumeMount)
 	} else if volume.VolumeSource.Secret != nil {
 		secret, err := converter.store.GetSecret(volume.VolumeSource.Secret.SecretName)
 		if err != nil {
@@ -293,7 +292,6 @@ func (converter *DockerAPIConverter) handleVolumeSource(hostConfig *container.Ho
 		}
 
 		converter.setBindsFromAnnotations(hostConfig, secret.Annotations, volumeMount, "secret.k2d.io/")
-		// converter.setVolumesFromName(hostConfig, secret.Name, volumeMount)
 	} else if volume.HostPath != nil {
 		bind := fmt.Sprintf("%s:%s", volume.HostPath.Path, volumeMount.MountPath)
 		hostConfig.Binds = append(hostConfig.Binds, bind)
