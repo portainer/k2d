@@ -234,22 +234,6 @@ func (controller *OperationController) processOperation(op Operation, wg *sync.W
 				"request_id", op.RequestID,
 			)
 		}
-	case *appsv1.StatefulSet:
-		err := controller.createStatefulSet(op)
-		if err != nil {
-			controller.logger.Errorw("unable to create statefulset",
-				"error", err,
-				"request_id", op.RequestID,
-			)
-		}
-	case *appsv1.DaemonSet:
-		err := controller.createDaemonSet(op)
-		if err != nil {
-			controller.logger.Errorw("unable to create daemonset",
-				"error", err,
-				"request_id", op.RequestID,
-			)
-		}
 	case *corev1.ConfigMap:
 		err := controller.createConfigMap(op)
 		if err != nil {
@@ -283,16 +267,6 @@ func (controller *OperationController) createPod(op Operation) error {
 func (controller *OperationController) createDeployment(op Operation) error {
 	deployment := op.Operation.(*appsv1.Deployment)
 	return controller.adapter.CreateContainerFromDeployment(context.TODO(), deployment)
-}
-
-func (controller *OperationController) createStatefulSet(op Operation) error {
-	statefulSet := op.Operation.(*appsv1.StatefulSet)
-	return controller.adapter.CreateContainerFromStatefulSet(context.TODO(), statefulSet)
-}
-
-func (controller *OperationController) createDaemonSet(op Operation) error {
-	daemonSet := op.Operation.(*appsv1.DaemonSet)
-	return controller.adapter.CreateContainerFromDaemonSet(context.TODO(), daemonSet)
 }
 
 func (controller *OperationController) createService(op Operation) error {
