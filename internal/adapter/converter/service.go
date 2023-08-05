@@ -2,6 +2,7 @@ package converter
 
 import (
 	"fmt"
+	"math/rand"
 	"strconv"
 	"time"
 
@@ -9,6 +10,7 @@ import (
 	"github.com/docker/go-connections/nat"
 	k2dtypes "github.com/portainer/k2d/internal/adapter/types"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	intstr "k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/apis/core"
 )
 
@@ -23,10 +25,18 @@ func (converter *DockerAPIConverter) ConvertServiceSpecIntoContainerConfiguratio
 			HostIP: "0.0.0.0",
 		}
 
-		if port.NodePort != 0 {
-			hostBinding.HostPort = strconv.Itoa(int(port.NodePort))
-		} else {
-			hostBinding.HostPort = strconv.Itoa(int(port.Port))
+		switch serviceSpec.Type {
+		case core.ServiceTypeNodePort:
+			// nodePort: this is a port in the range of 30000-32767 that will be open in each node
+			// TODO: this requires a check to ensure the port is not already in use
+			hostBinding.HostPort = strconv.Itoa(rand.Intn(32767-30000+1) + 30000)
+			if port.NodePort != 0 {
+				hostBinding.HostPort = strconv.Itoa(int(port.NodePort))
+			}
+		case core.ServiceTypeClusterIP:
+			hostBinding.HostPort = ""
+		default:
+			hostBinding.HostPort = ""
 		}
 
 		containerCfg.HostConfig.PortBindings[containerPort] = []nat.PortBinding{hostBinding}
@@ -51,9 +61,31 @@ func (converter *DockerAPIConverter) UpdateServiceFromContainerInfo(service *cor
 		service.Spec.Type = core.ServiceTypeClusterIP
 	}
 
-	service.Spec.ExternalIPs = []string{
-		converter.k2dServerConfiguration.ServerIpAddr,
-	}
-
 	service.Spec.ClusterIPs = []string{container.NetworkSettings.Networks[k2dtypes.K2DNetworkName].IPAddress}
+
+	servicePorts := []core.ServicePort{}
+	switch service.Spec.Type {
+	case core.ServiceTypeNodePort:
+		service.Spec.ExternalIPs = []string{
+			converter.k2dServerConfiguration.ServerIpAddr,
+		}
+		for _, port := range service.Spec.Ports {
+			for _, containerPort := range container.Ports {
+				if port.TargetPort == intstr.Parse(strconv.Itoa(int(containerPort.PrivatePort))) {
+					servicePorts = append(servicePorts, core.ServicePort{
+						Name:       port.Name,
+						Protocol:   port.Protocol,
+						Port:       port.Port,
+						TargetPort: port.TargetPort,
+						NodePort:   int32(containerPort.PublicPort),
+					})
+				}
+			}
+		}
+		service.Spec.Ports = servicePorts
+	case core.ServiceTypeClusterIP:
+		service.Spec.ExternalIPs = []string{}
+	default:
+		service.Spec.ExternalIPs = []string{}
+	}
 }

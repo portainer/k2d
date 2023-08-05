@@ -2,12 +2,14 @@ package converter
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/network"
+	"github.com/docker/go-connections/nat"
 	k2dtypes "github.com/portainer/k2d/internal/adapter/types"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/apis/core"
@@ -74,6 +76,26 @@ func (converter *DockerAPIConverter) ConvertContainerToPod(container types.Conta
 // It returns a ContainerConfiguration struct, or an error if the conversion fails.
 func (converter *DockerAPIConverter) ConvertPodSpecToContainerConfiguration(spec core.PodSpec, labels map[string]string) (ContainerConfiguration, error) {
 	containerSpec := spec.Containers[0]
+	containerPortMaps := nat.PortMap{}
+	containerExposedPorts := nat.PortSet{}
+
+	// support for hostPort
+	for _, port := range containerSpec.Ports {
+		if port.HostPort != 0 {
+			containerPort, err := nat.NewPort(string(port.Protocol), strconv.Itoa(int(port.ContainerPort)))
+			if err != nil {
+				return ContainerConfiguration{}, err
+			}
+
+			hostBinding := nat.PortBinding{
+				HostIP:   "0.0.0.0",
+				HostPort: strconv.Itoa(int(port.HostPort)),
+			}
+
+			containerPortMaps[containerPort] = []nat.PortBinding{hostBinding}
+			containerExposedPorts[containerPort] = struct{}{}
+		}
+	}
 
 	containerConfig := &container.Config{
 		Image:  containerSpec.Image,
@@ -82,6 +104,7 @@ func (converter *DockerAPIConverter) ConvertPodSpecToContainerConfiguration(spec
 			fmt.Sprintf("KUBERNETES_SERVICE_HOST=%s", converter.k2dServerConfiguration.ServerIpAddr),
 			fmt.Sprintf("KUBERNETES_SERVICE_PORT=%d", converter.k2dServerConfiguration.ServerPort),
 		},
+		ExposedPorts: containerExposedPorts,
 	}
 
 	if err := converter.setEnvVars(containerConfig, containerSpec.Env, containerSpec.EnvFrom); err != nil {
@@ -96,6 +119,7 @@ func (converter *DockerAPIConverter) ConvertPodSpecToContainerConfiguration(spec
 		ExtraHosts: []string{
 			fmt.Sprintf("kubernetes.default.svc:%s", converter.k2dServerConfiguration.ServerIpAddr),
 		},
+		PortBindings: containerPortMaps,
 	}
 
 	setRestartPolicy(hostConfig, spec.RestartPolicy)
