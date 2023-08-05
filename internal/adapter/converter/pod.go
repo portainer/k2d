@@ -2,12 +2,14 @@ package converter
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/network"
+	"github.com/docker/go-connections/nat"
 	k2dtypes "github.com/portainer/k2d/internal/adapter/types"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/apis/core"
@@ -84,10 +86,6 @@ func (converter *DockerAPIConverter) ConvertPodSpecToContainerConfiguration(spec
 		},
 	}
 
-	if err := converter.setEnvVars(containerConfig, containerSpec.Env, containerSpec.EnvFrom); err != nil {
-		return ContainerConfiguration{}, err
-	}
-
 	hostConfig := &container.HostConfig{
 		Binds: []string{
 			fmt.Sprintf("%s:%s", converter.k2dServerConfiguration.CaPath, "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"),
@@ -96,6 +94,14 @@ func (converter *DockerAPIConverter) ConvertPodSpecToContainerConfiguration(spec
 		ExtraHosts: []string{
 			fmt.Sprintf("kubernetes.default.svc:%s", converter.k2dServerConfiguration.ServerIpAddr),
 		},
+	}
+
+	if err := converter.setHostPorts(containerConfig, hostConfig, containerSpec.Ports); err != nil {
+		return ContainerConfiguration{}, err
+	}
+
+	if err := converter.setEnvVars(containerConfig, containerSpec.Env, containerSpec.EnvFrom); err != nil {
+		return ContainerConfiguration{}, err
 	}
 
 	setRestartPolicy(hostConfig, spec.RestartPolicy)
@@ -114,6 +120,38 @@ func (converter *DockerAPIConverter) ConvertPodSpecToContainerConfiguration(spec
 			},
 		},
 	}, nil
+}
+
+// setHostPorts configures the Docker container's ports based on the provided core.ContainerPort slices (coming from the pod specs).
+// It iterates through the ports and sets both the container's exposed ports (inside the container) and
+// the host's port bindings (on the host machine). Ports are mapped only if the HostPort is not zero.
+// The mappings are applied to the provided containerConfig and hostConfig.
+// It returns an error if any occurred during the port conversion or mapping process.
+func (converter *DockerAPIConverter) setHostPorts(containerConfig *container.Config, hostConfig *container.HostConfig, ports []core.ContainerPort) error {
+	containerPortMaps := nat.PortMap{}
+	containerExposedPorts := nat.PortSet{}
+
+	for _, port := range ports {
+		if port.HostPort != 0 {
+			containerPort, err := nat.NewPort(string(port.Protocol), strconv.Itoa(int(port.ContainerPort)))
+			if err != nil {
+				return err
+			}
+
+			hostBinding := nat.PortBinding{
+				HostIP:   "0.0.0.0",
+				HostPort: strconv.Itoa(int(port.HostPort)),
+			}
+
+			containerPortMaps[containerPort] = []nat.PortBinding{hostBinding}
+			containerExposedPorts[containerPort] = struct{}{}
+		}
+	}
+
+	containerConfig.ExposedPorts = containerExposedPorts
+	hostConfig.PortBindings = containerPortMaps
+
+	return nil
 }
 
 // setEnvVars handles setting the environment variables for the Docker container configuration.
