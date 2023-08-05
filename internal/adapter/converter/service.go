@@ -15,27 +15,33 @@ import (
 )
 
 func (converter *DockerAPIConverter) ConvertServiceSpecIntoContainerConfiguration(serviceSpec core.ServiceSpec, containerCfg *ContainerConfiguration) error {
+	if serviceSpec.Type == "" {
+		serviceSpec.Type = core.ServiceTypeClusterIP
+	}
+
+	// portBindings forces a random high port to be used for a non-NodePort service
+	// hence, we need to check for the NodePort service type only
 	for _, port := range serviceSpec.Ports {
-		containerPort, err := nat.NewPort(string(port.Protocol), port.TargetPort.String())
-		if err != nil {
-			return fmt.Errorf("invalid container port: %w", err)
-		}
-
-		hostBinding := nat.PortBinding{
-			HostIP: "0.0.0.0",
-		}
-
 		if serviceSpec.Type == core.ServiceTypeNodePort {
+			containerPort, err := nat.NewPort(string(port.Protocol), port.TargetPort.String())
+			if err != nil {
+				return fmt.Errorf("invalid container port: %w", err)
+			}
+
+			hostBinding := nat.PortBinding{
+				HostIP: "0.0.0.0",
+			}
+
 			if port.NodePort != 0 {
 				hostBinding.HostPort = strconv.Itoa(int(port.NodePort))
 			} else {
 				// TODO: this requires a check to ensure the randomly selected port is not already in use
 				hostBinding.HostPort = strconv.Itoa(rand.Intn(32767-30000+1) + 30000)
 			}
-		}
 
-		containerCfg.HostConfig.PortBindings[containerPort] = []nat.PortBinding{hostBinding}
-		containerCfg.ContainerConfig.ExposedPorts[containerPort] = struct{}{}
+			containerCfg.HostConfig.PortBindings[containerPort] = []nat.PortBinding{hostBinding}
+			containerCfg.ContainerConfig.ExposedPorts[containerPort] = struct{}{}
+		}
 	}
 
 	return nil
