@@ -25,18 +25,13 @@ func (converter *DockerAPIConverter) ConvertServiceSpecIntoContainerConfiguratio
 			HostIP: "0.0.0.0",
 		}
 
-		switch serviceSpec.Type {
-		case core.ServiceTypeNodePort:
-			// nodePort: this is a port in the range of 30000-32767 that will be open in each node
-			// TODO: this requires a check to ensure the port is not already in use
-			hostBinding.HostPort = strconv.Itoa(rand.Intn(32767-30000+1) + 30000)
+		if serviceSpec.Type == core.ServiceTypeNodePort {
 			if port.NodePort != 0 {
 				hostBinding.HostPort = strconv.Itoa(int(port.NodePort))
+			} else {
+				// TODO: this requires a check to ensure the randomly selected port is not already in use
+				hostBinding.HostPort = strconv.Itoa(rand.Intn(32767-30000+1) + 30000)
 			}
-		case core.ServiceTypeClusterIP:
-			hostBinding.HostPort = ""
-		default:
-			hostBinding.HostPort = ""
 		}
 
 		containerCfg.HostConfig.PortBindings[containerPort] = []nat.PortBinding{hostBinding}
@@ -63,12 +58,10 @@ func (converter *DockerAPIConverter) UpdateServiceFromContainerInfo(service *cor
 
 	service.Spec.ClusterIPs = []string{container.NetworkSettings.Networks[k2dtypes.K2DNetworkName].IPAddress}
 
-	servicePorts := []core.ServicePort{}
-	switch service.Spec.Type {
-	case core.ServiceTypeNodePort:
-		service.Spec.ExternalIPs = []string{
-			converter.k2dServerConfiguration.ServerIpAddr,
-		}
+	if service.Spec.Type == core.ServiceTypeNodePort {
+		service.Spec.ExternalIPs = []string{converter.k2dServerConfiguration.ServerIpAddr}
+
+		servicePorts := []core.ServicePort{}
 		for _, port := range service.Spec.Ports {
 			for _, containerPort := range container.Ports {
 				if port.TargetPort == intstr.Parse(strconv.Itoa(int(containerPort.PrivatePort))) {
@@ -83,9 +76,5 @@ func (converter *DockerAPIConverter) UpdateServiceFromContainerInfo(service *cor
 			}
 		}
 		service.Spec.Ports = servicePorts
-	case core.ServiceTypeClusterIP:
-		service.Spec.ExternalIPs = []string{}
-	default:
-		service.Spec.ExternalIPs = []string{}
 	}
 }

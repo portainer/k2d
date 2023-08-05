@@ -76,26 +76,6 @@ func (converter *DockerAPIConverter) ConvertContainerToPod(container types.Conta
 // It returns a ContainerConfiguration struct, or an error if the conversion fails.
 func (converter *DockerAPIConverter) ConvertPodSpecToContainerConfiguration(spec core.PodSpec, labels map[string]string) (ContainerConfiguration, error) {
 	containerSpec := spec.Containers[0]
-	containerPortMaps := nat.PortMap{}
-	containerExposedPorts := nat.PortSet{}
-
-	// support for hostPort
-	for _, port := range containerSpec.Ports {
-		if port.HostPort != 0 {
-			containerPort, err := nat.NewPort(string(port.Protocol), strconv.Itoa(int(port.ContainerPort)))
-			if err != nil {
-				return ContainerConfiguration{}, err
-			}
-
-			hostBinding := nat.PortBinding{
-				HostIP:   "0.0.0.0",
-				HostPort: strconv.Itoa(int(port.HostPort)),
-			}
-
-			containerPortMaps[containerPort] = []nat.PortBinding{hostBinding}
-			containerExposedPorts[containerPort] = struct{}{}
-		}
-	}
 
 	containerConfig := &container.Config{
 		Image:  containerSpec.Image,
@@ -104,11 +84,6 @@ func (converter *DockerAPIConverter) ConvertPodSpecToContainerConfiguration(spec
 			fmt.Sprintf("KUBERNETES_SERVICE_HOST=%s", converter.k2dServerConfiguration.ServerIpAddr),
 			fmt.Sprintf("KUBERNETES_SERVICE_PORT=%d", converter.k2dServerConfiguration.ServerPort),
 		},
-		ExposedPorts: containerExposedPorts,
-	}
-
-	if err := converter.setEnvVars(containerConfig, containerSpec.Env, containerSpec.EnvFrom); err != nil {
-		return ContainerConfiguration{}, err
 	}
 
 	hostConfig := &container.HostConfig{
@@ -119,7 +94,14 @@ func (converter *DockerAPIConverter) ConvertPodSpecToContainerConfiguration(spec
 		ExtraHosts: []string{
 			fmt.Sprintf("kubernetes.default.svc:%s", converter.k2dServerConfiguration.ServerIpAddr),
 		},
-		PortBindings: containerPortMaps,
+	}
+
+	if err := converter.setHostPorts(containerConfig, hostConfig, containerSpec.Ports); err != nil {
+		return ContainerConfiguration{}, err
+	}
+
+	if err := converter.setEnvVars(containerConfig, containerSpec.Env, containerSpec.EnvFrom); err != nil {
+		return ContainerConfiguration{}, err
 	}
 
 	setRestartPolicy(hostConfig, spec.RestartPolicy)
@@ -138,6 +120,38 @@ func (converter *DockerAPIConverter) ConvertPodSpecToContainerConfiguration(spec
 			},
 		},
 	}, nil
+}
+
+// setHostPorts configures the Docker container's ports based on the provided core.ContainerPort slices (coming from the pod specs).
+// It iterates through the ports and sets both the container's exposed ports (inside the container) and
+// the host's port bindings (on the host machine). Ports are mapped only if the HostPort is not zero.
+// The mappings are applied to the provided containerConfig and hostConfig.
+// It returns an error if any occurred during the port conversion or mapping process.
+func (converter *DockerAPIConverter) setHostPorts(containerConfig *container.Config, hostConfig *container.HostConfig, ports []core.ContainerPort) error {
+	containerPortMaps := nat.PortMap{}
+	containerExposedPorts := nat.PortSet{}
+
+	for _, port := range ports {
+		if port.HostPort != 0 {
+			containerPort, err := nat.NewPort(string(port.Protocol), strconv.Itoa(int(port.ContainerPort)))
+			if err != nil {
+				return err
+			}
+
+			hostBinding := nat.PortBinding{
+				HostIP:   "0.0.0.0",
+				HostPort: strconv.Itoa(int(port.HostPort)),
+			}
+
+			containerPortMaps[containerPort] = []nat.PortBinding{hostBinding}
+			containerExposedPorts[containerPort] = struct{}{}
+		}
+	}
+
+	containerConfig.ExposedPorts = containerExposedPorts
+	hostConfig.PortBindings = containerPortMaps
+
+	return nil
 }
 
 // setEnvVars handles setting the environment variables for the Docker container configuration.
