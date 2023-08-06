@@ -15,6 +15,7 @@ import (
 )
 
 func (converter *DockerAPIConverter) ConvertServiceSpecIntoContainerConfiguration(serviceSpec core.ServiceSpec, containerCfg *ContainerConfiguration) error {
+	// if service type is not specified from the YAML file, we default to ClusterIP
 	if serviceSpec.Type == "" {
 		serviceSpec.Type = core.ServiceTypeClusterIP
 	}
