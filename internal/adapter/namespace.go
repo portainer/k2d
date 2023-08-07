@@ -27,6 +27,24 @@ func (adapter *KubeDockerAdapter) ListNamespaces() (corev1.NamespaceList, error)
 	return versionedNamespaceList, nil
 }
 
+func (adapter *KubeDockerAdapter) GetNamespace() (*corev1.Namespace, error) {
+	return &corev1.Namespace{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Namespace",
+			APIVersion: "v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "default",
+			CreationTimestamp: metav1.Time{
+				Time: adapter.startTime,
+			},
+		},
+		Status: corev1.NamespaceStatus{
+			Phase: corev1.NamespaceActive,
+		},
+	}, nil
+}
+
 func (adapter *KubeDockerAdapter) GetNamespaceTable() (*metav1.Table, error) {
 	namespaceList := adapter.listNamespaces()
 	return k8s.GenerateTable(&namespaceList)

@@ -21,4 +21,8 @@ func (svc NamespaceService) RegisterNamespaceAPI(ws *restful.WebService) {
 
 	ws.Route(ws.GET("/v1/namespaces").
 		To(svc.ListNamespaces))
+
+	ws.Route(ws.GET("/v1/namespaces/{name}").
+		To(svc.GetNamespace).
+		Param(ws.PathParameter("name", "name of the node").DataType("string")))
 }

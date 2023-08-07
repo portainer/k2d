@@ -59,7 +59,7 @@ func (svc V1Service) ListAPIResources(r *restful.Request, w *restful.Response) {
 				Kind:         "Namespace",
 				SingularName: "",
 				Name:         "namespaces",
-				Verbs:        []string{"list"},
+				Verbs:        []string{"list", "get"},
 				Namespaced:   false,
 				ShortNames:   []string{"ns"},
 			},
