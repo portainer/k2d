@@ -86,6 +86,10 @@ func StoreDataMapOnDisk(storagePath, filePrefix string, data map[string]string) 
 	return nil
 }
 
+// StoreMetadataOnDisk takes a path where the data will be stored (storagePath), a filename (fileName),
+// and a map of strings (data). It creates a file at the specified location with the given filename,
+// and writes the key-value pairs from the map into the file in the format "key=value\n".
+// If an error occurs during this process, it returns the error.
 func StoreMetadataOnDisk(storagePath, fileName string, data map[string]string) error {
 	file, err := os.Create(path.Join(storagePath, fileName))
 	if err != nil {
@@ -103,6 +107,10 @@ func StoreMetadataOnDisk(storagePath, fileName string, data map[string]string) e
 	return nil
 }
 
+// LoadMetadataFromDisk takes a path where the data is stored (storagePath) and a filename (fileName),
+// and reads the contents of the specified file. It expects the file contents to be in the format "key=value\n".
+// It returns a map where the keys and values are taken from the lines in the file.
+// If an error occurs during this process, it returns the error and a nil map.
 func LoadMetadataFromDisk(storagePath, fileName string) (map[string]string, error) {
 	file, err := os.Open(path.Join(storagePath, fileName))
 	if err != nil {
