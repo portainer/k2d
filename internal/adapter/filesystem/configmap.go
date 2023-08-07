@@ -107,7 +107,7 @@ func (store *FileSystemStore) GetConfigMap(configMapName string) (*core.ConfigMa
 				return &core.ConfigMap{}, fmt.Errorf("unable to read file %s: %w", file.Name(), err)
 			}
 
-			configMap.Data[strings.TrimPrefix(file.Name(), configMapName+CONFIGMAP_SEPARATOR)] = strings.TrimSuffix(string(data), "\n")
+			configMap.Data[strings.TrimPrefix(file.Name(), configMapName+CONFIGMAP_SEPARATOR)] = string(data)
 			info, err := os.Stat(path.Join(store.configMapPath, file.Name()))
 			if err != nil {
 				return &core.ConfigMap{}, fmt.Errorf("unable to get file info for %s: %w", file.Name(), err)
