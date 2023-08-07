@@ -15,6 +15,7 @@ import (
 )
 
 // TODO: this package requires a lot of refactoring to make it more readable and maintainable
+// It shares a lot of commonalities with the secret.go file
 
 var ErrConfigMapNotFound = errors.New("configmap file(s) not found")
 
