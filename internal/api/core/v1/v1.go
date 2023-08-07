@@ -74,7 +74,7 @@ func (svc V1Service) ListAPIResources(r *restful.Request, w *restful.Response) {
 				Kind:         "Node",
 				SingularName: "",
 				Name:         "nodes",
-				Verbs:        []string{"list"},
+				Verbs:        []string{"list", "get"},
 				Namespaced:   false,
 			},
 			{

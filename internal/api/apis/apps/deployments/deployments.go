@@ -19,7 +19,6 @@ func NewDeploymentService(adapter *adapter.KubeDockerAdapter, operations chan co
 }
 
 func (svc DeploymentService) RegisterDeploymentAPI(ws *restful.WebService) {
-	// This is required for kubectl to be able to use the --dry-run=server flag
 	deploymentGVKExtension := map[string]string{
 		"group":   "apps",
 		"kind":    "Deployment",

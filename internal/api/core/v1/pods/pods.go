@@ -19,7 +19,6 @@ func NewPodService(adapter *adapter.KubeDockerAdapter, operations chan controlle
 }
 
 func (svc PodService) RegisterPodAPI(ws *restful.WebService) {
-	// This is required for kubectl to be able to use the --dry-run=server flag
 	podGVKExtension := map[string]string{
 		"group":   "",
 		"kind":    "Pod",
