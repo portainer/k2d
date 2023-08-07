@@ -19,7 +19,7 @@ type K2DServerConfiguration struct {
 
 const (
 	// Version represents the k2d server version
-	Version = "0.1.0-alpha-5-dev"
+	Version = "1.0.0-alpha-dev"
 	// RequestIDHeader is the name of the header that contains the request ID used for tracing purposes
 	RequestIDHeader = "X-K2d-Request-Id"
 )
