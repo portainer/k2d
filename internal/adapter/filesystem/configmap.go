@@ -49,6 +49,19 @@ func (store *FileSystemStore) DeleteConfigMap(configMapName string) error {
 		}
 	}
 
+	metadataFileName := fmt.Sprintf("%s-k2dcm.metadata", configMapName)
+	metadataFileFound, err := filesystem.FileExists(path.Join(store.configMapPath, metadataFileName))
+	if err != nil {
+		return fmt.Errorf("unable to check if metadata file exists: %w", err)
+	}
+
+	if metadataFileFound {
+		err := os.Remove(path.Join(store.configMapPath, metadataFileName))
+		if err != nil {
+			return fmt.Errorf("unable to remove file %s: %w", metadataFileName, err)
+		}
+	}
+
 	return nil
 }
 
@@ -105,6 +118,21 @@ func (store *FileSystemStore) GetConfigMap(configMapName string) (*core.ConfigMa
 		}
 	}
 
+	metadataFileName := fmt.Sprintf("%s-k2dcm.metadata", configMapName)
+	metadataFileFound, err := filesystem.FileExists(path.Join(store.configMapPath, metadataFileName))
+	if err != nil {
+		return &core.ConfigMap{}, fmt.Errorf("unable to check if metadata file exists: %w", err)
+	}
+
+	if metadataFileFound {
+		metadata, err := filesystem.LoadMetadataFromDisk(store.configMapPath, metadataFileName)
+		if err != nil {
+			return &core.ConfigMap{}, fmt.Errorf("unable to load configmap metadata from disk: %w", err)
+		}
+
+		configMap.Labels = metadata
+	}
+
 	return &configMap, nil
 }
 
@@ -123,6 +151,7 @@ func (store *FileSystemStore) GetConfigMaps() (core.ConfigMapList, error) {
 	}
 
 	uniqueNames := str.UniquePrefixes(fileNames, CONFIGMAP_SEPARATOR)
+	uniqueNames = str.RemoveItemsWithSuffix(uniqueNames, ".metadata")
 
 	configMaps := []core.ConfigMap{}
 	for _, name := range uniqueNames {
@@ -154,6 +183,21 @@ func (store *FileSystemStore) GetConfigMaps() (core.ConfigMapList, error) {
 			}
 		}
 
+		metadataFileName := fmt.Sprintf("%s-k2dcm.metadata", name)
+		metadataFileFound, err := filesystem.FileExists(path.Join(store.configMapPath, metadataFileName))
+		if err != nil {
+			return core.ConfigMapList{}, fmt.Errorf("unable to check if metadata file exists: %w", err)
+		}
+
+		if metadataFileFound {
+			metadata, err := filesystem.LoadMetadataFromDisk(store.configMapPath, metadataFileName)
+			if err != nil {
+				return core.ConfigMapList{}, fmt.Errorf("unable to load configmap metadata from disk: %w", err)
+			}
+
+			configMap.Labels = metadata
+		}
+
 		configMaps = append(configMaps, configMap)
 	}
 
@@ -174,6 +218,14 @@ func (store *FileSystemStore) StoreConfigMap(configMap *corev1.ConfigMap) error 
 	err := filesystem.StoreDataMapOnDisk(store.configMapPath, filePrefix, configMap.Data)
 	if err != nil {
 		return err
+	}
+
+	if len(configMap.Labels) != 0 {
+		metadataFileName := fmt.Sprintf("%s-k2dcm.metadata", configMap.Name)
+		err = filesystem.StoreMetadataOnDisk(store.configMapPath, metadataFileName, configMap.Labels)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil

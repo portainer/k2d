@@ -1,11 +1,13 @@
 package filesystem
 
 import (
+	"bufio"
 	"errors"
 	"fmt"
 	"os"
 	"path"
 	"path/filepath"
+	"strings"
 )
 
 // FileExists checks if a file exists on the filesystem
@@ -82,4 +84,46 @@ func StoreDataMapOnDisk(storagePath, filePrefix string, data map[string]string) 
 	}
 
 	return nil
+}
+
+func StoreMetadataOnDisk(storagePath, fileName string, data map[string]string) error {
+	file, err := os.Create(path.Join(storagePath, fileName))
+	if err != nil {
+		return fmt.Errorf("an error occurred while creating the file: %w", err)
+	}
+	defer file.Close()
+
+	for key, value := range data {
+		_, err = file.WriteString(fmt.Sprintf("%s=%s\n", key, value))
+		if err != nil {
+			return fmt.Errorf("an error occurred while writing to the file: %w", err)
+		}
+	}
+
+	return nil
+}
+
+func LoadMetadataFromDisk(storagePath, fileName string) (map[string]string, error) {
+	file, err := os.Open(path.Join(storagePath, fileName))
+	if err != nil {
+		return nil, fmt.Errorf("an error occurred while opening the file: %w", err)
+	}
+	defer file.Close()
+
+	data := make(map[string]string)
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := scanner.Text()
+		parts := strings.SplitN(line, "=", 2)
+		if len(parts) != 2 {
+			return nil, fmt.Errorf("invalid data format: %s", line)
+		}
+		data[parts[0]] = parts[1]
+	}
+
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("an error occurred while reading the file: %w", err)
+	}
+
+	return data, nil
 }
