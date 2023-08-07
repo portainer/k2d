@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 
 	"github.com/docker/docker/api/types"
@@ -223,7 +224,7 @@ func (adapter *KubeDockerAdapter) createContainerFromPodSpec(ctx context.Context
 	}
 	defer out.Close()
 
-	io.Copy(io.Discard, out)
+	io.Copy(os.Stdout, out)
 
 	containerCreateResponse, err := adapter.cli.ContainerCreate(ctx,
 		containerCfg.ContainerConfig,
@@ -333,7 +334,7 @@ func (adapter *KubeDockerAdapter) DeployPortainerEdgeAgent(ctx context.Context, 
 	}
 	defer out.Close()
 
-	io.Copy(io.Discard, out)
+	io.Copy(os.Stdout, out)
 
 	_, err = adapter.cli.ContainerCreate(ctx, containerConfig, hostConfig, networkConfig, nil, "portainer-agent")
 
