@@ -22,6 +22,11 @@ func (converter *DockerAPIConverter) UpdateDeploymentFromContainerInfo(deploymen
 
 	containerState := container.State
 
+	// if the number of replicas isn't set in the deployment, set it to 1
+	if deployment.Spec.Replicas == 0 {
+		deployment.Spec.Replicas = 1
+	}
+
 	deployment.Status.Replicas = 1
 
 	if containerState == "running" {
