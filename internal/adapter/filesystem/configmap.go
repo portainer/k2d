@@ -14,9 +14,13 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core"
 )
 
+// TODO: this package requires a lot of refactoring to make it more readable and maintainable
+
 var ErrConfigMapNotFound = errors.New("configmap file(s) not found")
 
-// TODO: this package requires a lot of refactoring to make it more readable and maintainable
+func buildConfigMapMetadataFileName(configMapName string) string {
+	return fmt.Sprintf("%s-k2dcm.metadata", configMapName)
+}
 
 func (store *FileSystemStore) DeleteConfigMap(configMapName string) error {
 	store.mutex.Lock()
@@ -49,7 +53,7 @@ func (store *FileSystemStore) DeleteConfigMap(configMapName string) error {
 		}
 	}
 
-	metadataFileName := fmt.Sprintf("%s-k2dcm.metadata", configMapName)
+	metadataFileName := buildConfigMapMetadataFileName(configMapName)
 	metadataFileFound, err := filesystem.FileExists(path.Join(store.configMapPath, metadataFileName))
 	if err != nil {
 		return fmt.Errorf("unable to check if metadata file exists: %w", err)
@@ -118,7 +122,7 @@ func (store *FileSystemStore) GetConfigMap(configMapName string) (*core.ConfigMa
 		}
 	}
 
-	metadataFileName := fmt.Sprintf("%s-k2dcm.metadata", configMapName)
+	metadataFileName := buildConfigMapMetadataFileName(configMapName)
 	metadataFileFound, err := filesystem.FileExists(path.Join(store.configMapPath, metadataFileName))
 	if err != nil {
 		return &core.ConfigMap{}, fmt.Errorf("unable to check if metadata file exists: %w", err)
@@ -183,7 +187,7 @@ func (store *FileSystemStore) GetConfigMaps() (core.ConfigMapList, error) {
 			}
 		}
 
-		metadataFileName := fmt.Sprintf("%s-k2dcm.metadata", name)
+		metadataFileName := buildConfigMapMetadataFileName(name)
 		metadataFileFound, err := filesystem.FileExists(path.Join(store.configMapPath, metadataFileName))
 		if err != nil {
 			return core.ConfigMapList{}, fmt.Errorf("unable to check if metadata file exists: %w", err)
@@ -221,7 +225,7 @@ func (store *FileSystemStore) StoreConfigMap(configMap *corev1.ConfigMap) error 
 	}
 
 	if len(configMap.Labels) != 0 {
-		metadataFileName := fmt.Sprintf("%s-k2dcm.metadata", configMap.Name)
+		metadataFileName := buildConfigMapMetadataFileName(configMap.Name)
 		err = filesystem.StoreMetadataOnDisk(store.configMapPath, metadataFileName, configMap.Labels)
 		if err != nil {
 			return err

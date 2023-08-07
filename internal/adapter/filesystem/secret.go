@@ -17,6 +17,10 @@ import (
 
 var ErrSecretNotFound = errors.New("secret file(s) not found")
 
+func buildSecretMetadataFileName(secretName string) string {
+	return fmt.Sprintf("%s-k2dsec.metadata", secretName)
+}
+
 func (store *FileSystemStore) DeleteSecret(secretName string) error {
 	store.mutex.Lock()
 	defer store.mutex.Unlock()
@@ -48,7 +52,7 @@ func (store *FileSystemStore) DeleteSecret(secretName string) error {
 		}
 	}
 
-	metadataFileName := fmt.Sprintf("%s-k2dsec.metadata", secretName)
+	metadataFileName := buildSecretMetadataFileName(secretName)
 	metadataFileFound, err := filesystem.FileExists(path.Join(store.secretPath, metadataFileName))
 	if err != nil {
 		return fmt.Errorf("unable to check if metadata file exists: %w", err)
@@ -117,7 +121,7 @@ func (store *FileSystemStore) GetSecret(secretName string) (*core.Secret, error)
 		}
 	}
 
-	metadataFileName := fmt.Sprintf("%s-k2dsec.metadata", secretName)
+	metadataFileName := buildSecretMetadataFileName(secretName)
 	metadataFileFound, err := filesystem.FileExists(path.Join(store.secretPath, metadataFileName))
 	if err != nil {
 		return &core.Secret{}, fmt.Errorf("unable to check if metadata file exists: %w", err)
@@ -184,7 +188,7 @@ func (store *FileSystemStore) GetSecrets() (core.SecretList, error) {
 			}
 		}
 
-		metadataFileName := fmt.Sprintf("%s-k2dsec.metadata", secret.Name)
+		metadataFileName := buildSecretMetadataFileName(secret.Name)
 		metadataFileFound, err := filesystem.FileExists(path.Join(store.secretPath, metadataFileName))
 		if err != nil {
 			return core.SecretList{}, fmt.Errorf("unable to check if metadata file exists: %w", err)
@@ -232,7 +236,7 @@ func (store *FileSystemStore) StoreSecret(secret *corev1.Secret) error {
 	}
 
 	if len(secret.Labels) != 0 {
-		metadataFileName := fmt.Sprintf("%s-k2dsec.metadata", secret.Name)
+		metadataFileName := buildSecretMetadataFileName(secret.Name)
 		err = filesystem.StoreMetadataOnDisk(store.secretPath, metadataFileName, secret.Labels)
 		if err != nil {
 			return err
