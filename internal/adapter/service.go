@@ -98,7 +98,14 @@ func (adapter *KubeDockerAdapter) CreateContainerFromService(ctx context.Context
 		return fmt.Errorf("unable to convert versioned service spec to internal service spec: %w", err)
 	}
 
-	err = adapter.converter.ConvertServiceSpecIntoContainerConfiguration(internalServiceSpec, &cfg)
+	usedPorts := make(map[int]struct{})
+	for _, container := range containers {
+		for _, port := range container.Ports {
+			usedPorts[int(port.PublicPort)] = struct{}{}
+		}
+	}
+
+	err = adapter.converter.ConvertServiceSpecIntoContainerConfiguration(internalServiceSpec, &cfg, usedPorts)
 	if err != nil {
 		return fmt.Errorf("unable to convert service spec into container configuration: %w", err)
 	}

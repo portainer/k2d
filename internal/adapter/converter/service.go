@@ -2,7 +2,6 @@ package converter
 
 import (
 	"fmt"
-	"math/rand"
 	"strconv"
 	"time"
 
@@ -14,7 +13,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core"
 )
 
-func (converter *DockerAPIConverter) ConvertServiceSpecIntoContainerConfiguration(serviceSpec core.ServiceSpec, containerCfg *ContainerConfiguration) error {
+func (converter *DockerAPIConverter) ConvertServiceSpecIntoContainerConfiguration(serviceSpec core.ServiceSpec, containerCfg *ContainerConfiguration, usedPorts map[int]struct{}) error {
 	// if service type is not specified from the YAML file, we default to ClusterIP
 	if serviceSpec.Type == "" {
 		serviceSpec.Type = core.ServiceTypeClusterIP
@@ -36,8 +35,12 @@ func (converter *DockerAPIConverter) ConvertServiceSpecIntoContainerConfiguratio
 			if port.NodePort != 0 {
 				hostBinding.HostPort = strconv.Itoa(int(port.NodePort))
 			} else {
-				// TODO: this requires a check to ensure the randomly selected port is not already in use
-				hostBinding.HostPort = strconv.Itoa(rand.Intn(32767-30000+1) + 30000)
+				randomPort, err := converter.portGenerator.GenerateRandomPort(&usedPorts)
+				if err != nil {
+					return fmt.Errorf("unable to generate random port: %w", err)
+				}
+
+				hostBinding.HostPort = strconv.Itoa(randomPort)
 			}
 
 			containerCfg.HostConfig.PortBindings[containerPort] = []nat.PortBinding{hostBinding}
