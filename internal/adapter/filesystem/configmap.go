@@ -14,9 +14,13 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core"
 )
 
+// TODO: this package requires a lot of refactoring to make it more readable and maintainable
+
 var ErrConfigMapNotFound = errors.New("configmap file(s) not found")
 
-// TODO: this package requires a lot of refactoring to make it more readable and maintainable
+func buildConfigMapMetadataFileName(configMapName string) string {
+	return fmt.Sprintf("%s-k2dcm.metadata", configMapName)
+}
 
 func (store *FileSystemStore) DeleteConfigMap(configMapName string) error {
 	store.mutex.Lock()
@@ -46,6 +50,19 @@ func (store *FileSystemStore) DeleteConfigMap(configMapName string) error {
 			if err != nil {
 				return fmt.Errorf("unable to remove file %s: %w", file.Name(), err)
 			}
+		}
+	}
+
+	metadataFileName := buildConfigMapMetadataFileName(configMapName)
+	metadataFileFound, err := filesystem.FileExists(path.Join(store.configMapPath, metadataFileName))
+	if err != nil {
+		return fmt.Errorf("unable to check if metadata file exists: %w", err)
+	}
+
+	if metadataFileFound {
+		err := os.Remove(path.Join(store.configMapPath, metadataFileName))
+		if err != nil {
+			return fmt.Errorf("unable to remove file %s: %w", metadataFileName, err)
 		}
 	}
 
@@ -94,7 +111,7 @@ func (store *FileSystemStore) GetConfigMap(configMapName string) (*core.ConfigMa
 				return &core.ConfigMap{}, fmt.Errorf("unable to read file %s: %w", file.Name(), err)
 			}
 
-			configMap.Data[strings.TrimPrefix(file.Name(), configMapName+CONFIGMAP_SEPARATOR)] = strings.TrimSuffix(string(data), "\n")
+			configMap.Data[strings.TrimPrefix(file.Name(), configMapName+CONFIGMAP_SEPARATOR)] = string(data)
 			info, err := os.Stat(path.Join(store.configMapPath, file.Name()))
 			if err != nil {
 				return &core.ConfigMap{}, fmt.Errorf("unable to get file info for %s: %w", file.Name(), err)
@@ -103,6 +120,21 @@ func (store *FileSystemStore) GetConfigMap(configMapName string) (*core.ConfigMa
 			configMap.ObjectMeta.CreationTimestamp = metav1.NewTime(info.ModTime())
 			configMap.ObjectMeta.Annotations[fmt.Sprintf("configmap.k2d.io/%s", file.Name())] = path.Join(store.configMapPath, file.Name())
 		}
+	}
+
+	metadataFileName := buildConfigMapMetadataFileName(configMapName)
+	metadataFileFound, err := filesystem.FileExists(path.Join(store.configMapPath, metadataFileName))
+	if err != nil {
+		return &core.ConfigMap{}, fmt.Errorf("unable to check if metadata file exists: %w", err)
+	}
+
+	if metadataFileFound {
+		metadata, err := filesystem.LoadMetadataFromDisk(store.configMapPath, metadataFileName)
+		if err != nil {
+			return &core.ConfigMap{}, fmt.Errorf("unable to load configmap metadata from disk: %w", err)
+		}
+
+		configMap.Labels = metadata
 	}
 
 	return &configMap, nil
@@ -123,6 +155,7 @@ func (store *FileSystemStore) GetConfigMaps() (core.ConfigMapList, error) {
 	}
 
 	uniqueNames := str.UniquePrefixes(fileNames, CONFIGMAP_SEPARATOR)
+	uniqueNames = str.RemoveItemsWithSuffix(uniqueNames, ".metadata")
 
 	configMaps := []core.ConfigMap{}
 	for _, name := range uniqueNames {
@@ -154,6 +187,21 @@ func (store *FileSystemStore) GetConfigMaps() (core.ConfigMapList, error) {
 			}
 		}
 
+		metadataFileName := buildConfigMapMetadataFileName(name)
+		metadataFileFound, err := filesystem.FileExists(path.Join(store.configMapPath, metadataFileName))
+		if err != nil {
+			return core.ConfigMapList{}, fmt.Errorf("unable to check if metadata file exists: %w", err)
+		}
+
+		if metadataFileFound {
+			metadata, err := filesystem.LoadMetadataFromDisk(store.configMapPath, metadataFileName)
+			if err != nil {
+				return core.ConfigMapList{}, fmt.Errorf("unable to load configmap metadata from disk: %w", err)
+			}
+
+			configMap.Labels = metadata
+		}
+
 		configMaps = append(configMaps, configMap)
 	}
 
@@ -174,6 +222,14 @@ func (store *FileSystemStore) StoreConfigMap(configMap *corev1.ConfigMap) error 
 	err := filesystem.StoreDataMapOnDisk(store.configMapPath, filePrefix, configMap.Data)
 	if err != nil {
 		return err
+	}
+
+	if len(configMap.Labels) != 0 {
+		metadataFileName := buildConfigMapMetadataFileName(configMap.Name)
+		err = filesystem.StoreMetadataOnDisk(store.configMapPath, metadataFileName, configMap.Labels)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil

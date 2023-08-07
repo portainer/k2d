@@ -32,3 +32,13 @@ func IsStringInSlice(target string, slice []string) bool {
 	}
 	return false
 }
+
+func RemoveItemsWithSuffix(items []string, suffix string) []string {
+	var result []string
+	for _, s := range items {
+		if !strings.HasSuffix(s, suffix) {
+			result = append(result, s)
+		}
+	}
+	return result
+}

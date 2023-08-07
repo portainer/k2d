@@ -17,6 +17,10 @@ import (
 
 var ErrSecretNotFound = errors.New("secret file(s) not found")
 
+func buildSecretMetadataFileName(secretName string) string {
+	return fmt.Sprintf("%s-k2dsec.metadata", secretName)
+}
+
 func (store *FileSystemStore) DeleteSecret(secretName string) error {
 	store.mutex.Lock()
 	defer store.mutex.Unlock()
@@ -45,6 +49,19 @@ func (store *FileSystemStore) DeleteSecret(secretName string) error {
 			if err != nil {
 				return fmt.Errorf("unable to remove file %s: %w", file.Name(), err)
 			}
+		}
+	}
+
+	metadataFileName := buildSecretMetadataFileName(secretName)
+	metadataFileFound, err := filesystem.FileExists(path.Join(store.secretPath, metadataFileName))
+	if err != nil {
+		return fmt.Errorf("unable to check if metadata file exists: %w", err)
+	}
+
+	if metadataFileFound {
+		err := os.Remove(path.Join(store.secretPath, metadataFileName))
+		if err != nil {
+			return fmt.Errorf("unable to remove file %s: %w", metadataFileName, err)
 		}
 	}
 
@@ -104,6 +121,21 @@ func (store *FileSystemStore) GetSecret(secretName string) (*core.Secret, error)
 		}
 	}
 
+	metadataFileName := buildSecretMetadataFileName(secretName)
+	metadataFileFound, err := filesystem.FileExists(path.Join(store.secretPath, metadataFileName))
+	if err != nil {
+		return &core.Secret{}, fmt.Errorf("unable to check if metadata file exists: %w", err)
+	}
+
+	if metadataFileFound {
+		metadata, err := filesystem.LoadMetadataFromDisk(store.secretPath, metadataFileName)
+		if err != nil {
+			return &core.Secret{}, fmt.Errorf("unable to load secret metadata from disk: %w", err)
+		}
+
+		secret.Labels = metadata
+	}
+
 	return &secret, nil
 }
 
@@ -122,6 +154,7 @@ func (store *FileSystemStore) GetSecrets() (core.SecretList, error) {
 	}
 
 	uniqueNames := str.UniquePrefixes(fileNames, SECRET_SEPARATOR)
+	uniqueNames = str.RemoveItemsWithSuffix(uniqueNames, ".metadata")
 
 	secrets := []core.Secret{}
 
@@ -155,6 +188,21 @@ func (store *FileSystemStore) GetSecrets() (core.SecretList, error) {
 			}
 		}
 
+		metadataFileName := buildSecretMetadataFileName(secret.Name)
+		metadataFileFound, err := filesystem.FileExists(path.Join(store.secretPath, metadataFileName))
+		if err != nil {
+			return core.SecretList{}, fmt.Errorf("unable to check if metadata file exists: %w", err)
+		}
+
+		if metadataFileFound {
+			metadata, err := filesystem.LoadMetadataFromDisk(store.secretPath, metadataFileName)
+			if err != nil {
+				return core.SecretList{}, fmt.Errorf("unable to load secret metadata from disk: %w", err)
+			}
+
+			secret.Labels = metadata
+		}
+
 		secrets = append(secrets, secret)
 	}
 
@@ -185,6 +233,14 @@ func (store *FileSystemStore) StoreSecret(secret *corev1.Secret) error {
 	err := filesystem.StoreDataMapOnDisk(store.secretPath, filePrefix, data)
 	if err != nil {
 		return err
+	}
+
+	if len(secret.Labels) != 0 {
+		metadataFileName := buildSecretMetadataFileName(secret.Name)
+		err = filesystem.StoreMetadataOnDisk(store.secretPath, metadataFileName, secret.Labels)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
