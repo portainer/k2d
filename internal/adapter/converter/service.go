@@ -22,8 +22,8 @@ func (converter *DockerAPIConverter) ConvertServiceSpecIntoContainerConfiguratio
 
 	// portBindings forces a random high port to be used for a non-NodePort service
 	// hence, we need to check for the NodePort service type only
-	for _, port := range serviceSpec.Ports {
-		if serviceSpec.Type == core.ServiceTypeNodePort {
+	if serviceSpec.Type == core.ServiceTypeNodePort {
+		for _, port := range serviceSpec.Ports {
 			containerPort, err := nat.NewPort(string(port.Protocol), port.TargetPort.String())
 			if err != nil {
 				return fmt.Errorf("invalid container port: %w", err)
