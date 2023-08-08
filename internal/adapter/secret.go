@@ -6,6 +6,7 @@ import (
 	"github.com/portainer/k2d/internal/k8s"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/kubernetes/pkg/apis/core"
 )
 
@@ -40,8 +41,9 @@ func (adapter *KubeDockerAdapter) GetSecret(secretName string) (*corev1.Secret, 
 	return &versionedSecret, nil
 }
 
-func (adapter *KubeDockerAdapter) ListSecrets() (corev1.SecretList, error) {
-	secretList, err := adapter.listSecrets()
+func (adapter *KubeDockerAdapter) ListSecrets(selector labels.Selector) (corev1.SecretList, error) {
+
+	secretList, err := adapter.listSecrets(selector)
 	if err != nil {
 		return corev1.SecretList{}, fmt.Errorf("unable to list secrets: %w", err)
 	}
@@ -61,8 +63,8 @@ func (adapter *KubeDockerAdapter) ListSecrets() (corev1.SecretList, error) {
 	return versionedSecretList, nil
 }
 
-func (adapter *KubeDockerAdapter) GetSecretTable() (*metav1.Table, error) {
-	secretList, err := adapter.listSecrets()
+func (adapter *KubeDockerAdapter) GetSecretTable(selector labels.Selector) (*metav1.Table, error) {
+	secretList, err := adapter.listSecrets(selector)
 	if err != nil {
 		return &metav1.Table{}, fmt.Errorf("unable to list secrets: %w", err)
 	}
@@ -70,6 +72,6 @@ func (adapter *KubeDockerAdapter) GetSecretTable() (*metav1.Table, error) {
 	return k8s.GenerateTable(&secretList)
 }
 
-func (adapter *KubeDockerAdapter) listSecrets() (core.SecretList, error) {
-	return adapter.fileSystemStore.GetSecrets()
+func (adapter *KubeDockerAdapter) listSecrets(selector labels.Selector) (core.SecretList, error) {
+	return adapter.fileSystemStore.GetSecrets(selector)
 }

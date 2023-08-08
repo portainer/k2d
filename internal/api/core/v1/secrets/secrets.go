@@ -34,9 +34,11 @@ func (svc SecretService) RegisterSecretAPI(ws *restful.WebService) {
 		Param(ws.QueryParameter("dryRun", "when present, indicates that modifications should not be persisted").DataType("string")))
 
 	ws.Route(ws.GET("/v1/secrets").
+		Param(ws.QueryParameter("labelSelector", "a selector to restrict the list of returned objects by their labels").DataType("string")).
 		To(svc.ListSecrets))
 
 	ws.Route(ws.GET("/v1/namespaces/{namespace}/secrets").
+		Param(ws.QueryParameter("labelSelector", "a selector to restrict the list of returned objects by their labels").DataType("string")).
 		To(svc.ListSecrets))
 
 	ws.Route(ws.DELETE("/v1/secrets/{name}").
