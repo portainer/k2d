@@ -72,14 +72,6 @@ func (adapter *KubeDockerAdapter) CreateContainerFromService(ctx context.Context
 		return errors.New("no container was found matching the service selector")
 	}
 
-	if service.ObjectMeta.Annotations["kubectl.kubernetes.io/last-applied-configuration"] == "" && service.Labels["app.kubernetes.io/managed-by"] == "Helm" {
-		serviceData, err := json.Marshal(service)
-		if err != nil {
-			return fmt.Errorf("unable to marshal service: %w", err)
-		}
-		service.ObjectMeta.Annotations["kubectl.kubernetes.io/last-applied-configuration"] = string(serviceData)
-	}
-
 	if service.ObjectMeta.Annotations["kubectl.kubernetes.io/last-applied-configuration"] == matchingContainer.Labels[k2dtypes.ServiceLastAppliedConfigLabelKey] {
 		logger.Infow("the container matching the service selector already exists with the same service configuration. The update will be skipped",
 			"container_id", matchingContainer.ID,
@@ -87,11 +79,6 @@ func (adapter *KubeDockerAdapter) CreateContainerFromService(ctx context.Context
 		)
 		return nil
 	}
-
-	// if service.Labels["app.kubernetes.io/managed-by"] == "Helm" {
-	// 	service.ObjectMeta.Annotations["meta.helm.sh/release-name"] = service.Labels["app.kubernetes.io/name"]
-	// 	service.ObjectMeta.Annotations["meta.helm.sh/release-namespace"] = "default"
-	// }
 
 	logger.Infow("container found matching the service selector with a different service configuration. The container will be re-created",
 		"container_id", matchingContainer.ID,

@@ -28,14 +28,6 @@ func (adapter *KubeDockerAdapter) CreateContainerFromDeployment(ctx context.Cont
 		labels:        deployment.Spec.Template.Labels,
 	}
 
-	if deployment.ObjectMeta.Annotations["kubectl.kubernetes.io/last-applied-configuration"] == "" && deployment.Labels["app.kubernetes.io/managed-by"] == "Helm" {
-		deploymentData, err := json.Marshal(deployment)
-		if err != nil {
-			return fmt.Errorf("unable to marshal deployment: %w", err)
-		}
-		deployment.ObjectMeta.Annotations["kubectl.kubernetes.io/last-applied-configuration"] = string(deploymentData)
-	}
-
 	opts.labels[k2dtypes.WorkloadLabelKey] = DeploymentWorkloadType
 	opts.lastAppliedConfiguration = deployment.ObjectMeta.Annotations["kubectl.kubernetes.io/last-applied-configuration"]
 
