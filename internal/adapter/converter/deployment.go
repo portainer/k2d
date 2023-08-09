@@ -16,7 +16,9 @@ func (converter *DockerAPIConverter) UpdateDeploymentFromContainerInfo(deploymen
 	}
 
 	deployment.ObjectMeta.CreationTimestamp = metav1.NewTime(time.Unix(container.Created, 0))
-	deployment.ObjectMeta.Annotations["kubectl.kubernetes.io/last-applied-configuration"] = container.Labels[k2dtypes.WorkloadLastAppliedConfigLabelKey]
+	deployment.ObjectMeta.Annotations = map[string]string{
+		"kubectl.kubernetes.io/last-applied-configuration": container.Labels[k2dtypes.WorkloadLastAppliedConfigLabelKey],
+	}
 
 	containerState := container.State
 
