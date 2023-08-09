@@ -211,6 +211,10 @@ func (adapter *KubeDockerAdapter) createContainerFromPodSpec(ctx context.Context
 
 			logger.Infof("container with the name %s already exists with a different configuration. The container will be recreated", containerCfg.ContainerName)
 
+			if container.Labels[k2dtypes.ServiceLastAppliedConfigLabelKey] != "" {
+				options.labels[k2dtypes.ServiceLastAppliedConfigLabelKey] = container.Labels[k2dtypes.ServiceLastAppliedConfigLabelKey]
+			}
+
 			err := adapter.cli.ContainerRemove(ctx, container.ID, types.ContainerRemoveOptions{Force: true})
 			if err != nil {
 				return fmt.Errorf("unable to remove container: %w", err)

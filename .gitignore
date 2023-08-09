@@ -1,5 +1,4 @@
 .DS_Store
 dist
 tmp
-tests/manifests
-tests/kubeconfig
+tests/*

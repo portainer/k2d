@@ -12,6 +12,7 @@ import (
 	str "github.com/portainer/k2d/pkg/strings"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/kubernetes/pkg/apis/core"
 )
 
@@ -139,7 +140,7 @@ func (store *FileSystemStore) GetSecret(secretName string) (*core.Secret, error)
 	return &secret, nil
 }
 
-func (store *FileSystemStore) GetSecrets() (core.SecretList, error) {
+func (store *FileSystemStore) GetSecrets(selector labels.Selector) (core.SecretList, error) {
 	store.mutex.Lock()
 	defer store.mutex.Unlock()
 
@@ -172,6 +173,25 @@ func (store *FileSystemStore) GetSecrets() (core.SecretList, error) {
 			Type: core.SecretTypeOpaque,
 		}
 
+		metadataFileName := buildSecretMetadataFileName(secret.Name)
+		metadataFileFound, err := filesystem.FileExists(path.Join(store.secretPath, metadataFileName))
+		if err != nil {
+			return core.SecretList{}, fmt.Errorf("unable to check if metadata file exists: %w", err)
+		}
+
+		if metadataFileFound {
+			metadata, err := filesystem.LoadMetadataFromDisk(store.secretPath, metadataFileName)
+			if err != nil {
+				return core.SecretList{}, fmt.Errorf("unable to load secret metadata from disk: %w", err)
+			}
+
+			secret.Labels = metadata
+		}
+
+		if !selector.Matches(labels.Set(secret.Labels)) {
+			continue
+		}
+
 		for _, file := range files {
 			if strings.HasPrefix(file.Name(), fmt.Sprintf("%s%s", name, SECRET_SEPARATOR)) {
 				data, err := os.ReadFile(path.Join(store.secretPath, file.Name()))
@@ -186,21 +206,6 @@ func (store *FileSystemStore) GetSecrets() (core.SecretList, error) {
 				}
 				secret.ObjectMeta.CreationTimestamp = metav1.NewTime(info.ModTime())
 			}
-		}
-
-		metadataFileName := buildSecretMetadataFileName(secret.Name)
-		metadataFileFound, err := filesystem.FileExists(path.Join(store.secretPath, metadataFileName))
-		if err != nil {
-			return core.SecretList{}, fmt.Errorf("unable to check if metadata file exists: %w", err)
-		}
-
-		if metadataFileFound {
-			metadata, err := filesystem.LoadMetadataFromDisk(store.secretPath, metadataFileName)
-			if err != nil {
-				return core.SecretList{}, fmt.Errorf("unable to load secret metadata from disk: %w", err)
-			}
-
-			secret.Labels = metadata
 		}
 
 		secrets = append(secrets, secret)
