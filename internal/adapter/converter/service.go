@@ -58,9 +58,12 @@ func (converter *DockerAPIConverter) UpdateServiceFromContainerInfo(service *cor
 	}
 
 	service.ObjectMeta.CreationTimestamp = metav1.NewTime(time.Unix(container.Created, 0))
-	service.ObjectMeta.Annotations = map[string]string{
-		"kubectl.kubernetes.io/last-applied-configuration": container.Labels[k2dtypes.ServiceLastAppliedConfigLabelKey],
+
+	if service.ObjectMeta.Annotations == nil {
+		service.ObjectMeta.Annotations = make(map[string]string)
 	}
+
+	service.ObjectMeta.Annotations["kubectl.kubernetes.io/last-applied-configuration"] = container.Labels[k2dtypes.ServiceLastAppliedConfigLabelKey]
 
 	if service.Spec.Type == "" {
 		service.Spec.Type = core.ServiceTypeClusterIP

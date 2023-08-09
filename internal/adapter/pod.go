@@ -27,6 +27,14 @@ func (adapter *KubeDockerAdapter) CreateContainerFromPod(ctx context.Context, po
 		labels:        pod.Labels,
 	}
 
+	if pod.Labels["app.kubernetes.io/managed-by"] == "Helm" {
+		podData, err := json.Marshal(pod)
+		if err != nil {
+			return fmt.Errorf("unable to marshal pod: %w", err)
+		}
+		pod.ObjectMeta.Annotations["kubectl.kubernetes.io/last-applied-configuration"] = string(podData)
+	}
+
 	opts.lastAppliedConfiguration = pod.ObjectMeta.Annotations["kubectl.kubernetes.io/last-applied-configuration"]
 
 	return adapter.createContainerFromPodSpec(ctx, opts)
