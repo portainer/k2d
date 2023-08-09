@@ -70,13 +70,13 @@ func (svc SecretService) RegisterSecretAPI(ws *restful.WebService) {
 		Param(ws.PathParameter("name", "name of the secret").DataType("string")))
 
 	ws.Route(ws.PUT("/v1/secrets/{name}").
-		To(svc.CreateSecret).
+		To(svc.PutSecret).
 		Param(ws.QueryParameter("dryRun", "when present, indicates that modifications should not be persisted").DataType("string")).
 		AddExtension("x-kubernetes-group-version-kind", secretGVKExtension).
 		Param(ws.PathParameter("name", "name of the secret").DataType("string")))
 
 	ws.Route(ws.PUT("/v1/namespaces/{namespace}/secrets/{name}").
-		To(svc.CreateSecret).
+		To(svc.PutSecret).
 		Param(ws.QueryParameter("dryRun", "when present, indicates that modifications should not be persisted").DataType("string")).
 		AddExtension("x-kubernetes-group-version-kind", secretGVKExtension).
 		Param(ws.PathParameter("name", "name of the secret").DataType("string")))
