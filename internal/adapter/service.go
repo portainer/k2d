@@ -38,6 +38,7 @@ func (adapter *KubeDockerAdapter) DeleteService(ctx context.Context, serviceName
 
 			delete(cfg.ContainerConfig.Labels, k2dtypes.ServiceNameLabelKey)
 			delete(cfg.ContainerConfig.Labels, k2dtypes.ServiceLastAppliedConfigLabelKey)
+			cfg.NetworkConfig.EndpointsConfig[k2dtypes.K2DNetworkName].Aliases = []string{}
 
 			return adapter.reCreateContainerWithNewConfiguration(ctx, cntr.ID, cfg)
 		}
@@ -117,6 +118,8 @@ func (adapter *KubeDockerAdapter) CreateContainerFromService(ctx context.Context
 	if err != nil {
 		return fmt.Errorf("unable to convert service spec into container configuration: %w", err)
 	}
+
+	cfg.NetworkConfig.EndpointsConfig[k2dtypes.K2DNetworkName].Aliases = []string{service.Name}
 
 	return adapter.reCreateContainerWithNewConfiguration(ctx, matchingContainer.ID, cfg)
 }

@@ -215,6 +215,10 @@ func (adapter *KubeDockerAdapter) createContainerFromPodSpec(ctx context.Context
 				options.labels[k2dtypes.ServiceLastAppliedConfigLabelKey] = container.Labels[k2dtypes.ServiceLastAppliedConfigLabelKey]
 			}
 
+			if len(container.NetworkSettings.Networks[k2dtypes.K2DNetworkName].Aliases) > 0 {
+				containerCfg.NetworkConfig.EndpointsConfig[k2dtypes.K2DNetworkName].Aliases = container.NetworkSettings.Networks[k2dtypes.K2DNetworkName].Aliases
+			}
+
 			err := adapter.cli.ContainerRemove(ctx, container.ID, types.ContainerRemoveOptions{Force: true})
 			if err != nil {
 				return fmt.Errorf("unable to remove container: %w", err)
