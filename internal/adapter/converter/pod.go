@@ -106,6 +106,7 @@ func (converter *DockerAPIConverter) ConvertPodSpecToContainerConfiguration(spec
 
 	setRestartPolicy(hostConfig, spec.RestartPolicy)
 	setSecurityContext(containerConfig, hostConfig, spec.SecurityContext, containerSpec.SecurityContext)
+	converter.setResourceRequirements(hostConfig, containerSpec.Resources)
 
 	if err := converter.setVolumeMounts(hostConfig, spec.Volumes, containerSpec.VolumeMounts); err != nil {
 		return ContainerConfiguration{}, err
@@ -120,6 +121,36 @@ func (converter *DockerAPIConverter) ConvertPodSpecToContainerConfiguration(spec
 			},
 		},
 	}, nil
+}
+
+// setResourceRequirements configures the Docker container's resource constraints based on the provided core.ResourceRequirements.
+// It receives a Docker HostConfig and a Kubernetes ResourceRequirements.
+// It returns nothing.
+func (converter *DockerAPIConverter) setResourceRequirements(hostConfig *container.HostConfig, resources core.ResourceRequirements) {
+	resourceRequirements := container.Resources{}
+	if resources.Requests != nil {
+		for resourceName, quantity := range resources.Requests {
+			switch resourceName {
+			case core.ResourceCPU:
+				resourceRequirements.CPUShares = int64(quantity.MilliValue())
+			case core.ResourceMemory:
+				resourceRequirements.MemoryReservation = int64(quantity.Value())
+			}
+		}
+	}
+
+	if resources.Limits != nil {
+		for resourceName, quantity := range resources.Limits {
+			switch resourceName {
+			case core.ResourceCPU:
+				resourceRequirements.NanoCPUs = int64(quantity.MilliValue()) * 1000000
+			case core.ResourceMemory:
+				resourceRequirements.Memory = int64(quantity.Value())
+			}
+		}
+	}
+
+	hostConfig.Resources = resourceRequirements
 }
 
 // setHostPorts configures the Docker container's ports based on the provided core.ContainerPort slices (coming from the pod specs).

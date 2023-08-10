@@ -129,6 +129,7 @@ func (adapter *KubeDockerAdapter) buildContainerConfigurationFromExistingContain
 			Binds:         containerDetails.HostConfig.Binds,
 			ExtraHosts:    containerDetails.HostConfig.ExtraHosts,
 			Privileged:    containerDetails.HostConfig.Privileged,
+			Resources:     containerDetails.HostConfig.Resources,
 		},
 		NetworkConfig: &network.NetworkingConfig{
 			EndpointsConfig: map[string]*network.EndpointSettings{
