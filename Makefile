@@ -48,7 +48,7 @@ image-multiarch:
 		$(image)-linux-arm64 \
 		$(image)-linux-386 \
 		$(image)-linux-armv6 \
-		$(image)-linux-armv7 \
+		$(image)-linux-armv7
 
 clean:
 	rm -rf $(dist)/*
