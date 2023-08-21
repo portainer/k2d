@@ -31,6 +31,8 @@ func (svc SecretService) PutSecret(r *restful.Request, w *restful.Response) {
 
 	// TODO: this is a temporary hack to to wait for secrets to be created
 	// by clients that are sending rapid requests such as Helm
+	// To work around this, we will introduce a retry mechanism that will
+	// look for the secret every second and retry for 10 seconds
 
 	timeoutCh := time.After(10 * time.Second)
 
