@@ -5,12 +5,13 @@ PLATFORM="$(shell go env GOOS)"
 ARCH="$(shell go env GOARCH)"
 ARM=""
 VERSION="latest"
+REPOSITORY="portainer"
 
 .PHONY: pre dev build release image image-arm-6 image-arm-7 image-multiarch clean
 
 dist := dist
 bin := $(shell basename $(CURDIR))
-image := portainer/k2d:$(VERSION)
+image := $(REPOSITORY)/k2d:$(VERSION)
 
 pre:
 	mkdir -pv $(dist) 
