@@ -13,10 +13,6 @@ on:
     - "fix/*"
     - "refactor/*"
 
-env:
-  DOCKER_HUB_CI_REPOSITORY: portainerci
-  CONTINAER_IMAGE_TAG: pr${{ github.event.number }}
-
 jobs:
   build_images:
     runs-on: ubuntu-latest
@@ -42,9 +38,10 @@ jobs:
         username: ${{ secrets.DOCKER_HUB_USERNAME }}
         password: ${{ secrets.DOCKER_HUB_PASSWORD }}
     - name: "[execution] build k2d and build docker images"
-      env:
-        if: github.event.number == ''
-        CONTAINER_IMAGE_TAG: ${{ github.ref.name }}
       run: |
-        env
-        make image-multiarch REPOSITORY=${DOCKER_HUB_CI_REPOSITORY} VERSION=${CONTAINER_IMAGE_TAG}
+        if [ "${GITHUB_EVENT_NAME}" == "pull_request" ]; then
+          CONTAINER_IMAGE_TAG=pr${{ github.event.number }}
+        else
+          CONTAINER_IMAGE_TAG=${{ github.ref.name }}
+        fi
+        make image-multiarch VERSION=${CONTAINER_IMAGE_TAG}
