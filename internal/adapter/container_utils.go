@@ -2,25 +2,30 @@ package adapter
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/network"
+	"github.com/docker/go-connections/nat"
+	"github.com/portainer/k2d/internal/adapter/converter"
 	k2dtypes "github.com/portainer/k2d/internal/adapter/types"
 	"github.com/portainer/k2d/internal/logging"
 	"github.com/portainer/k2d/pkg/maputils"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/kubernetes/pkg/apis/core"
 )
 
-// findMatchingContainer iterates over a slice of Container types, looking for a Container
+// findContainerMatchingSelector iterates over a slice of Container types, looking for a Container
 // whose Labels contain a key-value pair specified in the provided selector map.
 // The function returns a pointer to the first matching Container it finds.
 // If no matching Container is found, the function returns nil.
-func findMatchingContainer(containers []types.Container, selector map[string]string) *types.Container {
+func findContainerMatchingSelector(containers []types.Container, selector map[string]string) *types.Container {
 	for _, container := range containers {
 		for key, value := range container.Labels {
 			if maputils.ContainsKeyValuePairInMap(key, value, selector) {
@@ -30,6 +35,108 @@ func findMatchingContainer(containers []types.Container, selector map[string]str
 	}
 
 	return nil
+}
+
+// reCreateContainerWithNewConfiguration replaces an existing Docker container with a new one having updated configuration.
+// The function performs the following steps:
+// 1. Stops the existing container.
+// 2. Creates a new container with the updated configuration using a temporary name.
+// 3. Attempts to start the new container.
+// 4. If the new container starts successfully, it removes the old container and renames the new container to the original name.
+// In case of failure during the creation or start of the new container, it attempts to restart the old container and remove the new one.
+// This way, the function ensures that a working container is always available.
+// The function takes three arguments:
+// - ctx is the context, used to control cancellation or timeouts for the operations.
+// - containerID is the ID of the existing container that needs to be replaced.
+// - newContainerCfg is the configuration for the new container.
+// The function returns an error if any step in the process fails.
+func (adapter *KubeDockerAdapter) reCreateContainerWithNewConfiguration(ctx context.Context, containerID string, newContainerCfg converter.ContainerConfiguration) error {
+	// Define temporary container name
+	tempContainerName := newContainerCfg.ContainerName + "_temp"
+
+	// Stop the existing container
+	containerStopTimeout := 3
+	err := adapter.cli.ContainerStop(ctx, containerID, container.StopOptions{Timeout: &containerStopTimeout})
+	if err != nil {
+		return fmt.Errorf("unable to stop existing container: %w", err)
+	}
+
+	// Create a new container
+	containerCreateResponse, err := adapter.cli.ContainerCreate(ctx,
+		newContainerCfg.ContainerConfig,
+		newContainerCfg.HostConfig,
+		newContainerCfg.NetworkConfig,
+		nil,
+		tempContainerName,
+	)
+	if err != nil {
+		// Attempt to start the old container again in case of failure
+		if startErr := adapter.cli.ContainerStart(ctx, containerID, types.ContainerStartOptions{}); startErr != nil {
+			return fmt.Errorf("unable to start the old container after failed new container creation: %w", startErr)
+		}
+		return fmt.Errorf("unable to create container: %w", err)
+	}
+
+	// Start the new container
+	err = adapter.cli.ContainerStart(ctx, containerCreateResponse.ID, types.ContainerStartOptions{})
+	if err != nil {
+		// If the new container fails to start, attempt cleanup and start the old container again
+		if removeErr := adapter.cli.ContainerRemove(ctx, containerCreateResponse.ID, types.ContainerRemoveOptions{}); removeErr != nil {
+			return fmt.Errorf("unable to remove the newly created container after failed start: %w", removeErr)
+		}
+
+		if startErr := adapter.cli.ContainerStart(ctx, containerID, types.ContainerStartOptions{}); startErr != nil {
+			return fmt.Errorf("unable to start the old container after failed new container start: %w", startErr)
+		}
+		return fmt.Errorf("unable to start container: %w", err)
+	}
+
+	// If the new container started successfully, remove the old container
+	err = adapter.cli.ContainerRemove(ctx, containerID, types.ContainerRemoveOptions{})
+	if err != nil {
+		return fmt.Errorf("unable to remove old container: %w", err)
+	}
+
+	// Rename the new container to the original name
+	err = adapter.cli.ContainerRename(ctx, containerCreateResponse.ID, newContainerCfg.ContainerName)
+	if err != nil {
+		return fmt.Errorf("unable to rename container: %w", err)
+	}
+
+	return nil
+}
+
+// buildContainerConfigurationFromExistingContainer builds a ContainerConfiguration from an existing Docker container.
+// This function must be updated when adding support to new container configuration options.
+func (adapter *KubeDockerAdapter) buildContainerConfigurationFromExistingContainer(ctx context.Context, containerID string) (converter.ContainerConfiguration, error) {
+	containerDetails, err := adapter.cli.ContainerInspect(ctx, containerID)
+	if err != nil {
+		return converter.ContainerConfiguration{}, fmt.Errorf("unable to inspect container: %w", err)
+	}
+
+	return converter.ContainerConfiguration{
+		ContainerName: containerDetails.Name,
+		ContainerConfig: &container.Config{
+			Image:        containerDetails.Image,
+			Labels:       containerDetails.Config.Labels,
+			ExposedPorts: nat.PortSet{},
+			Env:          containerDetails.Config.Env,
+			User:         containerDetails.Config.User,
+		},
+		HostConfig: &container.HostConfig{
+			PortBindings:  nat.PortMap{},
+			RestartPolicy: containerDetails.HostConfig.RestartPolicy,
+			Binds:         containerDetails.HostConfig.Binds,
+			ExtraHosts:    containerDetails.HostConfig.ExtraHosts,
+			Privileged:    containerDetails.HostConfig.Privileged,
+			Resources:     containerDetails.HostConfig.Resources,
+		},
+		NetworkConfig: &network.NetworkingConfig{
+			EndpointsConfig: map[string]*network.EndpointSettings{
+				k2dtypes.K2DNetworkName: {},
+			},
+		},
+	}, nil
 }
 
 // ContainerCreationOptions is a struct used to provide parameters for creating a container.
@@ -71,10 +178,23 @@ func (adapter *KubeDockerAdapter) createContainerFromPodSpec(ctx context.Context
 		options.labels[k2dtypes.WorkloadLastAppliedConfigLabelKey] = options.lastAppliedConfiguration
 	}
 
-	container, err := adapter.converter.ConvertPodToContainer(options.podSpec, options.labels)
+	internalPodSpec := core.PodSpec{}
+	err := adapter.ConvertK8SResource(&options.podSpec, &internalPodSpec)
+	if err != nil {
+		return fmt.Errorf("unable to convert versioned pod spec to internal pod spec: %w", err)
+	}
+
+	internalPodSpecData, err := json.Marshal(internalPodSpec)
+	if err != nil {
+		return fmt.Errorf("unable to marshal internal pod spec: %w", err)
+	}
+	options.labels[k2dtypes.PodLastAppliedConfigLabelKey] = string(internalPodSpecData)
+
+	containerCfg, err := adapter.converter.ConvertPodSpecToContainerConfiguration(internalPodSpec, options.labels)
 	if err != nil {
 		return fmt.Errorf("unable to build container configuration from pod spec: %w", err)
 	}
+	containerCfg.ContainerName = options.containerName
 
 	containers, err := adapter.cli.ContainerList(ctx, types.ContainerListOptions{})
 	if err != nil {
@@ -82,15 +202,23 @@ func (adapter *KubeDockerAdapter) createContainerFromPodSpec(ctx context.Context
 	}
 
 	for _, container := range containers {
-		if container.Names[0] == "/"+options.containerName {
+		if container.Names[0] == "/"+containerCfg.ContainerName {
 			logger := logging.LoggerFromContext(ctx)
 
 			if options.lastAppliedConfiguration == container.Labels[k2dtypes.WorkloadLastAppliedConfigLabelKey] {
-				logger.Infof("container with the name %s already exists with the same configuration. The update will be skipped", options.containerName)
+				logger.Infof("container with the name %s already exists with the same configuration. The update will be skipped", containerCfg.ContainerName)
 				return nil
 			}
 
-			logger.Infof("container with the name %s already exists with a different configuration. The container will be recreated", options.containerName)
+			logger.Infof("container with the name %s already exists with a different configuration. The container will be recreated", containerCfg.ContainerName)
+
+			if container.Labels[k2dtypes.ServiceLastAppliedConfigLabelKey] != "" {
+				options.labels[k2dtypes.ServiceLastAppliedConfigLabelKey] = container.Labels[k2dtypes.ServiceLastAppliedConfigLabelKey]
+			}
+
+			if len(container.NetworkSettings.Networks[k2dtypes.K2DNetworkName].Aliases) > 0 {
+				containerCfg.NetworkConfig.EndpointsConfig[k2dtypes.K2DNetworkName].Aliases = container.NetworkSettings.Networks[k2dtypes.K2DNetworkName].Aliases
+			}
 
 			err := adapter.cli.ContainerRemove(ctx, container.ID, types.ContainerRemoveOptions{Force: true})
 			if err != nil {
@@ -99,21 +227,21 @@ func (adapter *KubeDockerAdapter) createContainerFromPodSpec(ctx context.Context
 		}
 	}
 
-	networkConfig := &network.NetworkingConfig{
-		EndpointsConfig: map[string]*network.EndpointSettings{
-			k2dtypes.K2DNetworkName: {},
-		},
-	}
-
-	out, err := adapter.cli.ImagePull(ctx, container.ContainerConfig.Image, types.ImagePullOptions{})
+	out, err := adapter.cli.ImagePull(ctx, containerCfg.ContainerConfig.Image, types.ImagePullOptions{})
 	if err != nil {
-		return fmt.Errorf("unable to pull %s image: %w", container.ContainerConfig.Image, err)
+		return fmt.Errorf("unable to pull %s image: %w", containerCfg.ContainerConfig.Image, err)
 	}
 	defer out.Close()
 
-	io.Copy(io.Discard, out)
+	io.Copy(os.Stdout, out)
 
-	containerCreateResponse, err := adapter.cli.ContainerCreate(ctx, container.ContainerConfig, container.HostConfig, networkConfig, nil, options.containerName)
+	containerCreateResponse, err := adapter.cli.ContainerCreate(ctx,
+		containerCfg.ContainerConfig,
+		containerCfg.HostConfig,
+		containerCfg.NetworkConfig,
+		nil,
+		containerCfg.ContainerName,
+	)
 	if err != nil {
 		return fmt.Errorf("unable to create container: %w", err)
 	}
@@ -215,7 +343,7 @@ func (adapter *KubeDockerAdapter) DeployPortainerEdgeAgent(ctx context.Context, 
 	}
 	defer out.Close()
 
-	io.Copy(io.Discard, out)
+	io.Copy(os.Stdout, out)
 
 	_, err = adapter.cli.ContainerCreate(ctx, containerConfig, hostConfig, networkConfig, nil, "portainer-agent")
 

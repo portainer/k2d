@@ -12,6 +12,7 @@ import (
 	str "github.com/portainer/k2d/pkg/strings"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/kubernetes/pkg/apis/core"
 )
 
@@ -76,6 +77,21 @@ func (store *FileSystemStore) GetSecret(secretName string) (*core.Secret, error)
 			secret.ObjectMeta.CreationTimestamp = metav1.NewTime(info.ModTime())
 			secret.ObjectMeta.Annotations[fmt.Sprintf("secret.k2d.io/%s", file.Name())] = secretName
 		}
+	}
+
+	metadataFileName := buildSecretMetadataFileName(secretName)
+	metadataFileFound, err := filesystem.FileExists(path.Join(store.secretPath, metadataFileName))
+	if err != nil {
+		return &core.Secret{}, fmt.Errorf("unable to check if metadata file exists: %w", err)
+	}
+
+	if metadataFileFound {
+		metadata, err := filesystem.LoadMetadataFromDisk(store.secretPath, metadataFileName)
+		if err != nil {
+			return &core.Secret{}, fmt.Errorf("unable to load secret metadata from disk: %w", err)
+		}
+
+		secret.Labels = metadata
 	}
 
 	return &secret, nil
@@ -164,6 +180,14 @@ func (store *FileSystemStore) StoreSecret(secret *corev1.Secret) error {
 	err = filesystem.StoreDataMapOnDisk(path.Join(store.path, secret.Name, "_data"), filePrefix, data)
 	if err != nil {
 		return err
+	}
+
+	if len(secret.Labels) != 0 {
+		metadataFileName := buildSecretMetadataFileName(secret.Name)
+		err = filesystem.StoreMetadataOnDisk(store.secretPath, metadataFileName, secret.Labels)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil

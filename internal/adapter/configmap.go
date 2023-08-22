@@ -66,9 +66,9 @@ func (adapter *KubeDockerAdapter) GetConfigMap(configMapName string) (*corev1.Co
 		},
 	}
 
-	err = adapter.ConvertObjectToVersionedObject(configMap, &versionedConfigMap)
+	err = adapter.ConvertK8SResource(configMap, &versionedConfigMap)
 	if err != nil {
-		return nil, fmt.Errorf("unable to convert object to versioned object: %w", err)
+		return nil, fmt.Errorf("unable to convert internal object to versioned object: %w", err)
 	}
 
 	versionedConfigMap.ObjectMeta.Annotations["kubectl.kubernetes.io/last-applied-configuration"] = ""

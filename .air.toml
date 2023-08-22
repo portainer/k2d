@@ -13,7 +13,7 @@ full_bin = "./dist/k2d"
 # Watch these filename extensions.
 include_ext = ["go"]
 # Ignore these filename extensions or directories.
-exclude_dir = ["data", "tmp", "dist", "ssl"]
+exclude_dir = ["data", "tmp", "dist", "ssl", "tests"]
 # Watch these directories if you specified.
 include_dir = []
 # Watch these files.

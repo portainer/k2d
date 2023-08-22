@@ -9,6 +9,7 @@ import (
 	k2dtypes "github.com/portainer/k2d/internal/adapter/types"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/kubernetes/pkg/apis/core"
 )
 
@@ -67,9 +68,9 @@ func (adapter *KubeDockerAdapter) GetSecret(secretName string) (*corev1.Secret, 
 		},
 	}
 
-	err = adapter.ConvertObjectToVersionedObject(secret, &versionedSecret)
+	err = adapter.ConvertK8SResource(secret, &versionedSecret)
 	if err != nil {
-		return nil, fmt.Errorf("unable to convert object to versioned object: %w", err)
+		return nil, fmt.Errorf("unable to convert internal object to versioned object: %w", err)
 	}
 
 	versionedSecret.ObjectMeta.Annotations["kubectl.kubernetes.io/last-applied-configuration"] = ""

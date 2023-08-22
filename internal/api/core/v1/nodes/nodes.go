@@ -18,4 +18,8 @@ func NewNodeService(adapter *adapter.KubeDockerAdapter) NodeService {
 func (svc NodeService) RegisterNodeAPI(ws *restful.WebService) {
 	ws.Route(ws.GET("/v1/nodes").
 		To(svc.ListNodes))
+
+	ws.Route(ws.GET("/v1/nodes/{name}").
+		To(svc.GetNode).
+		Param(ws.PathParameter("name", "name of the node").DataType("string")))
 }

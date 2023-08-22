@@ -1,4 +1,4 @@
-package daemonsets
+package services
 
 import (
 	"fmt"
@@ -9,12 +9,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func (svc DaemonSetService) DeleteDaemonSet(r *restful.Request, w *restful.Response) {
-	daemonSetName := r.PathParameter("name")
+func (svc ServiceService) DeleteService(r *restful.Request, w *restful.Response) {
+	serviceName := r.PathParameter("name")
 
-	err := svc.adapter.DeleteContainer(r.Request.Context(), daemonSetName)
+	err := svc.adapter.DeleteService(r.Request.Context(), serviceName)
 	if err != nil {
-		utils.HttpError(r, w, http.StatusInternalServerError, fmt.Errorf("unable to delete daemonset: %w", err))
+		utils.HttpError(r, w, http.StatusInternalServerError, fmt.Errorf("unable to delete service: %w", err))
 		return
 	}
 

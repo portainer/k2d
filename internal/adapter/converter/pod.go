@@ -8,18 +8,15 @@ import (
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/network"
+	"github.com/docker/go-connections/nat"
 	k2dtypes "github.com/portainer/k2d/internal/adapter/types"
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/apis/core"
 )
 
-// Container is a wrapper around the Docker API container configuration
-type Container struct {
-	ContainerConfig *container.Config
-	HostConfig      *container.HostConfig
-}
-
+// ConvertContainerToPod tries to convert a Docker container into a Kubernetes Pod.
+// It only implements partial conversion at the moment.
 func (converter *DockerAPIConverter) ConvertContainerToPod(container types.Container) core.Pod {
 	containerName := strings.TrimPrefix(container.Names[0], "/")
 	containerState := container.State
@@ -74,27 +71,10 @@ func (converter *DockerAPIConverter) ConvertContainerToPod(container types.Conta
 	return pod
 }
 
-func (converter *DockerAPIConverter) ConvertContainersToPods(containers []types.Container) core.PodList {
-	pods := []core.Pod{}
-
-	for _, container := range containers {
-		pod := converter.ConvertContainerToPod(container)
-		pods = append(pods, pod)
-	}
-
-	return core.PodList{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "PodList",
-			APIVersion: "v1",
-		},
-		Items: pods,
-	}
-}
-
-// ConvertPodToContainer converts a Kubernetes PodSpec into a Docker Container.
+// ConvertPodSpecToContainerConfiguration converts a Kubernetes PodSpec into a Docker container configuration.
 // It receives a Kubernetes PodSpec and a map of labels.
-// It returns a Container struct, or an error if the conversion fails.
-func (converter *DockerAPIConverter) ConvertPodToContainer(spec corev1.PodSpec, labels map[string]string) (Container, error) {
+// It returns a ContainerConfiguration struct, or an error if the conversion fails.
+func (converter *DockerAPIConverter) ConvertPodSpecToContainerConfiguration(spec core.PodSpec, labels map[string]string) (ContainerConfiguration, error) {
 	containerSpec := spec.Containers[0]
 
 	containerConfig := &container.Config{
@@ -104,10 +84,6 @@ func (converter *DockerAPIConverter) ConvertPodToContainer(spec corev1.PodSpec, 
 			fmt.Sprintf("KUBERNETES_SERVICE_HOST=%s", converter.k2dServerConfiguration.ServerIpAddr),
 			fmt.Sprintf("KUBERNETES_SERVICE_PORT=%d", converter.k2dServerConfiguration.ServerPort),
 		},
-	}
-
-	if err := converter.setEnvVars(containerConfig, containerSpec.Env, containerSpec.EnvFrom); err != nil {
-		return Container{}, err
 	}
 
 	hostConfig := &container.HostConfig{
@@ -120,23 +96,100 @@ func (converter *DockerAPIConverter) ConvertPodToContainer(spec corev1.PodSpec, 
 		},
 	}
 
-	setRestartPolicy(hostConfig, spec.RestartPolicy)
-	setSecurityContext(containerConfig, hostConfig, spec.SecurityContext, containerSpec.SecurityContext)
-
-	if err := converter.setVolumeMounts(hostConfig, spec.Volumes, containerSpec.VolumeMounts); err != nil {
-		return Container{}, err
+	if err := converter.setHostPorts(containerConfig, hostConfig, containerSpec.Ports); err != nil {
+		return ContainerConfiguration{}, err
 	}
 
-	return Container{
+	if err := converter.setEnvVars(containerConfig, containerSpec.Env, containerSpec.EnvFrom); err != nil {
+		return ContainerConfiguration{}, err
+	}
+
+	setCommandAndArgs(containerConfig, containerSpec.Command, containerSpec.Args)
+	setRestartPolicy(hostConfig, spec.RestartPolicy)
+	setSecurityContext(containerConfig, hostConfig, spec.SecurityContext, containerSpec.SecurityContext)
+	converter.setResourceRequirements(hostConfig, containerSpec.Resources)
+
+	if err := converter.setVolumeMounts(hostConfig, spec.Volumes, containerSpec.VolumeMounts); err != nil {
+		return ContainerConfiguration{}, err
+	}
+
+	return ContainerConfiguration{
 		ContainerConfig: containerConfig,
 		HostConfig:      hostConfig,
+		NetworkConfig: &network.NetworkingConfig{
+			EndpointsConfig: map[string]*network.EndpointSettings{
+				k2dtypes.K2DNetworkName: {},
+			},
+		},
 	}, nil
+}
+
+// setResourceRequirements configures the Docker container's resource constraints based on the provided core.ResourceRequirements.
+// It receives a Docker HostConfig and a Kubernetes ResourceRequirements.
+// It returns nothing.
+func (converter *DockerAPIConverter) setResourceRequirements(hostConfig *container.HostConfig, resources core.ResourceRequirements) {
+	resourceRequirements := container.Resources{}
+	if resources.Requests != nil {
+		for resourceName, quantity := range resources.Requests {
+			switch resourceName {
+			case core.ResourceCPU:
+				resourceRequirements.CPUShares = int64(quantity.MilliValue())
+			case core.ResourceMemory:
+				resourceRequirements.MemoryReservation = int64(quantity.Value())
+			}
+		}
+	}
+
+	if resources.Limits != nil {
+		for resourceName, quantity := range resources.Limits {
+			switch resourceName {
+			case core.ResourceCPU:
+				resourceRequirements.NanoCPUs = int64(quantity.MilliValue()) * 1000000
+			case core.ResourceMemory:
+				resourceRequirements.Memory = int64(quantity.Value())
+			}
+		}
+	}
+
+	hostConfig.Resources = resourceRequirements
+}
+
+// setHostPorts configures the Docker container's ports based on the provided core.ContainerPort slices (coming from the pod specs).
+// It iterates through the ports and sets both the container's exposed ports (inside the container) and
+// the host's port bindings (on the host machine). Ports are mapped only if the HostPort is not zero.
+// The mappings are applied to the provided containerConfig and hostConfig.
+// It returns an error if any occurred during the port conversion or mapping process.
+func (converter *DockerAPIConverter) setHostPorts(containerConfig *container.Config, hostConfig *container.HostConfig, ports []core.ContainerPort) error {
+	containerPortMaps := nat.PortMap{}
+	containerExposedPorts := nat.PortSet{}
+
+	for _, port := range ports {
+		if port.HostPort != 0 {
+			containerPort, err := nat.NewPort(string(port.Protocol), strconv.Itoa(int(port.ContainerPort)))
+			if err != nil {
+				return err
+			}
+
+			hostBinding := nat.PortBinding{
+				HostIP:   "0.0.0.0",
+				HostPort: strconv.Itoa(int(port.HostPort)),
+			}
+
+			containerPortMaps[containerPort] = []nat.PortBinding{hostBinding}
+			containerExposedPorts[containerPort] = struct{}{}
+		}
+	}
+
+	containerConfig.ExposedPorts = containerExposedPorts
+	hostConfig.PortBindings = containerPortMaps
+
+	return nil
 }
 
 // setEnvVars handles setting the environment variables for the Docker container configuration.
 // It receives a pointer to the container configuration and an array of Kubernetes environment variables.
 // It returns an error if the setting of environment variables fails.
-func (converter *DockerAPIConverter) setEnvVars(containerConfig *container.Config, envs []corev1.EnvVar, envFrom []corev1.EnvFromSource) error {
+func (converter *DockerAPIConverter) setEnvVars(containerConfig *container.Config, envs []core.EnvVar, envFrom []core.EnvFromSource) error {
 	for _, env := range envs {
 
 		if env.ValueFrom != nil {
@@ -167,7 +220,7 @@ func (converter *DockerAPIConverter) setEnvVars(containerConfig *container.Confi
 // If the EnvFromSource object points to a ConfigMap, the function retrieves the ConfigMap and adds its data as
 // environment variables to the Docker container configuration. Similarly, if the EnvFromSource points to a Secret,
 // the function retrieves the Secret and adds its data as environment variables.
-func (converter *DockerAPIConverter) handleValueFromEnvFromSource(containerConfig *container.Config, env corev1.EnvFromSource) error {
+func (converter *DockerAPIConverter) handleValueFromEnvFromSource(containerConfig *container.Config, env core.EnvFromSource) error {
 	if env.ConfigMapRef != nil {
 		configMap, err := converter.store.GetConfigMap(env.ConfigMapRef.Name)
 		if err != nil {
@@ -194,7 +247,7 @@ func (converter *DockerAPIConverter) handleValueFromEnvFromSource(containerConfi
 // handleValueFromEnvVars manages environment variables that are defined through ConfigMap or Secret references.
 // It receives a pointer to the container configuration and a Kubernetes environment variable.
 // It returns an error if the sourcing of the environment variables fails.
-func (converter *DockerAPIConverter) handleValueFromEnvVars(containerConfig *container.Config, env corev1.EnvVar) error {
+func (converter *DockerAPIConverter) handleValueFromEnvVars(containerConfig *container.Config, env core.EnvVar) error {
 	if env.ValueFrom.ConfigMapKeyRef != nil {
 		configMap, err := converter.store.GetConfigMap(env.ValueFrom.ConfigMapKeyRef.Name)
 		if err != nil {
@@ -215,7 +268,7 @@ func (converter *DockerAPIConverter) handleValueFromEnvVars(containerConfig *con
 
 // setRestartPolicy sets the Docker container's restart policy according to the Kubernetes pod's restart policy.
 // It receives a pointer to the host configuration and the Kubernetes pod's restart policy.
-func setRestartPolicy(hostConfig *container.HostConfig, restartPolicy corev1.RestartPolicy) {
+func setRestartPolicy(hostConfig *container.HostConfig, restartPolicy core.RestartPolicy) {
 	switch restartPolicy {
 	case "OnFailure":
 		hostConfig.RestartPolicy = container.RestartPolicy{Name: "on-failure"}
@@ -226,10 +279,23 @@ func setRestartPolicy(hostConfig *container.HostConfig, restartPolicy corev1.Res
 	}
 }
 
+// setCommandAndArgs configures the entrypoint and command arguments for a given Docker container configuration.
+// If the 'command' slice is non-empty, it is set as the container's entrypoint.
+// If the 'args' slice is non-empty, it is set as the container's command arguments.
+func setCommandAndArgs(containerConfig *container.Config, command []string, args []string) {
+	if len(command) > 0 {
+		containerConfig.Entrypoint = command
+	}
+
+	if len(args) > 0 {
+		containerConfig.Cmd = args
+	}
+}
+
 // setSecurityContext sets the user and group ID in the Docker container configuration based on the provided
 // Kubernetes PodSecurityContext.
 // If no security context is provided, the function does not modify the container configuration.
-func setSecurityContext(config *container.Config, hostConfig *container.HostConfig, podSecurityContext *corev1.PodSecurityContext, containerSecurityContext *corev1.SecurityContext) {
+func setSecurityContext(config *container.Config, hostConfig *container.HostConfig, podSecurityContext *core.PodSecurityContext, containerSecurityContext *core.SecurityContext) {
 	if podSecurityContext == nil {
 		return
 	}
@@ -250,7 +316,7 @@ func setSecurityContext(config *container.Config, hostConfig *container.HostConf
 // setVolumeMounts manages volume mounts for the Docker container.
 // It receives a pointer to the host configuration, an array of Kubernetes volumes, and an array of Kubernetes volume mounts.
 // It returns an error if the handling of volume mounts fails.
-func (converter *DockerAPIConverter) setVolumeMounts(hostConfig *container.HostConfig, volumes []corev1.Volume, volumeMounts []corev1.VolumeMount) error {
+func (converter *DockerAPIConverter) setVolumeMounts(hostConfig *container.HostConfig, volumes []core.Volume, volumeMounts []core.VolumeMount) error {
 	for _, volume := range volumes {
 		for _, volumeMount := range volumeMounts {
 			if volumeMount.Name == volume.Name {
@@ -277,7 +343,7 @@ func (converter *DockerAPIConverter) setVolumeMounts(hostConfig *container.HostC
 //
 // Returns:
 // An error if it's unable to fetch the ConfigMap or Secret from the store, otherwise returns nil.
-func (converter *DockerAPIConverter) handleVolumeSource(hostConfig *container.HostConfig, volume corev1.Volume, volumeMount corev1.VolumeMount) error {
+func (converter *DockerAPIConverter) handleVolumeSource(hostConfig *container.HostConfig, volume core.Volume, volumeMount core.VolumeMount) error {
 	if volume.VolumeSource.ConfigMap != nil {
 		configMap, err := converter.store.GetConfigMap(volume.VolumeSource.ConfigMap.Name)
 		if err != nil {

@@ -14,9 +14,14 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core"
 )
 
+// TODO: this package requires a lot of refactoring to make it more readable and maintainable
+// It shares a lot of commonalities with the secret.go file
+
 var ErrConfigMapNotFound = errors.New("configmap file(s) not found")
 
-// TODO: this package requires a lot of refactoring to make it more readable and maintainable
+func buildConfigMapMetadataFileName(configMapName string) string {
+	return fmt.Sprintf("%s-k2dcm.metadata", configMapName)
+}
 
 func (store *FileSystemStore) GetConfigMap(configMapName string) (*core.ConfigMap, error) {
 	store.mutex.Lock()
@@ -78,6 +83,21 @@ func (store *FileSystemStore) GetConfigMap(configMapName string) (*core.ConfigMa
 			configMap.ObjectMeta.CreationTimestamp = metav1.NewTime(info.ModTime())
 			configMap.ObjectMeta.Annotations[fmt.Sprintf("configmap.k2d.io/%s", file.Name())] = configMapName
 		}
+	}
+
+	metadataFileName := buildConfigMapMetadataFileName(configMapName)
+	metadataFileFound, err := filesystem.FileExists(path.Join(store.configMapPath, metadataFileName))
+	if err != nil {
+		return &core.ConfigMap{}, fmt.Errorf("unable to check if metadata file exists: %w", err)
+	}
+
+	if metadataFileFound {
+		metadata, err := filesystem.LoadMetadataFromDisk(store.configMapPath, metadataFileName)
+		if err != nil {
+			return &core.ConfigMap{}, fmt.Errorf("unable to load configmap metadata from disk: %w", err)
+		}
+
+		configMap.Labels = metadata
 	}
 
 	return &configMap, nil
@@ -156,6 +176,14 @@ func (store *FileSystemStore) StoreConfigMap(configMap *corev1.ConfigMap) error 
 	err = filesystem.StoreDataMapOnDisk(path.Join(store.path, configMap.Name, "_data"), filePrefix, configMap.Data)
 	if err != nil {
 		return err
+	}
+
+	if len(configMap.Labels) != 0 {
+		metadataFileName := buildConfigMapMetadataFileName(configMap.Name)
+		err = filesystem.StoreMetadataOnDisk(store.configMapPath, metadataFileName, configMap.Labels)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil

@@ -10,15 +10,11 @@ import (
 
 type AppsService struct {
 	deployments deployments.DeploymentService
-	// daemonsets  daemonsets.DaemonSetService
-	// statefulsets statefulsets.StatefulSetService
 }
 
 func NewAppsService(operations chan controller.Operation, adapter *adapter.KubeDockerAdapter) AppsService {
 	return AppsService{
 		deployments: deployments.NewDeploymentService(adapter, operations),
-		// daemonsets:  daemonsets.NewDaemonSetService(adapter, operations),
-		// statefulsets: statefulsets.NewStatefulSetService(adapter, operations),
 	}
 }
 
@@ -48,25 +44,6 @@ func (svc AppsService) ListAPIResources(r *restful.Request, w *restful.Response)
 				Verbs:        []string{"create", "list", "delete", "get", "patch"},
 				Namespaced:   true,
 			},
-			// TODO: StatefulSets support is disabled for now
-			// {
-			// 	Kind:         "StatefulSet",
-			// 	SingularName: "",
-			// 	Name:         "statefulsets",
-			// 	Verbs:        []string{"create", "list", "delete"},
-			// 	Namespaced:   false,
-			// 	ShortNames:   []string{"sts"},
-			// },
-
-			// TODO: DaemonSets support is disabled for now
-			// {
-			// 	Kind:         "DaemonSet",
-			// 	SingularName: "",
-			// 	Name:         "daemonsets",
-			// 	Verbs:        []string{"create", "list", "delete"},
-			// 	Namespaced:   false,
-			// 	ShortNames:   []string{"ds"},
-			// },
 		},
 	}
 
@@ -76,10 +53,4 @@ func (svc AppsService) ListAPIResources(r *restful.Request, w *restful.Response)
 func (svc AppsService) RegisterAppsAPI(routes *restful.WebService) {
 	// deployments
 	svc.deployments.RegisterDeploymentAPI(routes)
-
-	// daemonsets
-	// svc.daemonsets.RegisterDaemonSetAPI(routes)
-
-	// statefulsets
-	// svc.statefulsets.RegisterStatefulSetAPI(routes)
 }

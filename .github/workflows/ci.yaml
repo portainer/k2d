@@ -1,0 +1,47 @@
+name: k2d-ci
+
+on:
+  push:
+    branches:
+    - "develop"
+    - "!release/*"
+  pull_request:
+    branches:
+    - "develop"
+    - "release/*"
+    - "feat/*"
+    - "fix/*"
+    - "refactor/*"
+
+jobs:
+  build_images:
+    runs-on: ubuntu-latest
+    steps:
+    - name: "[preparation] checkout the current branch"
+      uses: actions/checkout@v3.5.3
+    - name: "[preparation] set up golang 1.20.4"
+      uses: actions/setup-go@v4.0.1
+      with:
+        go-version: "1.20.4"
+        cache-dependency-path: ./go.sum
+    - name: "[preparation] set up qemu"
+      uses: docker/setup-qemu-action@v2
+    - name: "[preparation] set up docker context for buildx"
+      run: docker context create builders
+    - name: "[preparation] set up docker buildx"
+      uses: docker/setup-buildx-action@v2
+      with:
+        endpoint: builders
+    - name: "[preparation] docker login"
+      uses: docker/login-action@v2.2.0
+      with:
+        username: ${{ secrets.DOCKER_HUB_USERNAME }}
+        password: ${{ secrets.DOCKER_HUB_PASSWORD }}
+    - name: "[execution] build k2d and build docker images"
+      run: |
+        if [ "${GITHUB_EVENT_NAME}" == "pull_request" ]; then
+          CONTAINER_IMAGE_TAG="pr${{ github.event.number }}"
+        else
+          CONTAINER_IMAGE_TAG="${GITHUB_REF_NAME}"
+        fi
+        make image-multiarch VERSION=${CONTAINER_IMAGE_TAG}

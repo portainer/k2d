@@ -2,8 +2,11 @@
 package converter
 
 import (
+	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/network"
 	"github.com/portainer/k2d/internal/adapter/filesystem"
 	"github.com/portainer/k2d/internal/types"
+	"github.com/portainer/k2d/pkg/rand"
 )
 
 // DockerAPIConverter is a struct that facilitates the conversion of Kubernetes objects into Docker API compatible configurations.
@@ -12,6 +15,15 @@ import (
 type DockerAPIConverter struct {
 	store                  *filesystem.FileSystemStore
 	k2dServerConfiguration *types.K2DServerConfiguration
+	portGenerator          *rand.PortGenerator
+}
+
+// ContainerConfiguration is a wrapper around the Docker API container configuration
+type ContainerConfiguration struct {
+	ContainerName   string
+	ContainerConfig *container.Config
+	HostConfig      *container.HostConfig
+	NetworkConfig   *network.NetworkingConfig
 }
 
 // NewDockerAPIConverter creates and returns a new DockerAPIConverter.
@@ -20,5 +32,6 @@ func NewDockerAPIConverter(store *filesystem.FileSystemStore, k2dServerConfig *t
 	return &DockerAPIConverter{
 		store:                  store,
 		k2dServerConfiguration: k2dServerConfig,
+		portGenerator:          rand.NewPortGenerator(),
 	}
 }
