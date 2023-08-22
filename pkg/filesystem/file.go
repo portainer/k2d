@@ -135,3 +135,14 @@ func LoadMetadataFromDisk(storagePath, fileName string) (map[string]string, erro
 
 	return data, nil
 }
+
+// ReadFileAsString reads the content of the file at the given file path and returns it as a string.
+// If an error occurs while opening the file, an error is returned with a description of the problem.
+func ReadFileAsString(filePath string) (string, error) {
+	fileBytes, err := os.ReadFile(filePath)
+	if err != nil {
+		return "", fmt.Errorf("an error occured while opening the file: %w", err)
+	}
+
+	return string(fileBytes), nil
+}
