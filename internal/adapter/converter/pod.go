@@ -104,6 +104,7 @@ func (converter *DockerAPIConverter) ConvertPodSpecToContainerConfiguration(spec
 		return ContainerConfiguration{}, err
 	}
 
+	setCommandAndArgs(containerConfig, containerSpec.Command, containerSpec.Args)
 	setRestartPolicy(hostConfig, spec.RestartPolicy)
 	setSecurityContext(containerConfig, hostConfig, spec.SecurityContext, containerSpec.SecurityContext)
 	converter.setResourceRequirements(hostConfig, containerSpec.Resources)
@@ -275,6 +276,19 @@ func setRestartPolicy(hostConfig *container.HostConfig, restartPolicy core.Resta
 		hostConfig.RestartPolicy = container.RestartPolicy{Name: "no"}
 	default:
 		hostConfig.RestartPolicy = container.RestartPolicy{Name: "always"}
+	}
+}
+
+// setCommandAndArgs configures the entrypoint and command arguments for a given Docker container configuration.
+// If the 'command' slice is non-empty, it is set as the container's entrypoint.
+// If the 'args' slice is non-empty, it is set as the container's command arguments.
+func setCommandAndArgs(containerConfig *container.Config, command []string, args []string) {
+	if len(command) > 0 {
+		containerConfig.Entrypoint = command
+	}
+
+	if len(args) > 0 {
+		containerConfig.Cmd = args
 	}
 }
 
