@@ -8,9 +8,9 @@ import (
 	"k8s.io/client-go/tools/clientcmd/api"
 )
 
-// GenerateKubeconfig generates a Kubernetes configuration file (kubeconfig) with the provided CA path and server address.
+// GenerateKubeconfig generates a Kubernetes configuration file (kubeconfig) with the provided CA path, server address, and authentication token.
 // The function returns the generated kubeconfig as a byte slice and an error if any.
-func GenerateKubeconfig(caPath, serverAddr string) ([]byte, error) {
+func GenerateKubeconfig(caPath, serverAddr, token string) ([]byte, error) {
 	caData, err := os.ReadFile(caPath)
 	if err != nil {
 		return []byte{}, fmt.Errorf("unable to read TLS CA file: %w", err)
@@ -34,7 +34,7 @@ func GenerateKubeconfig(caPath, serverAddr string) ([]byte, error) {
 		CurrentContext: "k2d",
 		AuthInfos: map[string]*api.AuthInfo{
 			"k2d-root": {
-				Token: "k2d-root-token",
+				Token: token,
 			},
 		},
 	}

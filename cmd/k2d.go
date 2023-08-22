@@ -21,11 +21,10 @@ import (
 	"github.com/portainer/k2d/internal/middleware"
 	"github.com/portainer/k2d/internal/openapi"
 	"github.com/portainer/k2d/internal/ssl"
+	"github.com/portainer/k2d/internal/token"
 	"github.com/portainer/k2d/internal/types"
-	fs "github.com/portainer/k2d/pkg/filesystem"
 	"github.com/portainer/k2d/pkg/network"
 	"github.com/sethvargo/go-envconfig"
-	"k8s.io/apimachinery/pkg/util/uuid"
 )
 
 func getAdvertiseIpAddr(advertiseAddr string) (net.IP, error) {
@@ -68,15 +67,10 @@ func main() {
 		logger.Fatalf("unable to setup TLS certificates: %s", err)
 	}
 
-	// We generate the token file that will be mounted into all containers
 	tokenPath := path.Join(cfg.DataPath, "token")
-	err = fs.CreateFileWithDirectories(tokenPath, []byte("fake-token"))
+	encodedSecret, err := token.RetrieveOrCreateEncodedSecret(logger, cfg.Secret, tokenPath)
 	if err != nil {
-		logger.Fatalf("unable to create token file: %s", err)
-	}
-
-	if cfg.Secret == "" {
-		cfg.Secret = string(uuid.NewUUID())
+		logger.Fatalf("unable to retrieve or create encoded secret: %s", err)
 	}
 
 	serverConfiguration := &types.K2DServerConfiguration{
@@ -84,7 +78,7 @@ func main() {
 		ServerPort:   cfg.Port,
 		CaPath:       ssl.SSLCAPath(cfg.DataPath),
 		TokenPath:    tokenPath,
-		Secret:       cfg.Secret,
+		Secret:       encodedSecret,
 	}
 
 	kubeDockerAdapterOptions := &adapter.KubeDockerAdapterOptions{
@@ -131,6 +125,7 @@ func main() {
 
 	container.Filter(middleware.AddTracingHeaders)
 	container.Filter(middleware.LogRequests)
+	container.Filter(middleware.CheckAuthenticationHeader(encodedSecret))
 
 	// We build the API
 	root := root.NewRootAPI()
@@ -179,12 +174,12 @@ func main() {
 	logger.Infow("starting k2d server on HTTPS port",
 		"address", fmt.Sprintf(":%d", cfg.Port),
 		"advertise_address", ip.String(),
-		"secret", cfg.Secret,
+		"secret", encodedSecret,
 	)
 
 	logger.Infoln("use the command below to retrieve the kubeconfig file")
-	logger.Infof("curl --insecure -H \"x-k2d-secret: %s\" https://%s:%d/k2d/kubeconfig",
-		serverConfiguration.Secret, serverConfiguration.ServerIpAddr, serverConfiguration.ServerPort)
+	logger.Infof("curl --insecure -H \"Authorization: Bearer %s\" https://%s:%d/k2d/kubeconfig",
+		encodedSecret, serverConfiguration.ServerIpAddr, serverConfiguration.ServerPort)
 
 	err = http.ListenAndServeTLS(
 		fmt.Sprintf(":%d", cfg.Port),
