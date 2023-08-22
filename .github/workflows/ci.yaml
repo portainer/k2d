@@ -15,7 +15,7 @@ on:
 
 env:
   DOCKER_HUB_CI_REPOSITORY: portainerci
-  CONTINAER_IMAGE_TAG: pr${{ github.event.pull_request.labels.name }}
+  CONTINAER_IMAGE_TAG: pr${{ github.event.number }}
 
 jobs:
   build_images:
@@ -23,18 +23,11 @@ jobs:
     steps:
     - name: "[preparation] checkout the current branch"
       uses: actions/checkout@v3.5.3
-      with:
-        ref: ${{ github.event.inputs.branch }}
-    - name: "[preparation] extract the branch name"
-      shell: bash
-      run: |
-        echo "branch=$(echo ${GITHUB_REF#refs/heads/})" >> $GITHUB_OUTPUT
-      id: extract_branch
     - name: "[preparation] set up golang 1.20.4"
       uses: actions/setup-go@v4.0.1
       with:
         go-version: "1.20.4"
-        cache-dependency-path: ./api/go.sum
+        cache-dependency-path: ./go.sum
     - name: "[preparation] set up qemu"
       uses: docker/setup-qemu-action@v2
     - name: "[preparation] set up docker context for buildx"
@@ -50,7 +43,7 @@ jobs:
         password: ${{ secrets.DOCKER_HUB_PASSWORD }}
     - name: "[execution] build k2d and build docker images"
       env:
-        if: github.event.pull_request.labels.name == ''
-        CONTAINER_IMAGE_TAG: ${{ steps.extract_branch.outputs.branch }}
-      run: |     
+        if: github.event.number == ''
+        CONTAINER_IMAGE_TAG: ${{ github.ref.name }}
+      run: |
         make image-multiarch REPOSITORY=${DOCKER_HUB_CI_REPOSITORY} VERSION=${CONTAINER_IMAGE_TAG}
