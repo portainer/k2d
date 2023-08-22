@@ -40,8 +40,8 @@ jobs:
     - name: "[execution] build k2d and build docker images"
       run: |
         if [ "${GITHUB_EVENT_NAME}" == "pull_request" ]; then
-          CONTAINER_IMAGE_TAG=pr${{ github.event.number }}
+          CONTAINER_IMAGE_TAG="pr${{ github.event.number }}"
         else
-          CONTAINER_IMAGE_TAG=${{ github.ref.name }}
+          CONTAINER_IMAGE_TAG="${GITHUB_REF_NAME}"
         fi
         make image-multiarch VERSION=${CONTAINER_IMAGE_TAG}
