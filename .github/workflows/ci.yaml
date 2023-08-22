@@ -46,4 +46,5 @@ jobs:
         if: github.event.number == ''
         CONTAINER_IMAGE_TAG: ${{ github.ref.name }}
       run: |
+        env
         make image-multiarch REPOSITORY=${DOCKER_HUB_CI_REPOSITORY} VERSION=${CONTAINER_IMAGE_TAG}
