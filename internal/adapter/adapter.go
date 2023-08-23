@@ -37,6 +37,8 @@ type (
 	KubeDockerAdapterOptions struct {
 		// DataPath is the path to the data directory where the configmaps and secrets will be stored
 		DataPath string
+		// VolumePath is the path to the directory where the volumes will be stored
+		VolumePath string
 		// DockerClientTimeout is the timeout that will be used when communicating with the Docker API with the Docker client
 		// It is responsible for the timeout of the Docker API calls such as creating a container, pulling an image...
 		DockerClientTimeout time.Duration
@@ -58,7 +60,7 @@ func NewKubeDockerAdapter(options *KubeDockerAdapterOptions) (*KubeDockerAdapter
 		return nil, fmt.Errorf("unable to create docker client: %w", err)
 	}
 
-	filesystemStore, err := filesystem.NewFileSystemStore(options.DataPath)
+	filesystemStore, err := filesystem.NewFileSystemStore(options.VolumePath)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create filesystem store: %w", err)
 	}

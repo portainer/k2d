@@ -83,6 +83,7 @@ func main() {
 
 	kubeDockerAdapterOptions := &adapter.KubeDockerAdapterOptions{
 		DataPath:            cfg.DataPath,
+		VolumePath:          cfg.VolumePath,
 		DockerClientTimeout: cfg.DockerClientTimeout,
 		ServerConfiguration: serverConfiguration,
 		Logger:              logger,

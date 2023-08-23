@@ -1,8 +1,12 @@
 package adapter
 
 import (
+	"context"
 	"fmt"
 
+	"github.com/docker/docker/api/types/filters"
+	"github.com/docker/docker/api/types/volume"
+	k2dtypes "github.com/portainer/k2d/internal/adapter/types"
 	"github.com/portainer/k2d/internal/k8s"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -10,12 +14,46 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core"
 )
 
-func (adapter *KubeDockerAdapter) CreateSecret(secret *corev1.Secret) error {
-	return adapter.fileSystemStore.StoreSecret(secret)
+func (adapter *KubeDockerAdapter) CreateSecret(ctx context.Context, secret *corev1.Secret) error {
+	// return adapter.fileSystemStore.StoreSecret(secret)
+	_, err := adapter.CreateVolume(ctx, VolumeOptions{
+		VolumeName: secret.Name,
+		Labels: map[string]string{
+			k2dtypes.GenericLabelKey: "secret",
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("unable to create volume: %w", err)
+	}
+
+	err = adapter.fileSystemStore.StoreSecret(secret)
+	if err != nil {
+		return fmt.Errorf("unable to store secret: %w", err)
+	}
+
+	return nil
 }
 
 func (adapter *KubeDockerAdapter) DeleteSecret(secretName string) error {
-	return adapter.fileSystemStore.DeleteSecret(secretName)
+	filter := filters.NewArgs()
+	filter.Add("label", fmt.Sprintf("%s=%s", k2dtypes.GenericLabelKey, "secret"))
+	filter.Add("name", secretName)
+
+	volume, err := adapter.cli.VolumeList(context.Background(), volume.ListOptions{
+		Filters: filter,
+	})
+	if err != nil {
+		return fmt.Errorf("unable to get the requested volume: %w", err)
+	}
+
+	if len(volume.Volumes) != 0 {
+		err = adapter.cli.VolumeRemove(context.Background(), volume.Volumes[0].Name, true)
+		if err != nil {
+			return fmt.Errorf("unable to remove volume: %w", err)
+		}
+	}
+
+	return nil
 }
 
 func (adapter *KubeDockerAdapter) GetSecret(secretName string) (*corev1.Secret, error) {
@@ -42,8 +80,7 @@ func (adapter *KubeDockerAdapter) GetSecret(secretName string) (*corev1.Secret, 
 }
 
 func (adapter *KubeDockerAdapter) ListSecrets(selector labels.Selector) (corev1.SecretList, error) {
-
-	secretList, err := adapter.listSecrets(selector)
+	secretList, err := adapter.listSecrets()
 	if err != nil {
 		return corev1.SecretList{}, fmt.Errorf("unable to list secrets: %w", err)
 	}
@@ -64,7 +101,7 @@ func (adapter *KubeDockerAdapter) ListSecrets(selector labels.Selector) (corev1.
 }
 
 func (adapter *KubeDockerAdapter) GetSecretTable(selector labels.Selector) (*metav1.Table, error) {
-	secretList, err := adapter.listSecrets(selector)
+	secretList, err := adapter.listSecrets()
 	if err != nil {
 		return &metav1.Table{}, fmt.Errorf("unable to list secrets: %w", err)
 	}
@@ -72,6 +109,22 @@ func (adapter *KubeDockerAdapter) GetSecretTable(selector labels.Selector) (*met
 	return k8s.GenerateTable(&secretList)
 }
 
-func (adapter *KubeDockerAdapter) listSecrets(selector labels.Selector) (core.SecretList, error) {
-	return adapter.fileSystemStore.GetSecrets(selector)
+func (adapter *KubeDockerAdapter) listSecrets() (core.SecretList, error) {
+	labelFilter := filters.NewArgs()
+	labelFilter.Add("label", fmt.Sprintf("%s=%s", k2dtypes.GenericLabelKey, "secret"))
+
+	volume, err := adapter.cli.VolumeList(context.Background(), volume.ListOptions{
+		Filters: labelFilter,
+	})
+
+	if err != nil {
+		return core.SecretList{}, fmt.Errorf("unable to list volumes: %w", err)
+	}
+
+	mountPoints := []string{}
+	for _, v := range volume.Volumes {
+		mountPoints = append(mountPoints, v.Mountpoint)
+	}
+
+	return adapter.fileSystemStore.GetSecrets(mountPoints)
 }

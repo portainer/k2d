@@ -1,6 +1,7 @@
 package secrets
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -39,7 +40,7 @@ func (svc SecretService) PutSecret(r *restful.Request, w *restful.Response) {
 	for {
 		_, err := svc.adapter.GetSecret(secretName)
 		if err == nil {
-			err = svc.adapter.CreateSecret(secret)
+			err = svc.adapter.CreateSecret(context.TODO(), secret)
 			if err != nil {
 				utils.HttpError(r, w, http.StatusInternalServerError, fmt.Errorf("unable to update secret: %w", err))
 				return

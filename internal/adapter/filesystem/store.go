@@ -2,11 +2,8 @@
 package filesystem
 
 import (
-	"fmt"
 	"path"
 	"sync"
-
-	"github.com/portainer/k2d/pkg/filesystem"
 )
 
 // Constants representing folder names and separators used in file paths.
@@ -25,6 +22,7 @@ type (
 		configMapPath string
 		secretPath    string
 		mutex         sync.Mutex
+		path          string
 	}
 )
 
@@ -32,18 +30,10 @@ type (
 // It receives a data path where the directories for configMaps and secrets are created.
 // If the directories cannot be created, an error is returned.
 func NewFileSystemStore(dataPath string) (*FileSystemStore, error) {
-	folders := []string{CONFIGMAP_FOLDER, SECRET_FOLDER}
-
-	for _, folder := range folders {
-		err := filesystem.CreateDir(path.Join(dataPath, folder))
-		if err != nil {
-			return nil, fmt.Errorf("unable to create directory %s: %w", folder, err)
-		}
-	}
-
 	return &FileSystemStore{
 		configMapPath: path.Join(dataPath, CONFIGMAP_FOLDER),
 		secretPath:    path.Join(dataPath, SECRET_FOLDER),
 		mutex:         sync.Mutex{},
+		path:          dataPath,
 	}, nil
 }

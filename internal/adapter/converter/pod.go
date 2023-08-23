@@ -2,6 +2,7 @@ package converter
 
 import (
 	"fmt"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -347,7 +348,7 @@ func (converter *DockerAPIConverter) handleVolumeSource(hostConfig *container.Ho
 	if volume.VolumeSource.ConfigMap != nil {
 		configMap, err := converter.store.GetConfigMap(volume.VolumeSource.ConfigMap.Name)
 		if err != nil {
-			return fmt.Errorf("unable to get configmap %s: %w", volume.VolumeSource.ConfigMap.Name, err)
+			return fmt.Errorf("unable to get configmap %s: %w", configMap.Name, err)
 		}
 
 		converter.setBindsFromAnnotations(hostConfig, configMap.Annotations, volumeMount, "configmap.k2d.io/")
@@ -370,7 +371,7 @@ func (converter *DockerAPIConverter) handleVolumeSource(hostConfig *container.Ho
 func (converter *DockerAPIConverter) setBindsFromAnnotations(hostConfig *container.HostConfig, annotations map[string]string, volumeMount core.VolumeMount, prefix string) {
 	for key, value := range annotations {
 		if strings.HasPrefix(key, prefix) {
-			bind := fmt.Sprintf("%s:%s", value, volumeMount.MountPath)
+			bind := fmt.Sprintf("%s:%s", value, filepath.Dir(volumeMount.MountPath))
 			hostConfig.Binds = append(hostConfig.Binds, bind)
 		}
 	}
