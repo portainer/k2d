@@ -19,57 +19,6 @@ import (
 
 var ErrConfigMapNotFound = errors.New("configmap file(s) not found")
 
-// func buildConfigMapMetadataFileName(configMapName string) string {
-// 	return fmt.Sprintf("%s-k2dcm.metadata", configMapName)
-// }
-
-// func (store *FileSystemStore) DeleteConfigMap(configMapName string) error {
-// 	store.mutex.Lock()
-// 	defer store.mutex.Unlock()
-
-// 	files, err := os.ReadDir(store.configMapPath)
-// 	if err != nil {
-// 		return fmt.Errorf("unable to read configmap directory: %w", err)
-// 	}
-
-// 	fileNames := []string{}
-// 	for _, file := range files {
-// 		fileNames = append(fileNames, file.Name())
-// 	}
-
-// 	uniqueNames := str.UniquePrefixes(fileNames, CONFIGMAP_SEPARATOR)
-
-// 	if !str.IsStringInSlice(configMapName, uniqueNames) {
-// 		return fmt.Errorf("configmap %s not found", configMapName)
-// 	}
-
-// 	filePrefix := fmt.Sprintf("%s%s", configMapName, CONFIGMAP_SEPARATOR)
-
-// 	for _, file := range files {
-// 		if strings.HasPrefix(file.Name(), filePrefix) {
-// 			err := os.Remove(path.Join(store.configMapPath, file.Name()))
-// 			if err != nil {
-// 				return fmt.Errorf("unable to remove file %s: %w", file.Name(), err)
-// 			}
-// 		}
-// 	}
-
-// 	metadataFileName := buildConfigMapMetadataFileName(configMapName)
-// 	metadataFileFound, err := filesystem.FileExists(path.Join(store.configMapPath, metadataFileName))
-// 	if err != nil {
-// 		return fmt.Errorf("unable to check if metadata file exists: %w", err)
-// 	}
-
-// 	if metadataFileFound {
-// 		err := os.Remove(path.Join(store.configMapPath, metadataFileName))
-// 		if err != nil {
-// 			return fmt.Errorf("unable to remove file %s: %w", metadataFileName, err)
-// 		}
-// 	}
-
-// 	return nil
-// }
-
 func (store *FileSystemStore) GetConfigMap(configMapName string) (*core.ConfigMap, error) {
 	store.mutex.Lock()
 	defer store.mutex.Unlock()

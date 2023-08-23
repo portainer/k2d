@@ -17,57 +17,6 @@ import (
 
 var ErrSecretNotFound = errors.New("secret file(s) not found")
 
-// func buildSecretMetadataFileName(secretName string) string {
-// 	return fmt.Sprintf("%s-k2dsec.metadata", secretName)
-// }
-
-// func (store *FileSystemStore) DeleteSecret(secretName string) error {
-// 	store.mutex.Lock()
-// 	defer store.mutex.Unlock()
-
-// 	files, err := os.ReadDir(store.secretPath)
-// 	if err != nil {
-// 		return fmt.Errorf("unable to read secret directory: %w", err)
-// 	}
-
-// 	fileNames := []string{}
-// 	for _, file := range files {
-// 		fileNames = append(fileNames, file.Name())
-// 	}
-
-// 	uniqueNames := str.UniquePrefixes(fileNames, SECRET_SEPARATOR)
-
-// 	if !str.IsStringInSlice(secretName, uniqueNames) {
-// 		return fmt.Errorf("secret %s not found", secretName)
-// 	}
-
-// 	filePrefix := fmt.Sprintf("%s%s", secretName, SECRET_SEPARATOR)
-
-// 	for _, file := range files {
-// 		if strings.HasPrefix(file.Name(), filePrefix) {
-// 			err := os.Remove(path.Join(store.secretPath, file.Name()))
-// 			if err != nil {
-// 				return fmt.Errorf("unable to remove file %s: %w", file.Name(), err)
-// 			}
-// 		}
-// 	}
-
-// 	metadataFileName := buildSecretMetadataFileName(secretName)
-// 	metadataFileFound, err := filesystem.FileExists(path.Join(store.secretPath, metadataFileName))
-// 	if err != nil {
-// 		return fmt.Errorf("unable to check if metadata file exists: %w", err)
-// 	}
-
-// 	if metadataFileFound {
-// 		err := os.Remove(path.Join(store.secretPath, metadataFileName))
-// 		if err != nil {
-// 			return fmt.Errorf("unable to remove file %s: %w", metadataFileName, err)
-// 		}
-// 	}
-
-// 	return nil
-// }
-
 func (store *FileSystemStore) GetSecret(secretName string) (*core.Secret, error) {
 	store.mutex.Lock()
 	defer store.mutex.Unlock()
