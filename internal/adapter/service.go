@@ -62,6 +62,14 @@ func (adapter *KubeDockerAdapter) CreateContainerFromService(ctx context.Context
 		return nil
 	}
 
+	// ExternalName services are not supported
+	if service.Spec.Type == corev1.ServiceTypeExternalName {
+		logger.Infow("externalName service detected. The service will be ignored",
+			"service_name", service.Name,
+		)
+		return nil
+	}
+
 	containers, err := adapter.cli.ContainerList(ctx, types.ContainerListOptions{})
 	if err != nil {
 		return fmt.Errorf("unable to list containers: %w", err)

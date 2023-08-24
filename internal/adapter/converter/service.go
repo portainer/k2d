@@ -20,8 +20,8 @@ func (converter *DockerAPIConverter) ConvertServiceSpecIntoContainerConfiguratio
 	}
 
 	// portBindings forces a random high port to be used for a non-NodePort service
-	// hence, we need to check for the NodePort service type only
-	if serviceSpec.Type == core.ServiceTypeNodePort {
+	// hence, we need to check for the non-NodePort service type and assign the right ports to it
+	if serviceSpec.Type != core.ServiceTypeClusterIP {
 		for _, port := range serviceSpec.Ports {
 			containerPort, err := nat.NewPort(string(port.Protocol), port.TargetPort.String())
 			if err != nil {
@@ -32,15 +32,19 @@ func (converter *DockerAPIConverter) ConvertServiceSpecIntoContainerConfiguratio
 				HostIP: "0.0.0.0",
 			}
 
-			if port.NodePort != 0 {
-				hostBinding.HostPort = strconv.Itoa(int(port.NodePort))
-			} else {
-				randomPort, err := converter.portGenerator.GenerateRandomPort(&usedPorts)
-				if err != nil {
-					return fmt.Errorf("unable to generate random port: %w", err)
-				}
+			if serviceSpec.Type == core.ServiceTypeNodePort {
+				if port.NodePort != 0 {
+					hostBinding.HostPort = strconv.Itoa(int(port.NodePort))
+				} else {
+					randomPort, err := converter.portGenerator.GenerateRandomPort(&usedPorts)
+					if err != nil {
+						return fmt.Errorf("unable to generate random port: %w", err)
+					}
 
-				hostBinding.HostPort = strconv.Itoa(randomPort)
+					hostBinding.HostPort = strconv.Itoa(randomPort)
+				}
+			} else if serviceSpec.Type == core.ServiceTypeLoadBalancer {
+				hostBinding.HostPort = strconv.Itoa(int(port.Port))
 			}
 
 			containerCfg.HostConfig.PortBindings[containerPort] = []nat.PortBinding{hostBinding}
@@ -71,20 +75,29 @@ func (converter *DockerAPIConverter) UpdateServiceFromContainerInfo(service *cor
 
 	service.Spec.ClusterIPs = []string{container.NetworkSettings.Networks[k2dtypes.K2DNetworkName].IPAddress}
 
-	if service.Spec.Type == core.ServiceTypeNodePort {
-		service.Spec.ExternalIPs = []string{converter.k2dServerConfiguration.ServerIpAddr}
-
+	if service.Spec.Type != core.ServiceTypeClusterIP {
 		servicePorts := []core.ServicePort{}
 		for _, port := range service.Spec.Ports {
 			for _, containerPort := range container.Ports {
 				if port.TargetPort == intstr.Parse(strconv.Itoa(int(containerPort.PrivatePort))) {
-					servicePorts = append(servicePorts, core.ServicePort{
-						Name:       port.Name,
-						Protocol:   port.Protocol,
-						Port:       port.Port,
-						TargetPort: port.TargetPort,
-						NodePort:   int32(containerPort.PublicPort),
-					})
+					if service.Spec.Type == core.ServiceTypeNodePort {
+						servicePorts = append(servicePorts, core.ServicePort{
+							Name:       port.Name,
+							Protocol:   port.Protocol,
+							Port:       port.Port,
+							TargetPort: port.TargetPort,
+							NodePort:   int32(containerPort.PublicPort),
+						})
+					} else if service.Spec.Type == core.ServiceTypeLoadBalancer {
+						// make external-ip only avaiable for the load balancer type
+						service.Spec.ExternalIPs = []string{converter.k2dServerConfiguration.ServerIpAddr}
+						servicePorts = append(servicePorts, core.ServicePort{
+							Name:       port.Name,
+							Protocol:   port.Protocol,
+							Port:       port.Port,
+							TargetPort: port.TargetPort,
+						})
+					}
 				}
 			}
 		}
