@@ -7,6 +7,7 @@ import (
 	"github.com/docker/docker/client"
 	"github.com/portainer/k2d/internal/adapter/converter"
 	"github.com/portainer/k2d/internal/adapter/filesystem"
+	"github.com/portainer/k2d/internal/adapter/memory"
 	"github.com/portainer/k2d/internal/types"
 	"go.uber.org/zap"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -26,7 +27,9 @@ type (
 	KubeDockerAdapter struct {
 		cli                    *client.Client
 		converter              *converter.DockerAPIConverter
-		fileSystemStore        *filesystem.FileSystemStore
+		configMapStore         types.ConfigMapStore
+		secretStore            types.SecretStore
+		registrySecretStore    types.SecretStore
 		logger                 *zap.SugaredLogger
 		conversionScheme       *runtime.Scheme
 		startTime              time.Time
@@ -73,7 +76,9 @@ func NewKubeDockerAdapter(options *KubeDockerAdapterOptions) (*KubeDockerAdapter
 	return &KubeDockerAdapter{
 		cli:                    cli,
 		converter:              converter.NewDockerAPIConverter(filesystemStore, options.ServerConfiguration),
-		fileSystemStore:        filesystemStore,
+		configMapStore:         filesystemStore,
+		secretStore:            filesystemStore,
+		registrySecretStore:    memory.NewInMemoryStore(),
 		logger:                 options.Logger,
 		conversionScheme:       scheme,
 		startTime:              time.Now(),
