@@ -1,4 +1,3 @@
-// Package filesystem provides functionality to interact with the file system.
 package filesystem
 
 import (
@@ -18,6 +17,7 @@ const (
 )
 
 // FileSystemStore is a structure that represents a file system store.
+// It can be used to store ConfigMaps and Secrets.
 // It holds paths to the configMap and secret directories,
 // and a mutex to handle concurrent access.
 type (

@@ -6,7 +6,7 @@ import (
 	"net/http"
 
 	"github.com/emicklei/go-restful/v3"
-	"github.com/portainer/k2d/internal/adapter/filesystem"
+	"github.com/portainer/k2d/internal/adapter/store/filesystem"
 	"github.com/portainer/k2d/internal/api/utils"
 )
 

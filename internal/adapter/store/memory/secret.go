@@ -14,7 +14,8 @@ type secretData struct {
 	Type string
 }
 
-// InMemoryStore is a simple in-memory store for secrets
+// InMemoryStore is a simple in-memory that can be used
+// to store Secrets.
 type InMemoryStore struct {
 	m         sync.RWMutex
 	secretMap map[string]secretData

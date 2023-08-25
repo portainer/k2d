@@ -4,7 +4,7 @@ package converter
 import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/network"
-	"github.com/portainer/k2d/internal/adapter/filesystem"
+	"github.com/portainer/k2d/internal/adapter/store/filesystem"
 	"github.com/portainer/k2d/internal/types"
 	"github.com/portainer/k2d/pkg/rand"
 )
