@@ -80,19 +80,6 @@ func (adapter *KubeDockerAdapter) GetSecretTable(selector labels.Selector) (*met
 }
 
 func (adapter *KubeDockerAdapter) getSecret(secretName string) (*core.Secret, error) {
-	// secret, err := adapter.secretStore.GetSecret(secretName)
-	// if err != nil {
-	// 	if !errors.Is(err, filesystem.ErrSecretNotFound) {
-	// 		return nil, fmt.Errorf("unable to get secret: %w", err)
-	// 	}
-
-	// 	// If not found in secretStore, try to fetch from registrySecretStore
-	// 	secret, err = adapter.registrySecretStore.GetSecret(secretName)
-	// 	if err != nil {
-	// 		return nil, fmt.Errorf("unable to get registry secret: %w", err)
-	// 	}
-	// }
-
 	secret, err := adapter.secretStore.GetSecret(secretName)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get secret: %w", err)
