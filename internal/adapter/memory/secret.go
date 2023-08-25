@@ -9,25 +9,26 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core"
 )
 
-type SecretData struct {
-	// Data map[string][]byte `json:"data"`
+type secretData struct {
 	Data map[string][]byte
+	Type string
 }
 
-type (
-	InMemoryStore struct {
-		m         sync.RWMutex
-		secretMap map[string]SecretData
-	}
-)
+// InMemoryStore is a simple in-memory store for secrets
+type InMemoryStore struct {
+	m         sync.RWMutex
+	secretMap map[string]secretData
+}
 
+// NewInMemoryStore creates a new in-memory store
 func NewInMemoryStore() *InMemoryStore {
 	return &InMemoryStore{
 		m:         sync.RWMutex{},
-		secretMap: make(map[string]SecretData),
+		secretMap: make(map[string]secretData),
 	}
 }
 
+// DeleteSecret deletes a secret from the in-memory store
 func (s *InMemoryStore) DeleteSecret(secretName string) error {
 	s.m.Lock()
 	defer s.m.Unlock()
@@ -35,6 +36,7 @@ func (s *InMemoryStore) DeleteSecret(secretName string) error {
 	return nil
 }
 
+// GetSecret gets a secret from the in-memory store
 func (s *InMemoryStore) GetSecret(secretName string) (*core.Secret, error) {
 	s.m.RLock()
 	defer s.m.RUnlock()
@@ -54,10 +56,11 @@ func (s *InMemoryStore) GetSecret(secretName string) (*core.Secret, error) {
 			Namespace:   "default",
 		},
 		Data: data.Data,
-		// Type: core.SecretTypeOpaque,
+		Type: core.SecretType(data.Type),
 	}, nil
 }
 
+// GetSecrets gets all secrets from the in-memory store
 func (s *InMemoryStore) GetSecrets(selector labels.Selector) (core.SecretList, error) {
 	s.m.RLock()
 	defer s.m.RUnlock()
@@ -76,7 +79,7 @@ func (s *InMemoryStore) GetSecrets(selector labels.Selector) (core.SecretList, e
 				Namespace:   "default",
 			},
 			Data: data.Data,
-			// Type: core.SecretTypeOpaque,
+			Type: core.SecretType(data.Type),
 		}
 
 		secrets = append(secrets, secret)
@@ -87,12 +90,14 @@ func (s *InMemoryStore) GetSecrets(selector labels.Selector) (core.SecretList, e
 	}, nil
 }
 
+// StoreSecret stores a secret in the in-memory store
 func (s *InMemoryStore) StoreSecret(secret *corev1.Secret) error {
 	s.m.Lock()
 	defer s.m.Unlock()
 
-	s.secretMap[secret.Name] = SecretData{
+	s.secretMap[secret.Name] = secretData{
 		Data: secret.Data,
+		Type: string(secret.Type),
 	}
 
 	return nil

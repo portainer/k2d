@@ -4,13 +4,15 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/portainer/k2d/internal/adapter/filesystem"
 	"github.com/portainer/k2d/internal/k8s"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/kubernetes/pkg/apis/core"
 )
+
+// ErrSecretNotFound is returned when a secret is not found in any available store
+var ErrSecretNotFound = errors.New("secret not found")
 
 func (adapter *KubeDockerAdapter) CreateSecret(secret *corev1.Secret) error {
 	if secret.Type == corev1.SecretTypeDockerConfigJson {
@@ -25,17 +27,9 @@ func (adapter *KubeDockerAdapter) DeleteSecret(secretName string) error {
 }
 
 func (adapter *KubeDockerAdapter) GetSecret(secretName string) (*corev1.Secret, error) {
-	secret, err := adapter.secretStore.GetSecret(secretName)
+	secret, err := adapter.getSecret(secretName)
 	if err != nil {
-		if !errors.Is(err, filesystem.ErrSecretNotFound) {
-			return nil, fmt.Errorf("unable to get secret: %w", err)
-		}
-
-		// If not found in secretStore, try to fetch from registrySecretStore
-		secret, err = adapter.registrySecretStore.GetSecret(secretName)
-		if err != nil {
-			return nil, fmt.Errorf("unable to get registry secret: %w", err)
-		}
+		return nil, fmt.Errorf("unable to get secret: %w", err)
 	}
 
 	versionedSecret := corev1.Secret{
@@ -83,6 +77,41 @@ func (adapter *KubeDockerAdapter) GetSecretTable(selector labels.Selector) (*met
 	}
 
 	return k8s.GenerateTable(&secretList)
+}
+
+func (adapter *KubeDockerAdapter) getSecret(secretName string) (*core.Secret, error) {
+	// secret, err := adapter.secretStore.GetSecret(secretName)
+	// if err != nil {
+	// 	if !errors.Is(err, filesystem.ErrSecretNotFound) {
+	// 		return nil, fmt.Errorf("unable to get secret: %w", err)
+	// 	}
+
+	// 	// If not found in secretStore, try to fetch from registrySecretStore
+	// 	secret, err = adapter.registrySecretStore.GetSecret(secretName)
+	// 	if err != nil {
+	// 		return nil, fmt.Errorf("unable to get registry secret: %w", err)
+	// 	}
+	// }
+
+	secret, err := adapter.secretStore.GetSecret(secretName)
+	if err != nil {
+		return nil, fmt.Errorf("unable to get secret: %w", err)
+	}
+
+	if secret != nil {
+		return secret, nil
+	}
+
+	registrySecret, err := adapter.registrySecretStore.GetSecret(secretName)
+	if err != nil {
+		return nil, fmt.Errorf("unable to get registry secret: %w", err)
+	}
+
+	if registrySecret != nil {
+		return registrySecret, nil
+	}
+
+	return nil, ErrSecretNotFound
 }
 
 func (adapter *KubeDockerAdapter) listSecrets(selector labels.Selector) (core.SecretList, error) {
