@@ -2,7 +2,6 @@ package filesystem
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"os"
 	"path"
@@ -15,8 +14,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/kubernetes/pkg/apis/core"
 )
-
-var ErrSecretNotFound = errors.New("secret file(s) not found")
 
 func buildSecretMetadataFileName(secretName string) string {
 	return fmt.Sprintf("%s-k2dsec.metadata", secretName)
@@ -75,7 +72,7 @@ func (store *FileSystemStore) GetSecret(secretName string) (*core.Secret, error)
 
 	files, err := os.ReadDir(store.secretPath)
 	if err != nil {
-		return &core.Secret{}, fmt.Errorf("unable to read secret directory: %w", err)
+		return nil, fmt.Errorf("unable to read secret directory: %w", err)
 	}
 
 	fileNames := []string{}
@@ -86,7 +83,7 @@ func (store *FileSystemStore) GetSecret(secretName string) (*core.Secret, error)
 	uniqueNames := str.UniquePrefixes(fileNames, SECRET_SEPARATOR)
 
 	if !str.IsStringInSlice(secretName, uniqueNames) {
-		return &core.Secret{}, ErrSecretNotFound
+		return nil, nil
 	}
 
 	secret := core.Secret{
@@ -109,13 +106,13 @@ func (store *FileSystemStore) GetSecret(secretName string) (*core.Secret, error)
 		if strings.HasPrefix(file.Name(), filePrefix) {
 			data, err := os.ReadFile(path.Join(store.secretPath, file.Name()))
 			if err != nil {
-				return &core.Secret{}, fmt.Errorf("unable to read file %s: %w", file.Name(), err)
+				return nil, fmt.Errorf("unable to read file %s: %w", file.Name(), err)
 			}
 
 			secret.Data[strings.TrimPrefix(file.Name(), secretName+SECRET_SEPARATOR)] = bytes.TrimSuffix(data, []byte("\n"))
 			info, err := os.Stat(path.Join(store.secretPath, file.Name()))
 			if err != nil {
-				return &core.Secret{}, fmt.Errorf("unable to get file info for %s: %w", file.Name(), err)
+				return nil, fmt.Errorf("unable to get file info for %s: %w", file.Name(), err)
 			}
 			secret.ObjectMeta.CreationTimestamp = metav1.NewTime(info.ModTime())
 			secret.ObjectMeta.Annotations[fmt.Sprintf("secret.k2d.io/%s", file.Name())] = path.Join(store.secretPath, file.Name())
@@ -125,13 +122,13 @@ func (store *FileSystemStore) GetSecret(secretName string) (*core.Secret, error)
 	metadataFileName := buildSecretMetadataFileName(secretName)
 	metadataFileFound, err := filesystem.FileExists(path.Join(store.secretPath, metadataFileName))
 	if err != nil {
-		return &core.Secret{}, fmt.Errorf("unable to check if metadata file exists: %w", err)
+		return nil, fmt.Errorf("unable to check if metadata file exists: %w", err)
 	}
 
 	if metadataFileFound {
 		metadata, err := filesystem.LoadMetadataFromDisk(store.secretPath, metadataFileName)
 		if err != nil {
-			return &core.Secret{}, fmt.Errorf("unable to load secret metadata from disk: %w", err)
+			return nil, fmt.Errorf("unable to load secret metadata from disk: %w", err)
 		}
 
 		secret.Labels = metadata

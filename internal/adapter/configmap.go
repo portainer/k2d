@@ -10,15 +10,15 @@ import (
 )
 
 func (adapter *KubeDockerAdapter) CreateConfigMap(configMap *corev1.ConfigMap) error {
-	return adapter.fileSystemStore.StoreConfigMap(configMap)
+	return adapter.configMapStore.StoreConfigMap(configMap)
 }
 
 func (adapter *KubeDockerAdapter) DeleteConfigMap(configMapName string) error {
-	return adapter.fileSystemStore.DeleteConfigMap(configMapName)
+	return adapter.configMapStore.DeleteConfigMap(configMapName)
 }
 
 func (adapter *KubeDockerAdapter) GetConfigMap(configMapName string) (*corev1.ConfigMap, error) {
-	configMap, err := adapter.fileSystemStore.GetConfigMap(configMapName)
+	configMap, err := adapter.configMapStore.GetConfigMap(configMapName)
 	if err != nil {
 		return &corev1.ConfigMap{}, fmt.Errorf("unable to get configmap: %w", err)
 	}
@@ -71,5 +71,5 @@ func (adapter *KubeDockerAdapter) ListConfigMaps() (corev1.ConfigMapList, error)
 }
 
 func (adapter *KubeDockerAdapter) listConfigMaps() (core.ConfigMapList, error) {
-	return adapter.fileSystemStore.GetConfigMaps()
+	return adapter.configMapStore.GetConfigMaps()
 }

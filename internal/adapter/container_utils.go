@@ -2,18 +2,22 @@ package adapter
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
 	"os"
 	"strings"
 
+	"github.com/docker/distribution/reference"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/network"
+	"github.com/docker/docker/api/types/registry"
 	"github.com/docker/go-connections/nat"
 	"github.com/portainer/k2d/internal/adapter/converter"
 	k2dtypes "github.com/portainer/k2d/internal/adapter/types"
+	"github.com/portainer/k2d/internal/k8s"
 	"github.com/portainer/k2d/internal/logging"
 	"github.com/portainer/k2d/pkg/maputils"
 	corev1 "k8s.io/api/core/v1"
@@ -152,12 +156,20 @@ type ContainerCreationOptions struct {
 }
 
 // createContainerFromPodSpec creates a new Docker container from a given Kubernetes PodSpec.
-// The function attempts to convert the PodSpec to a Docker container configuration.
-// It first checks if a container with the same name specified in the ContainerCreationOptions already exists.
-// If it exists and has the same configuration, the update is skipped and the function returns.
-// If it exists but has a different configuration, the old container is removed.
-// The function then pulls the necessary image, and if successful, creates and starts the new Docker container.
-// The created container is attached to a predefined Docker network.
+// The function first initializes labels if they are not provided and adds the last applied configuration
+// to the labels if it's specified. It then converts the versioned pod spec to an internal pod spec
+// and serializes it to JSON to be stored as a label on the Docker container.
+//
+// It attempts to convert the internal PodSpec to a Docker container configuration and lists existing
+// Docker containers to check if a container with the specified name already exists.
+//
+// If a matching container is found and has the same last applied configuration, the update is skipped.
+// If the existing container has a different configuration, it is removed, and its network aliases and
+// service last applied configuration label are preserved if present.
+//
+// The function then pulls the necessary image using the registry credentials obtained for the image
+// in the provided pod spec. If successful, it creates and starts the new Docker container, attaching
+// it to a predefined Docker network.
 //
 // Parameters:
 // ctx - The context within which the function works. Used for timeout and cancellation signals.
@@ -168,7 +180,8 @@ type ContainerCreationOptions struct {
 //   - lastAppliedConfiguration: String representation of the last applied configuration of the parent Kubernetes object.
 //     This field is stored as a label on the Docker container.
 //
-// If there is an error at any point in the process (conversion failure, image pull failure, etc.), the function returns the error.
+// If there is an error at any point in the process (e.g., conversion failure, image pull failure, container removal or creation),
+// the function returns the error, wrapped with a description of the step that failed.
 func (adapter *KubeDockerAdapter) createContainerFromPodSpec(ctx context.Context, options ContainerCreationOptions) error {
 	if options.labels == nil {
 		options.labels = map[string]string{}
@@ -227,7 +240,14 @@ func (adapter *KubeDockerAdapter) createContainerFromPodSpec(ctx context.Context
 		}
 	}
 
-	out, err := adapter.cli.ImagePull(ctx, containerCfg.ContainerConfig.Image, types.ImagePullOptions{})
+	registryAuth, err := adapter.getRegistryCredentials(options.podSpec, containerCfg.ContainerConfig.Image)
+	if err != nil {
+		return fmt.Errorf("unable to get registry credentials: %w", err)
+	}
+
+	out, err := adapter.cli.ImagePull(ctx, containerCfg.ContainerConfig.Image, types.ImagePullOptions{
+		RegistryAuth: registryAuth,
+	})
 	if err != nil {
 		return fmt.Errorf("unable to pull %s image: %w", containerCfg.ContainerConfig.Image, err)
 	}
@@ -259,6 +279,69 @@ func (adapter *KubeDockerAdapter) DeleteContainer(ctx context.Context, container
 	}
 
 	return nil
+}
+
+// getRegistryCredentials retrieves the registry credentials for a given image name
+// within the specified pod specification. If the podSpec's ImagePullSecrets are nil,
+// it returns an empty string without an error.
+//
+// The function first normalizes the image name by adding the "docker.io/" prefix if it
+// lacks a registry domain. Then, it parses the image name to obtain the registry URL.
+//
+// Using the first pull secret from podSpec.ImagePullSecrets, the function fetches the registry
+// secret and decodes it using the given registry URL. It constructs an authentication config
+// from the obtained username and password and returns its base64-encoded JSON representation.
+//
+// If any step fails, an error is returned.
+func (adapter *KubeDockerAdapter) getRegistryCredentials(podSpec corev1.PodSpec, imageName string) (string, error) {
+	if podSpec.ImagePullSecrets == nil {
+		return "", nil
+	}
+
+	if !strings.Contains(imageName, "/") || !strings.Contains(strings.Split(imageName, "/")[0], ".") {
+		imageName = "docker.io/" + imageName
+	}
+
+	parsed, err := reference.ParseNamed(imageName)
+	if err != nil {
+		return "", fmt.Errorf("unable to parse image name: %w", err)
+	}
+
+	registryURL := reference.Domain(parsed)
+
+	adapter.logger.Debugw("retrieving private registry credentials",
+		"container_image", imageName,
+		"registry", registryURL,
+	)
+
+	// We only support a single image pull secret for now
+	pullSecret := podSpec.ImagePullSecrets[0]
+
+	registrySecret, err := adapter.registrySecretStore.GetSecret(pullSecret.Name)
+	if err != nil {
+		return "", fmt.Errorf("unable to get registry secret: %w", err)
+	}
+
+	if registrySecret == nil {
+		return "", fmt.Errorf("registry secret %s not found", pullSecret.Name)
+	}
+
+	username, password, err := k8s.GetRegistryAuthFromSecret(registrySecret, registryURL)
+	if err != nil {
+		return "", fmt.Errorf("unable to decode registry secret: %w", err)
+	}
+
+	authConfig := registry.AuthConfig{
+		Username: username,
+		Password: password,
+	}
+
+	encodedAuthConfig, err := json.Marshal(authConfig)
+	if err != nil {
+		return "", fmt.Errorf("unable to marshal auth config: %w", err)
+	}
+
+	return base64.URLEncoding.EncodeToString(encodedAuthConfig), nil
 }
 
 // DeployPortainerEdgeAgent deploys a Portainer Edge Agent as a Docker container.
