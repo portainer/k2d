@@ -2,13 +2,11 @@ package namespaces
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
 
 	"github.com/emicklei/go-restful/v3"
-	"github.com/portainer/k2d/internal/adapter/filesystem"
 	"github.com/portainer/k2d/internal/api/utils"
 	"github.com/portainer/k2d/internal/controller"
 	"github.com/portainer/k2d/internal/types"
@@ -29,10 +27,7 @@ func (svc NamespaceService) PatchNamespace(r *restful.Request, w *restful.Respon
 	}
 
 	namespace, err := svc.adapter.GetNamespace(r.Request.Context(), namespaceName)
-	if err != nil && errors.Is(err, filesystem.ErrSecretNotFound) {
-		w.WriteHeader(http.StatusNotFound)
-		return
-	} else if err != nil {
+	if err != nil {
 		utils.HttpError(r, w, http.StatusInternalServerError, fmt.Errorf("unable to get namespace: %w", err))
 		return
 	}
