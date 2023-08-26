@@ -28,7 +28,7 @@ func NewV1Service(adapter *adapter.KubeDockerAdapter, operations chan controller
 	return V1Service{
 		configMaps: configmaps.NewConfigMapService(adapter, operations),
 		events:     events.NewEventService(adapter),
-		namespaces: namespaces.NewNamespaceService(adapter),
+		namespaces: namespaces.NewNamespaceService(adapter, operations),
 		nodes:      nodes.NewNodeService(adapter),
 		pods:       pods.NewPodService(adapter, operations),
 		secrets:    secrets.NewSecretService(adapter, operations),
@@ -59,7 +59,7 @@ func (svc V1Service) ListAPIResources(r *restful.Request, w *restful.Response) {
 				Kind:         "Namespace",
 				SingularName: "",
 				Name:         "namespaces",
-				Verbs:        []string{"list", "get"},
+				Verbs:        []string{"create", "list", "delete", "get", "patch"},
 				Namespaced:   false,
 				ShortNames:   []string{"ns"},
 			},

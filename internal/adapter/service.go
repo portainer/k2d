@@ -127,7 +127,13 @@ func (adapter *KubeDockerAdapter) CreateContainerFromService(ctx context.Context
 		return fmt.Errorf("unable to convert service spec into container configuration: %w", err)
 	}
 
-	cfg.NetworkConfig.EndpointsConfig[k2dtypes.K2DNetworkName].Aliases = []string{service.Name}
+	// Update with namespace as well
+	cfg.NetworkConfig.EndpointsConfig[service.Namespace].Aliases = []string{
+		service.Name,
+		fmt.Sprintf("%s.%s", service.Name, service.Namespace),
+		fmt.Sprintf("%s.%s.svc", service.Name, service.Namespace),
+		fmt.Sprintf("%s.%s.svc.cluster.local", service.Name, service.Namespace),
+	}
 
 	return adapter.reCreateContainerWithNewConfiguration(ctx, matchingContainer.ID, cfg)
 }
@@ -168,8 +174,8 @@ func (adapter *KubeDockerAdapter) GetService(ctx context.Context, serviceName st
 	return nil, nil
 }
 
-func (adapter *KubeDockerAdapter) GetServiceTable(ctx context.Context) (*metav1.Table, error) {
-	serviceList, err := adapter.listServices(ctx)
+func (adapter *KubeDockerAdapter) GetServiceTable(ctx context.Context, namespaceName string) (*metav1.Table, error) {
+	serviceList, err := adapter.listServices(ctx, namespaceName)
 	if err != nil {
 		return &metav1.Table{}, fmt.Errorf("unable to list services: %w", err)
 	}
@@ -177,8 +183,8 @@ func (adapter *KubeDockerAdapter) GetServiceTable(ctx context.Context) (*metav1.
 	return k8s.GenerateTable(&serviceList)
 }
 
-func (adapter *KubeDockerAdapter) ListServices(ctx context.Context) (corev1.ServiceList, error) {
-	serviceList, err := adapter.listServices(ctx)
+func (adapter *KubeDockerAdapter) ListServices(ctx context.Context, namespaceName string) (corev1.ServiceList, error) {
+	serviceList, err := adapter.listServices(ctx, namespaceName)
 	if err != nil {
 		return corev1.ServiceList{}, fmt.Errorf("unable to list services: %w", err)
 	}
@@ -225,7 +231,7 @@ func (adapter *KubeDockerAdapter) getService(container types.Container) (*core.S
 	return &service, nil
 }
 
-func (adapter *KubeDockerAdapter) listServices(ctx context.Context) (core.ServiceList, error) {
+func (adapter *KubeDockerAdapter) listServices(ctx context.Context, namespaceName string) (core.ServiceList, error) {
 	containers, err := adapter.cli.ContainerList(ctx, types.ContainerListOptions{All: true})
 	if err != nil {
 		return core.ServiceList{}, fmt.Errorf("unable to list containers: %w", err)
@@ -234,7 +240,7 @@ func (adapter *KubeDockerAdapter) listServices(ctx context.Context) (core.Servic
 	services := []core.Service{}
 
 	for _, container := range containers {
-		if container.Labels[k2dtypes.ServiceNameLabelKey] != "" {
+		if container.Labels[k2dtypes.ServiceNameLabelKey] != "" && container.Labels[k2dtypes.NamespaceLabelKey] == namespaceName {
 			service, err := adapter.getService(container)
 			if err != nil {
 				return core.ServiceList{}, fmt.Errorf("unable to get service: %w", err)

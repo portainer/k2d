@@ -29,7 +29,7 @@ func (converter *DockerAPIConverter) ConvertContainerToPod(container types.Conta
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              containerName,
 			CreationTimestamp: metav1.NewTime(time.Unix(container.Created, 0)),
-			Namespace:         "default",
+			Namespace:         container.Labels[k2dtypes.NamespaceLabelKey],
 			Annotations: map[string]string{
 				"kubectl.kubernetes.io/last-applied-configuration": container.Labels[k2dtypes.WorkloadLastAppliedConfigLabelKey],
 			},
@@ -74,7 +74,7 @@ func (converter *DockerAPIConverter) ConvertContainerToPod(container types.Conta
 // ConvertPodSpecToContainerConfiguration converts a Kubernetes PodSpec into a Docker container configuration.
 // It receives a Kubernetes PodSpec and a map of labels.
 // It returns a ContainerConfiguration struct, or an error if the conversion fails.
-func (converter *DockerAPIConverter) ConvertPodSpecToContainerConfiguration(spec core.PodSpec, labels map[string]string) (ContainerConfiguration, error) {
+func (converter *DockerAPIConverter) ConvertPodSpecToContainerConfiguration(spec core.PodSpec, networkName string, labels map[string]string) (ContainerConfiguration, error) {
 	containerSpec := spec.Containers[0]
 
 	containerConfig := &container.Config{
@@ -118,7 +118,7 @@ func (converter *DockerAPIConverter) ConvertPodSpecToContainerConfiguration(spec
 		HostConfig:      hostConfig,
 		NetworkConfig: &network.NetworkingConfig{
 			EndpointsConfig: map[string]*network.EndpointSettings{
-				k2dtypes.K2DNetworkName: {},
+				networkName: {},
 			},
 		},
 	}, nil

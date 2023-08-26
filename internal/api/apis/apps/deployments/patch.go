@@ -16,6 +16,7 @@ import (
 
 func (svc DeploymentService) PatchDeployment(r *restful.Request, w *restful.Response) {
 	deploymentName := r.PathParameter("name")
+	namespaceName := r.PathParameter("namespace")
 
 	patch, err := io.ReadAll(r.Request.Body)
 	if err != nil {
@@ -23,7 +24,7 @@ func (svc DeploymentService) PatchDeployment(r *restful.Request, w *restful.Resp
 		return
 	}
 
-	deployment, err := svc.adapter.GetDeployment(r.Request.Context(), deploymentName)
+	deployment, err := svc.adapter.GetDeployment(r.Request.Context(), deploymentName, namespaceName)
 	if err != nil {
 		utils.HttpError(r, w, http.StatusInternalServerError, fmt.Errorf("unable to get deployment: %w", err))
 		return

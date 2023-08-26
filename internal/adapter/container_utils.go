@@ -132,9 +132,7 @@ func (adapter *KubeDockerAdapter) buildContainerConfigurationFromExistingContain
 			Resources:     containerDetails.HostConfig.Resources,
 		},
 		NetworkConfig: &network.NetworkingConfig{
-			EndpointsConfig: map[string]*network.EndpointSettings{
-				k2dtypes.K2DNetworkName: {},
-			},
+			EndpointsConfig: containerDetails.NetworkSettings.Networks,
 		},
 	}, nil
 }
@@ -146,6 +144,7 @@ func (adapter *KubeDockerAdapter) buildContainerConfigurationFromExistingContain
 // It also includes a string representation of the last applied configuration of the parent Kubernetes object.
 type ContainerCreationOptions struct {
 	containerName            string
+	networkName              string
 	podSpec                  corev1.PodSpec
 	labels                   map[string]string
 	lastAppliedConfiguration string
@@ -189,8 +188,9 @@ func (adapter *KubeDockerAdapter) createContainerFromPodSpec(ctx context.Context
 		return fmt.Errorf("unable to marshal internal pod spec: %w", err)
 	}
 	options.labels[k2dtypes.PodLastAppliedConfigLabelKey] = string(internalPodSpecData)
+	options.labels[k2dtypes.NamespaceLabelKey] = options.networkName
 
-	containerCfg, err := adapter.converter.ConvertPodSpecToContainerConfiguration(internalPodSpec, options.labels)
+	containerCfg, err := adapter.converter.ConvertPodSpecToContainerConfiguration(internalPodSpec, options.networkName, options.labels)
 	if err != nil {
 		return fmt.Errorf("unable to build container configuration from pod spec: %w", err)
 	}
