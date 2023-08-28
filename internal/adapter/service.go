@@ -128,7 +128,12 @@ func (adapter *KubeDockerAdapter) CreateContainerFromService(ctx context.Context
 	}
 
 	// Update with namespace as well
-	cfg.NetworkConfig.EndpointsConfig[service.Namespace].Aliases = []string{
+	network := service.Namespace
+	if network == "default" {
+		network = "k2d_net"
+	}
+
+	cfg.NetworkConfig.EndpointsConfig[network].Aliases = []string{
 		service.Name,
 		fmt.Sprintf("%s.%s", service.Name, service.Namespace),
 		fmt.Sprintf("%s.%s.svc", service.Name, service.Namespace),

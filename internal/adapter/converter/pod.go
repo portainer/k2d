@@ -113,6 +113,11 @@ func (converter *DockerAPIConverter) ConvertPodSpecToContainerConfiguration(spec
 		return ContainerConfiguration{}, err
 	}
 
+	// ensure the default namespaces points to the default k2d_net network
+	if networkName == "default" {
+		networkName = "k2d_net"
+	}
+
 	return ContainerConfiguration{
 		ContainerConfig: containerConfig,
 		HostConfig:      hostConfig,
