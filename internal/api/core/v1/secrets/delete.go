@@ -10,6 +10,7 @@ import (
 )
 
 func (svc SecretService) DeleteSecret(r *restful.Request, w *restful.Response) {
+	// TODO: implement namespace later
 	secretName := r.PathParameter("name")
 
 	err := svc.adapter.DeleteSecret(secretName)

@@ -17,6 +17,7 @@ import (
 )
 
 func (svc ConfigMapService) PatchConfigMap(r *restful.Request, w *restful.Response) {
+	namespace := utils.NamespaceParameter(r)
 	configMapName := r.PathParameter("name")
 
 	patch, err := io.ReadAll(r.Request.Body)
@@ -25,7 +26,7 @@ func (svc ConfigMapService) PatchConfigMap(r *restful.Request, w *restful.Respon
 		return
 	}
 
-	configMap, err := svc.adapter.GetConfigMap(configMapName)
+	configMap, err := svc.adapter.GetConfigMap(configMapName, namespace)
 	if err != nil && errors.Is(err, storeerr.ErrResourceNotFound) {
 		w.WriteHeader(http.StatusNotFound)
 		return

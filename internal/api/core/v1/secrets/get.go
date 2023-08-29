@@ -11,6 +11,7 @@ import (
 )
 
 func (svc SecretService) GetSecret(r *restful.Request, w *restful.Response) {
+	// namespaceName := r.PathParameter("namespace")
 	secretName := r.PathParameter("name")
 
 	secret, err := svc.adapter.GetSecret(secretName)

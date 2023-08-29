@@ -10,6 +10,11 @@ import (
 )
 
 func (svc ServiceService) DeleteService(r *restful.Request, w *restful.Response) {
+	// TODO: namespace is not implemented, there might be an issue when removing a service from another namespace
+	// E.g to check
+	// k create svc svc1 -n test1
+	// k create svc svc1 -n test2
+	// k delete svc svc1 - what happens?
 	serviceName := r.PathParameter("name")
 
 	err := svc.adapter.DeleteService(r.Request.Context(), serviceName)

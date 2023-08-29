@@ -13,7 +13,7 @@ import (
 )
 
 func (svc ServiceService) CreateService(r *restful.Request, w *restful.Response) {
-	namespace := r.PathParameter("namespace")
+	namespace := utils.NamespaceParameter(r)
 
 	service := &corev1.Service{}
 
@@ -23,9 +23,7 @@ func (svc ServiceService) CreateService(r *restful.Request, w *restful.Response)
 		return
 	}
 
-	if namespace != "" {
-		service.Namespace = namespace
-	}
+	service.Namespace = namespace
 
 	dryRun := r.QueryParameter("dryRun") != ""
 	if dryRun {

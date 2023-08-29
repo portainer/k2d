@@ -13,12 +13,18 @@ import (
 )
 
 func (svc ConfigMapService) CreateConfigMap(r *restful.Request, w *restful.Response) {
+	namespace := utils.NamespaceParameter(r)
+
 	configMap := &corev1.ConfigMap{}
 
 	err := httputils.ParseJSONBody(r.Request, &configMap)
 	if err != nil {
 		utils.HttpError(r, w, http.StatusBadRequest, fmt.Errorf("unable to parse request body: %w", err))
 		return
+	}
+
+	if namespace != "" {
+		configMap.Namespace = namespace
 	}
 
 	dryRun := r.QueryParameter("dryRun") != ""

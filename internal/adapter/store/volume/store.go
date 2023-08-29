@@ -18,6 +18,10 @@ const (
 	// VolumeNameLabelKey is the key used to store the name of a volume in the resource labels
 	// It is used to identify the name of the volume associated with a ConfigMap or a Secret
 	VolumeNameLabelKey = "store.k2d.io/volume/volume-name"
+
+	// NamespaceNameLabelKey is the key used to store the namespace of a volume in the resource labels
+	// It is used to identify the namespace of the volume associated with a ConfigMap or a Secret
+	NamespaceNameLabelKey = "store.k2d.io/volume/namespace-name"
 )
 
 const (

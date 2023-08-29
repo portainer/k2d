@@ -15,6 +15,7 @@ import (
 )
 
 func (svc ServiceService) PatchService(r *restful.Request, w *restful.Response) {
+	// TODO: namespace?
 	serviceName := r.PathParameter("name")
 
 	patch, err := io.ReadAll(r.Request.Body)
