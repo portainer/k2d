@@ -31,12 +31,14 @@ func (svc ConfigMapService) RegisterConfigMapAPI(ws *restful.WebService) {
 
 	ws.Route(ws.POST("/v1/namespaces/{namespace}/configmaps").
 		To(svc.CreateConfigMap).
+		Param(ws.PathParameter("namespace", "namespace name").DataType("string")).
 		Param(ws.QueryParameter("dryRun", "when present, indicates that modifications should not be persisted").DataType("string")))
 
 	ws.Route(ws.GET("/v1/configmaps").
 		To(svc.ListConfigMaps))
 
 	ws.Route(ws.GET("/v1/namespaces/{namespace}/configmaps").
+		Param(ws.PathParameter("namespace", "namespace name").DataType("string")).
 		To(svc.ListConfigMaps))
 
 	ws.Route(ws.DELETE("/v1/configmaps/{name}").
@@ -45,6 +47,7 @@ func (svc ConfigMapService) RegisterConfigMapAPI(ws *restful.WebService) {
 
 	ws.Route(ws.DELETE("/v1/namespaces/{namespace}/configmaps/{name}").
 		To(svc.DeleteConfigMap).
+		Param(ws.PathParameter("namespace", "namespace name").DataType("string")).
 		Param(ws.PathParameter("name", "name of the configmap").DataType("string")))
 
 	ws.Route(ws.GET("/v1/configmaps/{name}").
@@ -53,17 +56,19 @@ func (svc ConfigMapService) RegisterConfigMapAPI(ws *restful.WebService) {
 
 	ws.Route(ws.GET("/v1/namespaces/{namespace}/configmaps/{name}").
 		To(svc.GetConfigMap).
+		Param(ws.PathParameter("namespace", "namespace name").DataType("string")).
 		Param(ws.PathParameter("name", "name of the configmap").DataType("string")))
 
 	ws.Route(ws.PATCH("/v1/configmaps/{name}").
 		To(svc.PatchConfigMap).
+		Param(ws.PathParameter("name", "name of the configmap").DataType("string")).
 		Param(ws.QueryParameter("dryRun", "when present, indicates that modifications should not be persisted").DataType("string")).
-		AddExtension("x-kubernetes-group-version-kind", configMapGVKExtension).
-		Param(ws.PathParameter("name", "name of the configmap").DataType("string")))
+		AddExtension("x-kubernetes-group-version-kind", configMapGVKExtension))
 
 	ws.Route(ws.PATCH("/v1/namespaces/{namespace}/configmaps/{name}").
 		To(svc.PatchConfigMap).
+		Param(ws.PathParameter("namespace", "namespace name").DataType("string")).
+		Param(ws.PathParameter("name", "name of the configmap").DataType("string")).
 		Param(ws.QueryParameter("dryRun", "when present, indicates that modifications should not be persisted").DataType("string")).
-		AddExtension("x-kubernetes-group-version-kind", configMapGVKExtension).
-		Param(ws.PathParameter("name", "name of the configmap").DataType("string")))
+		AddExtension("x-kubernetes-group-version-kind", configMapGVKExtension))
 }

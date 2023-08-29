@@ -51,6 +51,8 @@ func (adapter *KubeDockerAdapter) GetNetwork(ctx context.Context, networkName st
 		labelFilter.Add("name", "k2d_net")
 	}
 
+	// TODO: use network inspect
+
 	network, err := adapter.cli.NetworkList(ctx, types.NetworkListOptions{Filters: labelFilter})
 	if err != nil {
 		return &types.NetworkResource{}, fmt.Errorf("unable to list networks: %w", err)
