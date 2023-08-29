@@ -79,26 +79,22 @@ func (adapter *KubeDockerAdapter) GetPod(ctx context.Context, podName string, na
 
 func (adapter *KubeDockerAdapter) GetPodLogs(ctx context.Context, namespaceName string, podName string, opts PodLogOptions) (io.ReadCloser, error) {
 	labelFilter := filters.NewArgs()
+	labelFilter.Add("name", "/"+podName)
 	labelFilter.Add("label", fmt.Sprintf("%s=%s", k2dtypes.NamespaceLabelKey, namespaceName))
-
-	adapter.logger.Debug("Listing containers", "labelFilter", labelFilter)
 
 	containers, err := adapter.cli.ContainerList(ctx, types.ContainerListOptions{All: true, Filters: labelFilter})
 	if err != nil {
 		return nil, fmt.Errorf("unable to list containers: %w", err)
 	}
 
-	for _, container := range containers {
-		adapter.logger.Debug("Found container", "container", container)
-		if container.Names[0] == "/"+podName {
-			return adapter.cli.ContainerLogs(ctx, container.ID, types.ContainerLogsOptions{
-				ShowStdout: true,
-				ShowStderr: true,
-				Timestamps: opts.Timestamps,
-				Follow:     opts.Follow,
-				Tail:       opts.Tail,
-			})
-		}
+	if len(containers) > 0 {
+		return adapter.cli.ContainerLogs(ctx, containers[0].ID, types.ContainerLogsOptions{
+			ShowStdout: true,
+			ShowStderr: true,
+			Timestamps: opts.Timestamps,
+			Follow:     opts.Follow,
+			Tail:       opts.Tail,
+		})
 	}
 
 	return nil, nil

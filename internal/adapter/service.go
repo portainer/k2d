@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/filters"
 	k2dtypes "github.com/portainer/k2d/internal/adapter/types"
 	"github.com/portainer/k2d/internal/k8s"
 	"github.com/portainer/k2d/internal/logging"
@@ -38,7 +39,13 @@ func (adapter *KubeDockerAdapter) DeleteService(ctx context.Context, serviceName
 
 			delete(cfg.ContainerConfig.Labels, k2dtypes.ServiceNameLabelKey)
 			delete(cfg.ContainerConfig.Labels, k2dtypes.ServiceLastAppliedConfigLabelKey)
-			cfg.NetworkConfig.EndpointsConfig[k2dtypes.K2DNetworkName].Aliases = []string{}
+
+			networkName := cfg.ContainerConfig.Labels[k2dtypes.NamespaceLabelKey]
+			if networkName == "default" {
+				networkName = "k2d_net"
+			}
+
+			cfg.NetworkConfig.EndpointsConfig[networkName].Aliases = []string{}
 
 			return adapter.reCreateContainerWithNewConfiguration(ctx, cntr.ID, cfg)
 		}
@@ -127,7 +134,6 @@ func (adapter *KubeDockerAdapter) CreateContainerFromService(ctx context.Context
 		return fmt.Errorf("unable to convert service spec into container configuration: %w", err)
 	}
 
-	// Update with namespace as well
 	network := service.Namespace
 	if network == "default" {
 		network = "k2d_net"
@@ -237,7 +243,11 @@ func (adapter *KubeDockerAdapter) getService(container types.Container) (*core.S
 }
 
 func (adapter *KubeDockerAdapter) listServices(ctx context.Context, namespaceName string) (core.ServiceList, error) {
-	containers, err := adapter.cli.ContainerList(ctx, types.ContainerListOptions{All: true})
+	labelFilter := filters.NewArgs()
+	labelFilter.Add("label", k2dtypes.ServiceNameLabelKey)
+	labelFilter.Add("label", fmt.Sprintf("%s=%s", k2dtypes.NamespaceLabelKey, namespaceName))
+
+	containers, err := adapter.cli.ContainerList(ctx, types.ContainerListOptions{All: true, Filters: labelFilter})
 	if err != nil {
 		return core.ServiceList{}, fmt.Errorf("unable to list containers: %w", err)
 	}
@@ -245,15 +255,13 @@ func (adapter *KubeDockerAdapter) listServices(ctx context.Context, namespaceNam
 	services := []core.Service{}
 
 	for _, container := range containers {
-		if container.Labels[k2dtypes.ServiceNameLabelKey] != "" && container.Labels[k2dtypes.NamespaceLabelKey] == namespaceName {
-			service, err := adapter.getService(container)
-			if err != nil {
-				return core.ServiceList{}, fmt.Errorf("unable to get service: %w", err)
-			}
+		service, err := adapter.getService(container)
+		if err != nil {
+			return core.ServiceList{}, fmt.Errorf("unable to get service: %w", err)
+		}
 
-			if service != nil {
-				services = append(services, *service)
-			}
+		if service != nil {
+			services = append(services, *service)
 		}
 	}
 

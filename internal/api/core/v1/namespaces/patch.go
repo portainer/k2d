@@ -17,9 +17,6 @@ import (
 func (svc NamespaceService) PatchNamespace(r *restful.Request, w *restful.Response) {
 	namespaceName := r.PathParameter("name")
 
-	// print namespaceName
-	fmt.Println("namespaceName: ", namespaceName)
-
 	patch, err := io.ReadAll(r.Request.Body)
 	if err != nil {
 		utils.HttpError(r, w, http.StatusBadRequest, fmt.Errorf("unable to parse request body: %w", err))

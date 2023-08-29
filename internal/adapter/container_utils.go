@@ -10,6 +10,7 @@ import (
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/go-connections/nat"
 	"github.com/portainer/k2d/internal/adapter/converter"
@@ -196,34 +197,35 @@ func (adapter *KubeDockerAdapter) createContainerFromPodSpec(ctx context.Context
 	}
 	containerCfg.ContainerName = options.containerName
 
-	containers, err := adapter.cli.ContainerList(ctx, types.ContainerListOptions{})
+	labelFilter := filters.NewArgs()
+	labelFilter.Add("name", "/"+containerCfg.ContainerName)
+
+	containers, err := adapter.cli.ContainerList(ctx, types.ContainerListOptions{Filters: labelFilter})
 	if err != nil {
 		return fmt.Errorf("unable to list containers: %w", err)
 	}
 
 	for _, container := range containers {
-		if container.Names[0] == "/"+containerCfg.ContainerName {
-			logger := logging.LoggerFromContext(ctx)
+		logger := logging.LoggerFromContext(ctx)
 
-			if options.lastAppliedConfiguration == container.Labels[k2dtypes.WorkloadLastAppliedConfigLabelKey] {
-				logger.Infof("container with the name %s already exists with the same configuration. The update will be skipped", containerCfg.ContainerName)
-				return nil
-			}
+		if options.lastAppliedConfiguration == container.Labels[k2dtypes.WorkloadLastAppliedConfigLabelKey] {
+			logger.Infof("container with the name %s already exists with the same configuration. The update will be skipped", containerCfg.ContainerName)
+			return nil
+		}
 
-			logger.Infof("container with the name %s already exists with a different configuration. The container will be recreated", containerCfg.ContainerName)
+		logger.Infof("container with the name %s already exists with a different configuration. The container will be recreated", containerCfg.ContainerName)
 
-			if container.Labels[k2dtypes.ServiceLastAppliedConfigLabelKey] != "" {
-				options.labels[k2dtypes.ServiceLastAppliedConfigLabelKey] = container.Labels[k2dtypes.ServiceLastAppliedConfigLabelKey]
-			}
+		if container.Labels[k2dtypes.ServiceLastAppliedConfigLabelKey] != "" {
+			options.labels[k2dtypes.ServiceLastAppliedConfigLabelKey] = container.Labels[k2dtypes.ServiceLastAppliedConfigLabelKey]
+		}
 
-			if len(container.NetworkSettings.Networks[k2dtypes.K2DNetworkName].Aliases) > 0 {
-				containerCfg.NetworkConfig.EndpointsConfig[k2dtypes.K2DNetworkName].Aliases = container.NetworkSettings.Networks[k2dtypes.K2DNetworkName].Aliases
-			}
+		if len(container.NetworkSettings.Networks[k2dtypes.K2DNetworkName].Aliases) > 0 {
+			containerCfg.NetworkConfig.EndpointsConfig[k2dtypes.K2DNetworkName].Aliases = container.NetworkSettings.Networks[k2dtypes.K2DNetworkName].Aliases
+		}
 
-			err := adapter.cli.ContainerRemove(ctx, container.ID, types.ContainerRemoveOptions{Force: true})
-			if err != nil {
-				return fmt.Errorf("unable to remove container: %w", err)
-			}
+		err := adapter.cli.ContainerRemove(ctx, container.ID, types.ContainerRemoveOptions{Force: true})
+		if err != nil {
+			return fmt.Errorf("unable to remove container: %w", err)
 		}
 	}
 

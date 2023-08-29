@@ -10,10 +10,6 @@ import (
 )
 
 func (converter *DockerAPIConverter) ConvertNetworkToNamespace(network *types.NetworkResource) *core.Namespace {
-	if network.Name == "k2d_net" {
-		network.Name = "default"
-	}
-
 	namespace := &core.Namespace{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Namespace",

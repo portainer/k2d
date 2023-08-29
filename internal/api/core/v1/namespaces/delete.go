@@ -12,16 +12,10 @@ import (
 func (svc NamespaceService) DeleteNamespace(r *restful.Request, w *restful.Response) {
 	namespaceName := r.PathParameter("name")
 
-	// prevent the default network deletion as k2d runs on it
-	if namespaceName == "default" {
-		utils.HttpError(r, w, http.StatusBadRequest, fmt.Errorf("unable to delete the default namespace as it is the main namespace k2d runs on"))
+	err := svc.adapter.DeleteNamespace(r.Request.Context(), namespaceName)
+	if err != nil {
+		utils.HttpError(r, w, http.StatusInternalServerError, fmt.Errorf("unable to delete network: %w", err))
 		return
-	} else {
-		err := svc.adapter.DeleteNetwork(r.Request.Context(), namespaceName)
-		if err != nil {
-			utils.HttpError(r, w, http.StatusInternalServerError, fmt.Errorf("unable to delete network: %w", err))
-			return
-		}
 	}
 
 	w.WriteAsJson(metav1.Status{

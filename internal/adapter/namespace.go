@@ -2,8 +2,11 @@ package adapter
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
+	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/filters"
 	k2dtypes "github.com/portainer/k2d/internal/adapter/types"
 	"github.com/portainer/k2d/internal/k8s"
 	corev1 "k8s.io/api/core/v1"
@@ -12,9 +15,40 @@ import (
 )
 
 func (adapter *KubeDockerAdapter) CreateNetworkFromNamespace(ctx context.Context, namespace *corev1.Namespace) error {
-	err := adapter.CreateNetworkFromNamespaceSpec(ctx, *namespace)
+	network, err := adapter.GetNetwork(ctx, namespace.Name)
 	if err != nil {
-		return fmt.Errorf("unable to create network from namespace spec: %w", err)
+		return fmt.Errorf("unable to list networks: %w", err)
+	}
+
+	if network != nil {
+		return fmt.Errorf("network %s already exists", namespace.Name)
+	} else {
+		if namespace.Labels["app.kubernetes.io/managed-by"] == "Helm" {
+			namespaceData, err := json.Marshal(namespace)
+			if err != nil {
+				return fmt.Errorf("unable to marshal deployment: %w", err)
+			}
+			namespace.ObjectMeta.Annotations["kubectl.kubernetes.io/last-applied-configuration"] = string(namespaceData)
+		}
+
+		lastAppliedConfiguration := ""
+		if namespace.ObjectMeta.Annotations["kubectl.kubernetes.io/last-applied-configuration"] != "" {
+			lastAppliedConfiguration = namespace.ObjectMeta.Annotations["kubectl.kubernetes.io/last-applied-configuration"]
+		}
+
+		_, err := adapter.cli.NetworkCreate(ctx, namespace.Name, types.NetworkCreate{
+			Driver: "bridge",
+			Labels: map[string]string{
+				k2dtypes.NamespaceLabelKey:                  namespace.Name,
+				k2dtypes.NamespaceLastAppliedConfigLabelKey: lastAppliedConfiguration,
+			},
+			Options: map[string]string{
+				"com.docker.network.bridge.name": namespace.Name,
+			},
+		})
+		if err != nil {
+			return fmt.Errorf("unable to create network %s: %w", namespace.Name, err)
+		}
 	}
 
 	return nil
@@ -51,6 +85,10 @@ func (adapter *KubeDockerAdapter) GetNamespace(ctx context.Context, namespaceNam
 		return nil, nil
 	}
 
+	if network.Name == "k2d_net" {
+		network.Name = "default"
+	}
+
 	versionedNamespace := corev1.Namespace{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Namespace",
@@ -77,7 +115,10 @@ func (adapter *KubeDockerAdapter) GetNamespaceTable(ctx context.Context) (*metav
 }
 
 func (adapter *KubeDockerAdapter) listNamespaces(ctx context.Context) (core.NamespaceList, error) {
-	networks, err := adapter.ListNetworks(ctx)
+	labelFilter := filters.NewArgs()
+	labelFilter.Add("label", k2dtypes.NamespaceLabelKey)
+
+	networks, err := adapter.cli.NetworkList(ctx, types.NetworkListOptions{Filters: labelFilter})
 	if err != nil {
 		adapter.logger.Errorf("unable to list networks: %v", err)
 		return core.NamespaceList{}, err
@@ -86,10 +127,12 @@ func (adapter *KubeDockerAdapter) listNamespaces(ctx context.Context) (core.Name
 	namespaceList := []core.Namespace{}
 
 	for _, network := range networks {
-		if network.Labels[k2dtypes.NamespaceLabelKey] != "" {
-			namespaceList = append(namespaceList, *adapter.converter.ConvertNetworkToNamespace(&network))
+		if network.Name == "k2d_net" {
+			network.Name = "default"
 		}
+		namespaceList = append(namespaceList, *adapter.converter.ConvertNetworkToNamespace(&network))
 	}
+
 	return core.NamespaceList{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "NamespaceList",
@@ -101,9 +144,29 @@ func (adapter *KubeDockerAdapter) listNamespaces(ctx context.Context) (core.Name
 }
 
 func (adapter *KubeDockerAdapter) DeleteNamespace(ctx context.Context, namespaceName string) error {
-	err := adapter.DeleteNetwork(ctx, namespaceName)
+	filter := filters.NewArgs()
+	filter.Add("name", namespaceName)
+	filter.Add("label", k2dtypes.NamespaceLabelKey+"="+namespaceName)
+
+	network, err := adapter.cli.NetworkList(ctx, types.NetworkListOptions{Filters: filter})
 	if err != nil {
-		return fmt.Errorf("unable to delete the namespaces: %w", err)
+		return fmt.Errorf("unable to list networks: %w", err)
+	}
+
+	if len(network) == 0 {
+		return nil
+	}
+
+	networkIspect, err := adapter.cli.NetworkInspect(ctx, namespaceName, types.NetworkInspectOptions{})
+	if err != nil {
+		return fmt.Errorf("unable to inspect network %s: %w", namespaceName, err)
+	}
+
+	if len(networkIspect.Containers) == 0 {
+		err = adapter.cli.NetworkRemove(ctx, namespaceName)
+		if err != nil {
+			return fmt.Errorf("unable to delete network %s: %w", namespaceName, err)
+		}
 	}
 
 	return nil

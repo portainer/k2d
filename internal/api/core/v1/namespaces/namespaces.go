@@ -34,7 +34,7 @@ func (svc NamespaceService) RegisterNamespaceAPI(ws *restful.WebService) {
 
 	ws.Route(ws.GET("/v1/namespaces/{name}").
 		To(svc.GetNamespace).
-		Param(ws.PathParameter("name", "name of the node").DataType("string")))
+		Param(ws.PathParameter("name", "name of the namespace").DataType("string")))
 
 	ws.Route(ws.PATCH("/v1/namespaces/{name}").
 		To(svc.PatchNamespace).
@@ -44,5 +44,5 @@ func (svc NamespaceService) RegisterNamespaceAPI(ws *restful.WebService) {
 
 	ws.Route(ws.DELETE("/v1/namespaces/{name}").
 		To(svc.DeleteNamespace).
-		Param(ws.PathParameter("name", "name of the pod").DataType("string")))
+		Param(ws.PathParameter("name", "name of the namespace").DataType("string")))
 }
