@@ -322,10 +322,6 @@ func (adapter *KubeDockerAdapter) getRegistryCredentials(podSpec corev1.PodSpec,
 		return "", fmt.Errorf("unable to get registry secret: %w", err)
 	}
 
-	if registrySecret == nil {
-		return "", fmt.Errorf("registry secret %s not found", pullSecret.Name)
-	}
-
 	username, password, err := k8s.GetRegistryAuthFromSecret(registrySecret, registryURL)
 	if err != nil {
 		return "", fmt.Errorf("unable to decode registry secret: %w", err)
