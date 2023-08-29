@@ -13,12 +13,18 @@ import (
 )
 
 func (svc ServiceService) CreateService(r *restful.Request, w *restful.Response) {
+	namespace := r.PathParameter("namespace")
+
 	service := &corev1.Service{}
 
 	err := httputils.ParseJSONBody(r.Request, &service)
 	if err != nil {
 		utils.HttpError(r, w, http.StatusBadRequest, fmt.Errorf("unable to parse request body: %w", err))
 		return
+	}
+
+	if namespace != "" {
+		service.Namespace = namespace
 	}
 
 	dryRun := r.QueryParameter("dryRun") != ""

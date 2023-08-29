@@ -168,6 +168,14 @@ func (controller *OperationController) processPriorityOperations(ops []Operation
 
 func (controller *OperationController) processOperation(op Operation) {
 	switch op.Operation.(type) {
+	case *corev1.Namespace:
+		err := controller.createNamespace(op)
+		if err != nil {
+			controller.logger.Errorw("unable to create namespace",
+				"error", err,
+				"request_id", op.RequestID,
+			)
+		}
 	case *corev1.Pod:
 		err := controller.createPod(op)
 		if err != nil {
@@ -207,6 +215,11 @@ func (controller *OperationController) processOperation(op Operation) {
 			)
 		}
 	}
+}
+
+func (controller *OperationController) createNamespace(op Operation) error {
+	namespace := op.Operation.(*corev1.Namespace)
+	return controller.adapter.CreateNetworkFromNamespace(context.TODO(), namespace)
 }
 
 func (controller *OperationController) createPod(op Operation) error {

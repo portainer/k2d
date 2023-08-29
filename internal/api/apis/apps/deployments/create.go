@@ -13,12 +13,18 @@ import (
 )
 
 func (svc DeploymentService) CreateDeployment(r *restful.Request, w *restful.Response) {
+	namespace := r.PathParameter("namespace")
+
 	deployment := &appsv1.Deployment{}
 
 	err := httputils.ParseJSONBody(r.Request, &deployment)
 	if err != nil {
 		utils.HttpError(r, w, http.StatusBadRequest, fmt.Errorf("unable to parse request body: %w", err))
 		return
+	}
+
+	if namespace != "" {
+		deployment.Namespace = namespace
 	}
 
 	dryRun := r.QueryParameter("dryRun") != ""

@@ -10,8 +10,9 @@ import (
 
 func (svc PodService) GetPod(r *restful.Request, w *restful.Response) {
 	podName := r.PathParameter("name")
+	namespaceName := r.PathParameter("namespace")
 
-	pod, err := svc.adapter.GetPod(r.Request.Context(), podName)
+	pod, err := svc.adapter.GetPod(r.Request.Context(), podName, namespaceName)
 	if err != nil {
 		utils.HttpError(r, w, http.StatusInternalServerError, fmt.Errorf("unable to get pod: %w", err))
 		return

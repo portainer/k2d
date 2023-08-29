@@ -12,6 +12,7 @@ import (
 	"github.com/docker/distribution/reference"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/api/types/registry"
 	"github.com/docker/go-connections/nat"
@@ -136,9 +137,7 @@ func (adapter *KubeDockerAdapter) buildContainerConfigurationFromExistingContain
 			Resources:     containerDetails.HostConfig.Resources,
 		},
 		NetworkConfig: &network.NetworkingConfig{
-			EndpointsConfig: map[string]*network.EndpointSettings{
-				k2dtypes.K2DNetworkName: {},
-			},
+			EndpointsConfig: containerDetails.NetworkSettings.Networks,
 		},
 	}, nil
 }
@@ -150,6 +149,7 @@ func (adapter *KubeDockerAdapter) buildContainerConfigurationFromExistingContain
 // It also includes a string representation of the last applied configuration of the parent Kubernetes object.
 type ContainerCreationOptions struct {
 	containerName            string
+	networkName              string
 	podSpec                  corev1.PodSpec
 	labels                   map[string]string
 	lastAppliedConfiguration string
@@ -202,41 +202,43 @@ func (adapter *KubeDockerAdapter) createContainerFromPodSpec(ctx context.Context
 		return fmt.Errorf("unable to marshal internal pod spec: %w", err)
 	}
 	options.labels[k2dtypes.PodLastAppliedConfigLabelKey] = string(internalPodSpecData)
+	options.labels[k2dtypes.NamespaceLabelKey] = options.networkName
 
-	containerCfg, err := adapter.converter.ConvertPodSpecToContainerConfiguration(internalPodSpec, options.labels)
+	containerCfg, err := adapter.converter.ConvertPodSpecToContainerConfiguration(internalPodSpec, options.networkName, options.labels)
 	if err != nil {
 		return fmt.Errorf("unable to build container configuration from pod spec: %w", err)
 	}
 	containerCfg.ContainerName = options.containerName
 
-	containers, err := adapter.cli.ContainerList(ctx, types.ContainerListOptions{})
+	labelFilter := filters.NewArgs()
+	labelFilter.Add("name", "/"+containerCfg.ContainerName)
+
+	containers, err := adapter.cli.ContainerList(ctx, types.ContainerListOptions{Filters: labelFilter})
 	if err != nil {
 		return fmt.Errorf("unable to list containers: %w", err)
 	}
 
 	for _, container := range containers {
-		if container.Names[0] == "/"+containerCfg.ContainerName {
-			logger := logging.LoggerFromContext(ctx)
+		logger := logging.LoggerFromContext(ctx)
 
-			if options.lastAppliedConfiguration == container.Labels[k2dtypes.WorkloadLastAppliedConfigLabelKey] {
-				logger.Infof("container with the name %s already exists with the same configuration. The update will be skipped", containerCfg.ContainerName)
-				return nil
-			}
+		if options.lastAppliedConfiguration == container.Labels[k2dtypes.WorkloadLastAppliedConfigLabelKey] {
+			logger.Infof("container with the name %s already exists with the same configuration. The update will be skipped", containerCfg.ContainerName)
+			return nil
+		}
 
-			logger.Infof("container with the name %s already exists with a different configuration. The container will be recreated", containerCfg.ContainerName)
+		logger.Infof("container with the name %s already exists with a different configuration. The container will be recreated", containerCfg.ContainerName)
 
-			if container.Labels[k2dtypes.ServiceLastAppliedConfigLabelKey] != "" {
-				options.labels[k2dtypes.ServiceLastAppliedConfigLabelKey] = container.Labels[k2dtypes.ServiceLastAppliedConfigLabelKey]
-			}
+		if container.Labels[k2dtypes.ServiceLastAppliedConfigLabelKey] != "" {
+			options.labels[k2dtypes.ServiceLastAppliedConfigLabelKey] = container.Labels[k2dtypes.ServiceLastAppliedConfigLabelKey]
+		}
 
-			if len(container.NetworkSettings.Networks[k2dtypes.K2DNetworkName].Aliases) > 0 {
-				containerCfg.NetworkConfig.EndpointsConfig[k2dtypes.K2DNetworkName].Aliases = container.NetworkSettings.Networks[k2dtypes.K2DNetworkName].Aliases
-			}
+		if len(container.NetworkSettings.Networks[k2dtypes.K2DNetworkName].Aliases) > 0 {
+			containerCfg.NetworkConfig.EndpointsConfig[k2dtypes.K2DNetworkName].Aliases = container.NetworkSettings.Networks[k2dtypes.K2DNetworkName].Aliases
+		}
 
-			err := adapter.cli.ContainerRemove(ctx, container.ID, types.ContainerRemoveOptions{Force: true})
-			if err != nil {
-				return fmt.Errorf("unable to remove container: %w", err)
-			}
+		err := adapter.cli.ContainerRemove(ctx, container.ID, types.ContainerRemoveOptions{Force: true})
+		if err != nil {
+			return fmt.Errorf("unable to remove container: %w", err)
 		}
 	}
 
@@ -271,11 +273,11 @@ func (adapter *KubeDockerAdapter) createContainerFromPodSpec(ctx context.Context
 
 // DeleteContainer removes a Docker container given its ID or name.
 // This function will force the removal of the container, regardless if it's running or not.
-// It will return an error if the Docker client fails to remove the container for any reason.
+// It will log a warning if it fails to delete the container.
 func (adapter *KubeDockerAdapter) DeleteContainer(ctx context.Context, containerID string) error {
 	err := adapter.cli.ContainerRemove(ctx, containerID, types.ContainerRemoveOptions{Force: true})
 	if err != nil {
-		return fmt.Errorf("unable to remove container: %w", err)
+		adapter.logger.Warnf("unable to remove container: %s", err)
 	}
 
 	return nil

@@ -24,6 +24,7 @@ const (
 func (adapter *KubeDockerAdapter) CreateContainerFromDeployment(ctx context.Context, deployment *appsv1.Deployment) error {
 	opts := ContainerCreationOptions{
 		containerName: deployment.Name,
+		networkName:   deployment.Namespace,
 		podSpec:       deployment.Spec.Template.Spec,
 		labels:        deployment.Spec.Template.Labels,
 	}
@@ -38,49 +39,61 @@ func (adapter *KubeDockerAdapter) CreateContainerFromDeployment(ctx context.Cont
 		deployment.ObjectMeta.Annotations["kubectl.kubernetes.io/last-applied-configuration"] = string(deploymentData)
 	}
 
+	// kubectl create deployment does not pass the last-applied-configuration annotation
+	// so we need to add it manually
+	if deployment.ObjectMeta.Annotations["kubectl.kubernetes.io/last-applied-configuration"] == "" {
+		deploymentData, err := json.Marshal(deployment)
+		if err != nil {
+			return fmt.Errorf("unable to marshal deployment: %w", err)
+		}
+		opts.labels[k2dtypes.WorkloadLastAppliedConfigLabelKey] = string(deploymentData)
+	}
+
 	opts.lastAppliedConfiguration = deployment.ObjectMeta.Annotations["kubectl.kubernetes.io/last-applied-configuration"]
 
 	return adapter.createContainerFromPodSpec(ctx, opts)
 }
 
-func (adapter *KubeDockerAdapter) GetDeployment(ctx context.Context, deploymentName string) (*appsv1.Deployment, error) {
-	containers, err := adapter.cli.ContainerList(ctx, types.ContainerListOptions{All: true})
+func (adapter *KubeDockerAdapter) GetDeployment(ctx context.Context, deploymentName string, namespaceName string) (*appsv1.Deployment, error) {
+	labelFilter := filters.NewArgs()
+	labelFilter.Add("name", "/"+deploymentName)
+	labelFilter.Add("label", fmt.Sprintf("%s=%s", k2dtypes.NamespaceLabelKey, namespaceName))
+
+	container, err := adapter.cli.ContainerList(ctx, types.ContainerListOptions{All: true, Filters: labelFilter})
 	if err != nil {
 		return nil, fmt.Errorf("unable to list containers: %w", err)
 	}
 
-	for _, container := range containers {
-		if container.Names[0] == "/"+deploymentName {
-			deployment, err := adapter.getDeployment(container)
-			if err != nil {
-				return nil, fmt.Errorf("unable to get deployment: %w", err)
-			}
-
-			if deployment == nil {
-				return nil, nil
-			}
-
-			versionedDeployment := appsv1.Deployment{
-				TypeMeta: metav1.TypeMeta{
-					Kind:       "Deployment",
-					APIVersion: "apps/v1",
-				},
-			}
-
-			err = adapter.ConvertK8SResource(deployment, &versionedDeployment)
-			if err != nil {
-				return nil, fmt.Errorf("unable to convert internal object to versioned object: %w", err)
-			}
-
-			return &versionedDeployment, nil
-		}
+	if len(container) == 0 {
+		return nil, nil
 	}
 
-	return nil, nil
+	deployment, err := adapter.getDeployment(container[0])
+	if err != nil {
+		return nil, fmt.Errorf("unable to get deployment: %w", err)
+	}
+
+	if deployment == nil {
+		return nil, nil
+	}
+
+	versionedDeployment := appsv1.Deployment{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Deployment",
+			APIVersion: "apps/v1",
+		},
+	}
+
+	err = adapter.ConvertK8SResource(deployment, &versionedDeployment)
+	if err != nil {
+		return nil, fmt.Errorf("unable to convert internal object to versioned object: %w", err)
+	}
+
+	return &versionedDeployment, nil
 }
 
-func (adapter *KubeDockerAdapter) GetDeploymentTable(ctx context.Context) (*metav1.Table, error) {
-	deploymentList, err := adapter.listDeployments(ctx)
+func (adapter *KubeDockerAdapter) GetDeploymentTable(ctx context.Context, namespaceName string) (*metav1.Table, error) {
+	deploymentList, err := adapter.listDeployments(ctx, namespaceName)
 	if err != nil {
 		return &metav1.Table{}, fmt.Errorf("unable to list deployments: %w", err)
 	}
@@ -88,8 +101,8 @@ func (adapter *KubeDockerAdapter) GetDeploymentTable(ctx context.Context) (*meta
 	return k8s.GenerateTable(&deploymentList)
 }
 
-func (adapter *KubeDockerAdapter) ListDeployments(ctx context.Context) (appsv1.DeploymentList, error) {
-	deploymentList, err := adapter.listDeployments(ctx)
+func (adapter *KubeDockerAdapter) ListDeployments(ctx context.Context, namespaceName string) (appsv1.DeploymentList, error) {
+	deploymentList, err := adapter.listDeployments(ctx, namespaceName)
 	if err != nil {
 		return appsv1.DeploymentList{}, fmt.Errorf("unable to list deployments: %w", err)
 	}
@@ -137,9 +150,10 @@ func (adapter *KubeDockerAdapter) getDeployment(container types.Container) (*app
 	return &deployment, nil
 }
 
-func (adapter *KubeDockerAdapter) listDeployments(ctx context.Context) (apps.DeploymentList, error) {
+func (adapter *KubeDockerAdapter) listDeployments(ctx context.Context, namespaceName string) (apps.DeploymentList, error) {
 	labelFilter := filters.NewArgs()
 	labelFilter.Add("label", fmt.Sprintf("%s=%s", k2dtypes.WorkloadLabelKey, DeploymentWorkloadType))
+	labelFilter.Add("label", fmt.Sprintf("%s=%s", k2dtypes.NamespaceLabelKey, namespaceName))
 
 	containers, err := adapter.cli.ContainerList(ctx, types.ContainerListOptions{All: true, Filters: labelFilter})
 	if err != nil {

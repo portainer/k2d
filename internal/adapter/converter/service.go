@@ -73,7 +73,12 @@ func (converter *DockerAPIConverter) UpdateServiceFromContainerInfo(service *cor
 		service.Spec.Type = core.ServiceTypeClusterIP
 	}
 
-	service.Spec.ClusterIPs = []string{container.NetworkSettings.Networks[k2dtypes.K2DNetworkName].IPAddress}
+	network := service.Namespace
+	if network == "default" {
+		network = "k2d_net"
+	}
+
+	service.Spec.ClusterIPs = []string{container.NetworkSettings.Networks[network].IPAddress}
 
 	if service.Spec.Type != core.ServiceTypeClusterIP {
 		servicePorts := []core.ServicePort{}

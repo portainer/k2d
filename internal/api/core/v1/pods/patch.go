@@ -16,6 +16,7 @@ import (
 
 func (svc PodService) PatchPod(r *restful.Request, w *restful.Response) {
 	podName := r.PathParameter("name")
+	namespaceName := r.PathParameter("namespace")
 
 	patch, err := io.ReadAll(r.Request.Body)
 	if err != nil {
@@ -23,7 +24,7 @@ func (svc PodService) PatchPod(r *restful.Request, w *restful.Response) {
 		return
 	}
 
-	pod, err := svc.adapter.GetPod(r.Request.Context(), podName)
+	pod, err := svc.adapter.GetPod(r.Request.Context(), podName, namespaceName)
 	if err != nil {
 		utils.HttpError(r, w, http.StatusInternalServerError, fmt.Errorf("unable to get pod: %w", err))
 		return

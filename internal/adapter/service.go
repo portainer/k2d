@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/filters"
 	k2dtypes "github.com/portainer/k2d/internal/adapter/types"
 	"github.com/portainer/k2d/internal/k8s"
 	"github.com/portainer/k2d/internal/logging"
@@ -38,7 +39,13 @@ func (adapter *KubeDockerAdapter) DeleteService(ctx context.Context, serviceName
 
 			delete(cfg.ContainerConfig.Labels, k2dtypes.ServiceNameLabelKey)
 			delete(cfg.ContainerConfig.Labels, k2dtypes.ServiceLastAppliedConfigLabelKey)
-			cfg.NetworkConfig.EndpointsConfig[k2dtypes.K2DNetworkName].Aliases = []string{}
+
+			networkName := cfg.ContainerConfig.Labels[k2dtypes.NamespaceLabelKey]
+			if networkName == "default" {
+				networkName = "k2d_net"
+			}
+
+			cfg.NetworkConfig.EndpointsConfig[networkName].Aliases = []string{}
 
 			return adapter.reCreateContainerWithNewConfiguration(ctx, cntr.ID, cfg)
 		}
@@ -127,7 +134,17 @@ func (adapter *KubeDockerAdapter) CreateContainerFromService(ctx context.Context
 		return fmt.Errorf("unable to convert service spec into container configuration: %w", err)
 	}
 
-	cfg.NetworkConfig.EndpointsConfig[k2dtypes.K2DNetworkName].Aliases = []string{service.Name}
+	network := service.Namespace
+	if network == "default" {
+		network = "k2d_net"
+	}
+
+	cfg.NetworkConfig.EndpointsConfig[network].Aliases = []string{
+		service.Name,
+		fmt.Sprintf("%s.%s", service.Name, service.Namespace),
+		fmt.Sprintf("%s.%s.svc", service.Name, service.Namespace),
+		fmt.Sprintf("%s.%s.svc.cluster.local", service.Name, service.Namespace),
+	}
 
 	return adapter.reCreateContainerWithNewConfiguration(ctx, matchingContainer.ID, cfg)
 }
@@ -168,8 +185,8 @@ func (adapter *KubeDockerAdapter) GetService(ctx context.Context, serviceName st
 	return nil, nil
 }
 
-func (adapter *KubeDockerAdapter) GetServiceTable(ctx context.Context) (*metav1.Table, error) {
-	serviceList, err := adapter.listServices(ctx)
+func (adapter *KubeDockerAdapter) GetServiceTable(ctx context.Context, namespaceName string) (*metav1.Table, error) {
+	serviceList, err := adapter.listServices(ctx, namespaceName)
 	if err != nil {
 		return &metav1.Table{}, fmt.Errorf("unable to list services: %w", err)
 	}
@@ -177,8 +194,8 @@ func (adapter *KubeDockerAdapter) GetServiceTable(ctx context.Context) (*metav1.
 	return k8s.GenerateTable(&serviceList)
 }
 
-func (adapter *KubeDockerAdapter) ListServices(ctx context.Context) (corev1.ServiceList, error) {
-	serviceList, err := adapter.listServices(ctx)
+func (adapter *KubeDockerAdapter) ListServices(ctx context.Context, namespaceName string) (corev1.ServiceList, error) {
+	serviceList, err := adapter.listServices(ctx, namespaceName)
 	if err != nil {
 		return corev1.ServiceList{}, fmt.Errorf("unable to list services: %w", err)
 	}
@@ -225,8 +242,12 @@ func (adapter *KubeDockerAdapter) getService(container types.Container) (*core.S
 	return &service, nil
 }
 
-func (adapter *KubeDockerAdapter) listServices(ctx context.Context) (core.ServiceList, error) {
-	containers, err := adapter.cli.ContainerList(ctx, types.ContainerListOptions{All: true})
+func (adapter *KubeDockerAdapter) listServices(ctx context.Context, namespaceName string) (core.ServiceList, error) {
+	labelFilter := filters.NewArgs()
+	labelFilter.Add("label", k2dtypes.ServiceNameLabelKey)
+	labelFilter.Add("label", fmt.Sprintf("%s=%s", k2dtypes.NamespaceLabelKey, namespaceName))
+
+	containers, err := adapter.cli.ContainerList(ctx, types.ContainerListOptions{All: true, Filters: labelFilter})
 	if err != nil {
 		return core.ServiceList{}, fmt.Errorf("unable to list containers: %w", err)
 	}
@@ -234,15 +255,13 @@ func (adapter *KubeDockerAdapter) listServices(ctx context.Context) (core.Servic
 	services := []core.Service{}
 
 	for _, container := range containers {
-		if container.Labels[k2dtypes.ServiceNameLabelKey] != "" {
-			service, err := adapter.getService(container)
-			if err != nil {
-				return core.ServiceList{}, fmt.Errorf("unable to get service: %w", err)
-			}
+		service, err := adapter.getService(container)
+		if err != nil {
+			return core.ServiceList{}, fmt.Errorf("unable to get service: %w", err)
+		}
 
-			if service != nil {
-				services = append(services, *service)
-			}
+		if service != nil {
+			services = append(services, *service)
 		}
 	}
 

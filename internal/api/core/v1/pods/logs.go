@@ -20,6 +20,7 @@ import (
 // the data is immediately sent to the client.
 func (svc PodService) GetPodLogs(r *restful.Request, w *restful.Response) {
 	podName := r.PathParameter("name")
+	namespaceName := r.PathParameter("namespace")
 
 	podLogOptions := adapter.PodLogOptions{
 		Follow:     r.QueryParameter("follow") == "true",
@@ -27,7 +28,7 @@ func (svc PodService) GetPodLogs(r *restful.Request, w *restful.Response) {
 		Tail:       r.QueryParameter("tailLines"),
 	}
 
-	logs, err := svc.adapter.GetPodLogs(context.Background(), podName, podLogOptions)
+	logs, err := svc.adapter.GetPodLogs(context.Background(), namespaceName, podName, podLogOptions)
 	if err != nil {
 		utils.HttpError(r, w, http.StatusInternalServerError, fmt.Errorf("unable to get pod logs: %w", err))
 		return
