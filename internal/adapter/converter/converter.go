@@ -4,7 +4,7 @@ package converter
 import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/network"
-	"github.com/portainer/k2d/internal/adapter/store"
+	"github.com/portainer/k2d/internal/adapter/store/filesystem"
 	"github.com/portainer/k2d/internal/types"
 	"github.com/portainer/k2d/pkg/rand"
 )
@@ -13,8 +13,7 @@ import (
 // It contains a FileSystemStore for accessing data from the filesystem as well as the k2dServerAddr and k2dServerPort which will be shared with all
 // created containers.
 type DockerAPIConverter struct {
-	configMapStore         store.ConfigMapStore
-	secretStore            store.SecretStore
+	store                  *filesystem.FileSystemStore
 	k2dServerConfiguration *types.K2DServerConfiguration
 	portGenerator          *rand.PortGenerator
 }
@@ -29,10 +28,9 @@ type ContainerConfiguration struct {
 
 // NewDockerAPIConverter creates and returns a new DockerAPIConverter.
 // It receives a FileSystemStore which is used for accessing data from the filesystem.
-func NewDockerAPIConverter(configMapStore store.ConfigMapStore, secretStore store.SecretStore, k2dServerConfig *types.K2DServerConfiguration) *DockerAPIConverter {
+func NewDockerAPIConverter(store *filesystem.FileSystemStore, k2dServerConfig *types.K2DServerConfiguration) *DockerAPIConverter {
 	return &DockerAPIConverter{
-		configMapStore:         configMapStore,
-		secretStore:            secretStore,
+		store:                  store,
 		k2dServerConfiguration: k2dServerConfig,
 		portGenerator:          rand.NewPortGenerator(),
 	}

@@ -7,7 +7,6 @@ import (
 	"path"
 	"strings"
 
-	"github.com/portainer/k2d/internal/adapter/store/errors"
 	"github.com/portainer/k2d/pkg/filesystem"
 	str "github.com/portainer/k2d/pkg/strings"
 	corev1 "k8s.io/api/core/v1"
@@ -20,11 +19,11 @@ func buildSecretMetadataFileName(secretName string) string {
 	return fmt.Sprintf("%s-k2dsec.metadata", secretName)
 }
 
-func (s *FileSystemStore) DeleteSecret(secretName string) error {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
+func (store *FileSystemStore) DeleteSecret(secretName string) error {
+	store.mutex.Lock()
+	defer store.mutex.Unlock()
 
-	files, err := os.ReadDir(s.secretPath)
+	files, err := os.ReadDir(store.secretPath)
 	if err != nil {
 		return fmt.Errorf("unable to read secret directory: %w", err)
 	}
@@ -34,17 +33,17 @@ func (s *FileSystemStore) DeleteSecret(secretName string) error {
 		fileNames = append(fileNames, file.Name())
 	}
 
-	uniqueNames := str.UniquePrefixes(fileNames, SecretSeparator)
+	uniqueNames := str.UniquePrefixes(fileNames, SECRET_SEPARATOR)
 
 	if !str.IsStringInSlice(secretName, uniqueNames) {
 		return fmt.Errorf("secret %s not found", secretName)
 	}
 
-	filePrefix := fmt.Sprintf("%s%s", secretName, SecretSeparator)
+	filePrefix := fmt.Sprintf("%s%s", secretName, SECRET_SEPARATOR)
 
 	for _, file := range files {
 		if strings.HasPrefix(file.Name(), filePrefix) {
-			err := os.Remove(path.Join(s.secretPath, file.Name()))
+			err := os.Remove(path.Join(store.secretPath, file.Name()))
 			if err != nil {
 				return fmt.Errorf("unable to remove file %s: %w", file.Name(), err)
 			}
@@ -52,13 +51,13 @@ func (s *FileSystemStore) DeleteSecret(secretName string) error {
 	}
 
 	metadataFileName := buildSecretMetadataFileName(secretName)
-	metadataFileFound, err := filesystem.FileExists(path.Join(s.secretPath, metadataFileName))
+	metadataFileFound, err := filesystem.FileExists(path.Join(store.secretPath, metadataFileName))
 	if err != nil {
 		return fmt.Errorf("unable to check if metadata file exists: %w", err)
 	}
 
 	if metadataFileFound {
-		err := os.Remove(path.Join(s.secretPath, metadataFileName))
+		err := os.Remove(path.Join(store.secretPath, metadataFileName))
 		if err != nil {
 			return fmt.Errorf("unable to remove file %s: %w", metadataFileName, err)
 		}
@@ -67,25 +66,11 @@ func (s *FileSystemStore) DeleteSecret(secretName string) error {
 	return nil
 }
 
-// The filesystem implementation will return a list of files that needs to be mounted
-// for a specific Secret. This list is built from the store.k2d.io/filesystem/path/* annotations of the Secret.
-func (s *FileSystemStore) GetSecretBinds(secret *core.Secret) ([]string, error) {
-	binds := []string{}
+func (store *FileSystemStore) GetSecret(secretName string) (*core.Secret, error) {
+	store.mutex.Lock()
+	defer store.mutex.Unlock()
 
-	for key, value := range secret.Annotations {
-		if strings.HasPrefix(key, FilePathAnnotationKey) {
-			binds = append(binds, value)
-		}
-	}
-
-	return binds, nil
-}
-
-func (s *FileSystemStore) GetSecret(secretName string) (*core.Secret, error) {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-
-	files, err := os.ReadDir(s.secretPath)
+	files, err := os.ReadDir(store.secretPath)
 	if err != nil {
 		return nil, fmt.Errorf("unable to read secret directory: %w", err)
 	}
@@ -95,10 +80,10 @@ func (s *FileSystemStore) GetSecret(secretName string) (*core.Secret, error) {
 		fileNames = append(fileNames, file.Name())
 	}
 
-	uniqueNames := str.UniquePrefixes(fileNames, SecretSeparator)
+	uniqueNames := str.UniquePrefixes(fileNames, SECRET_SEPARATOR)
 
 	if !str.IsStringInSlice(secretName, uniqueNames) {
-		return nil, errors.ErrResourceNotFound
+		return nil, nil
 	}
 
 	secret := core.Secret{
@@ -115,37 +100,33 @@ func (s *FileSystemStore) GetSecret(secretName string) (*core.Secret, error) {
 		Type: core.SecretTypeOpaque,
 	}
 
-	filePrefix := fmt.Sprintf("%s%s", secretName, SecretSeparator)
+	filePrefix := fmt.Sprintf("%s%s", secretName, SECRET_SEPARATOR)
 
 	for _, file := range files {
 		if strings.HasPrefix(file.Name(), filePrefix) {
-			data, err := os.ReadFile(path.Join(s.secretPath, file.Name()))
+			data, err := os.ReadFile(path.Join(store.secretPath, file.Name()))
 			if err != nil {
 				return nil, fmt.Errorf("unable to read file %s: %w", file.Name(), err)
 			}
 
-			secret.Data[strings.TrimPrefix(file.Name(), secretName+SecretSeparator)] = bytes.TrimSuffix(data, []byte("\n"))
-			info, err := os.Stat(path.Join(s.secretPath, file.Name()))
+			secret.Data[strings.TrimPrefix(file.Name(), secretName+SECRET_SEPARATOR)] = bytes.TrimSuffix(data, []byte("\n"))
+			info, err := os.Stat(path.Join(store.secretPath, file.Name()))
 			if err != nil {
 				return nil, fmt.Errorf("unable to get file info for %s: %w", file.Name(), err)
 			}
-
 			secret.ObjectMeta.CreationTimestamp = metav1.NewTime(info.ModTime())
-
-			// The path to the file is stored in the annotation so that it can be mounted
-			// inside a container by reading the store.k2d.io/filesystem/path/* annotations.
-			secret.ObjectMeta.Annotations[fmt.Sprintf("%s/%s", FilePathAnnotationKey, file.Name())] = path.Join(s.secretPath, file.Name())
+			secret.ObjectMeta.Annotations[fmt.Sprintf("secret.k2d.io/%s", file.Name())] = path.Join(store.secretPath, file.Name())
 		}
 	}
 
 	metadataFileName := buildSecretMetadataFileName(secretName)
-	metadataFileFound, err := filesystem.FileExists(path.Join(s.secretPath, metadataFileName))
+	metadataFileFound, err := filesystem.FileExists(path.Join(store.secretPath, metadataFileName))
 	if err != nil {
 		return nil, fmt.Errorf("unable to check if metadata file exists: %w", err)
 	}
 
 	if metadataFileFound {
-		metadata, err := filesystem.LoadMetadataFromDisk(s.secretPath, metadataFileName)
+		metadata, err := filesystem.LoadMetadataFromDisk(store.secretPath, metadataFileName)
 		if err != nil {
 			return nil, fmt.Errorf("unable to load secret metadata from disk: %w", err)
 		}
@@ -156,11 +137,11 @@ func (s *FileSystemStore) GetSecret(secretName string) (*core.Secret, error) {
 	return &secret, nil
 }
 
-func (s *FileSystemStore) GetSecrets(selector labels.Selector) (core.SecretList, error) {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
+func (store *FileSystemStore) GetSecrets(selector labels.Selector) (core.SecretList, error) {
+	store.mutex.Lock()
+	defer store.mutex.Unlock()
 
-	files, err := os.ReadDir(s.secretPath)
+	files, err := os.ReadDir(store.secretPath)
 	if err != nil {
 		return core.SecretList{}, fmt.Errorf("unable to read secret directory: %w", err)
 	}
@@ -170,7 +151,7 @@ func (s *FileSystemStore) GetSecrets(selector labels.Selector) (core.SecretList,
 		fileNames = append(fileNames, file.Name())
 	}
 
-	uniqueNames := str.UniquePrefixes(fileNames, SecretSeparator)
+	uniqueNames := str.UniquePrefixes(fileNames, SECRET_SEPARATOR)
 	uniqueNames = str.RemoveItemsWithSuffix(uniqueNames, ".metadata")
 
 	secrets := []core.Secret{}
@@ -190,13 +171,13 @@ func (s *FileSystemStore) GetSecrets(selector labels.Selector) (core.SecretList,
 		}
 
 		metadataFileName := buildSecretMetadataFileName(secret.Name)
-		metadataFileFound, err := filesystem.FileExists(path.Join(s.secretPath, metadataFileName))
+		metadataFileFound, err := filesystem.FileExists(path.Join(store.secretPath, metadataFileName))
 		if err != nil {
 			return core.SecretList{}, fmt.Errorf("unable to check if metadata file exists: %w", err)
 		}
 
 		if metadataFileFound {
-			metadata, err := filesystem.LoadMetadataFromDisk(s.secretPath, metadataFileName)
+			metadata, err := filesystem.LoadMetadataFromDisk(store.secretPath, metadataFileName)
 			if err != nil {
 				return core.SecretList{}, fmt.Errorf("unable to load secret metadata from disk: %w", err)
 			}
@@ -209,14 +190,14 @@ func (s *FileSystemStore) GetSecrets(selector labels.Selector) (core.SecretList,
 		}
 
 		for _, file := range files {
-			if strings.HasPrefix(file.Name(), fmt.Sprintf("%s%s", name, SecretSeparator)) {
-				data, err := os.ReadFile(path.Join(s.secretPath, file.Name()))
+			if strings.HasPrefix(file.Name(), fmt.Sprintf("%s%s", name, SECRET_SEPARATOR)) {
+				data, err := os.ReadFile(path.Join(store.secretPath, file.Name()))
 				if err != nil {
 					return core.SecretList{}, fmt.Errorf("unable to read file %s: %w", file.Name(), err)
 				}
 
-				secret.Data[strings.TrimPrefix(file.Name(), name+SecretSeparator)] = data
-				info, err := os.Stat(path.Join(s.secretPath, file.Name()))
+				secret.Data[strings.TrimPrefix(file.Name(), name+SECRET_SEPARATOR)] = data
+				info, err := os.Stat(path.Join(store.secretPath, file.Name()))
 				if err != nil {
 					return core.SecretList{}, fmt.Errorf("unable to get file info for %s: %w", file.Name(), err)
 				}
@@ -236,9 +217,9 @@ func (s *FileSystemStore) GetSecrets(selector labels.Selector) (core.SecretList,
 	}, nil
 }
 
-func (s *FileSystemStore) StoreSecret(secret *corev1.Secret) error {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
+func (store *FileSystemStore) StoreSecret(secret *corev1.Secret) error {
+	store.mutex.Lock()
+	defer store.mutex.Unlock()
 
 	data := map[string]string{}
 
@@ -250,15 +231,15 @@ func (s *FileSystemStore) StoreSecret(secret *corev1.Secret) error {
 		data[key] = value
 	}
 
-	filePrefix := fmt.Sprintf("%s%s", secret.Name, SecretSeparator)
-	err := filesystem.StoreDataMapOnDisk(s.secretPath, filePrefix, data)
+	filePrefix := fmt.Sprintf("%s%s", secret.Name, SECRET_SEPARATOR)
+	err := filesystem.StoreDataMapOnDisk(store.secretPath, filePrefix, data)
 	if err != nil {
 		return err
 	}
 
 	if len(secret.Labels) != 0 {
 		metadataFileName := buildSecretMetadataFileName(secret.Name)
-		err = filesystem.StoreMetadataOnDisk(s.secretPath, metadataFileName, secret.Labels)
+		err = filesystem.StoreMetadataOnDisk(store.secretPath, metadataFileName, secret.Labels)
 		if err != nil {
 			return err
 		}

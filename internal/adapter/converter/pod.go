@@ -2,8 +2,6 @@ package converter
 
 import (
 	"fmt"
-	"path"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -13,7 +11,6 @@ import (
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/go-connections/nat"
 	k2dtypes "github.com/portainer/k2d/internal/adapter/types"
-	"go.uber.org/zap"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/apis/core"
 )
@@ -90,19 +87,14 @@ func (converter *DockerAPIConverter) ConvertPodSpecToContainerConfiguration(spec
 	}
 
 	hostConfig := &container.HostConfig{
-		// TODO: add the ability to load these from a system secret
-		// Binds: []string{
-		// 	fmt.Sprintf("%s:%s", converter.k2dServerConfiguration.CaPath, "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"),
-		// 	fmt.Sprintf("%s:%s", converter.k2dServerConfiguration.TokenPath, "/var/run/secrets/kubernetes.io/serviceaccount/token"),
-		// },
+		Binds: []string{
+			fmt.Sprintf("%s:%s", converter.k2dServerConfiguration.CaPath, "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"),
+			fmt.Sprintf("%s:%s", converter.k2dServerConfiguration.TokenPath, "/var/run/secrets/kubernetes.io/serviceaccount/token"),
+		},
 		ExtraHosts: []string{
 			fmt.Sprintf("kubernetes.default.svc:%s", converter.k2dServerConfiguration.ServerIpAddr),
 		},
 	}
-
-	// if err := converter.setTokenAndCAFromSecret(hostConfig); err != nil {
-	// 	return ContainerConfiguration{}, err
-	// }
 
 	if err := converter.setHostPorts(containerConfig, hostConfig, containerSpec.Ports); err != nil {
 		return ContainerConfiguration{}, err
@@ -160,27 +152,6 @@ func (converter *DockerAPIConverter) setResourceRequirements(hostConfig *contain
 	}
 
 	hostConfig.Resources = resourceRequirements
-}
-
-// TODO: comment
-func (converter *DockerAPIConverter) setTokenAndCAFromSecret(hostConfig *container.HostConfig) error {
-	secret, err := converter.secretStore.GetSecret(k2dtypes.SystemSecretName)
-	if err != nil {
-		return fmt.Errorf("unable to get secret %s: %w", k2dtypes.SystemSecretName, err)
-	}
-
-	binds, err := converter.secretStore.GetSecretBinds(secret)
-	if err != nil {
-		return fmt.Errorf("unable to get binds for secrets %s: %w", k2dtypes.SystemSecretName, err)
-	}
-
-	for _, bind := range binds {
-		b := fmt.Sprintf("%s:%s", bind, "/var/run/secrets/kubernetes.io/serviceaccount/")
-		zap.S().Debugf("Adding bind: %s", b)
-		hostConfig.Binds = append(hostConfig.Binds, b)
-	}
-
-	return nil
 }
 
 // setHostPorts configures the Docker container's ports based on the provided core.ContainerPort slices (coming from the pod specs).
@@ -251,7 +222,7 @@ func (converter *DockerAPIConverter) setEnvVars(containerConfig *container.Confi
 // the function retrieves the Secret and adds its data as environment variables.
 func (converter *DockerAPIConverter) handleValueFromEnvFromSource(containerConfig *container.Config, env core.EnvFromSource) error {
 	if env.ConfigMapRef != nil {
-		configMap, err := converter.configMapStore.GetConfigMap(env.ConfigMapRef.Name)
+		configMap, err := converter.store.GetConfigMap(env.ConfigMapRef.Name)
 		if err != nil {
 			return fmt.Errorf("unable to get configmap %s: %w", env.ConfigMapRef.Name, err)
 		}
@@ -260,7 +231,7 @@ func (converter *DockerAPIConverter) handleValueFromEnvFromSource(containerConfi
 			containerConfig.Env = append(containerConfig.Env, fmt.Sprintf("%s=%s", key, value))
 		}
 	} else if env.SecretRef != nil {
-		secret, err := converter.secretStore.GetSecret(env.SecretRef.Name)
+		secret, err := converter.store.GetSecret(env.SecretRef.Name)
 		if err != nil {
 			return fmt.Errorf("unable to get secret %s: %w", env.SecretRef.Name, err)
 		}
@@ -278,14 +249,14 @@ func (converter *DockerAPIConverter) handleValueFromEnvFromSource(containerConfi
 // It returns an error if the sourcing of the environment variables fails.
 func (converter *DockerAPIConverter) handleValueFromEnvVars(containerConfig *container.Config, env core.EnvVar) error {
 	if env.ValueFrom.ConfigMapKeyRef != nil {
-		configMap, err := converter.configMapStore.GetConfigMap(env.ValueFrom.ConfigMapKeyRef.Name)
+		configMap, err := converter.store.GetConfigMap(env.ValueFrom.ConfigMapKeyRef.Name)
 		if err != nil {
 			return fmt.Errorf("unable to get configmap %s: %w", env.ValueFrom.ConfigMapKeyRef.Name, err)
 		}
 
 		containerConfig.Env = append(containerConfig.Env, fmt.Sprintf("%s=%s", env.Name, configMap.Data[env.ValueFrom.ConfigMapKeyRef.Key]))
 	} else if env.ValueFrom.SecretKeyRef != nil {
-		secret, err := converter.secretStore.GetSecret(env.ValueFrom.SecretKeyRef.Name)
+		secret, err := converter.store.GetSecret(env.ValueFrom.SecretKeyRef.Name)
 		if err != nil {
 			return fmt.Errorf("unable to get secret %s: %w", env.ValueFrom.SecretKeyRef.Name, err)
 		}
@@ -359,65 +330,48 @@ func (converter *DockerAPIConverter) setVolumeMounts(hostConfig *container.HostC
 	return nil
 }
 
-// handleVolumeSource processes a Kubernetes VolumeSource, which can either be a ConfigMap, a Secret, or a HostPath.
-// This function sets up the volume bindings in the Docker host configuration according to the provided VolumeSource.
-//
-// For ConfigMap and Secret:
-// 1. It fetches the resource (ConfigMap or Secret) from the store.
-// 2. It generates the list of filesystem binds via the store specific implementation.
-// 3. These binds are then appended to the Docker host configuration.
-//
-// For HostPath:
-// The function directly uses the HostPath and volume mount to set up the bind in the Docker host configuration.
+// handleVolumeSource handles the Kubernetes VolumeSource that can be a ConfigMap, a Secret or a HostPath.
+// For ConfigMap and Secret, it fetches the respective resources from the store and sets the binds in the host configuration
+// based on the annotations in the ConfigMap or Secret.
+// For HostPath, it sets the binds in the host configuration directly from the HostPath and volume mount.
+// It receives a pointer to the host configuration, a Kubernetes volume and a Kubernetes volume mount.
 //
 // Parameters:
-// - hostConfig:   The Docker host configuration where the volume binds will be set.
-// - volume:       The Kubernetes volume object to be processed.
-// - volumeMount:  The Kubernetes volume mount object that provides additional information on how the volume should be mounted.
+// hostConfig - The Docker host configuration to set the binds on.
+// volume - The Kubernetes volume to handle.
+// volumeMount - The Kubernetes volume mount to use in creating the bind.
 //
 // Returns:
-// An error if fetching the ConfigMap or Secret from the store fails; otherwise, it returns nil.
+// An error if it's unable to fetch the ConfigMap or Secret from the store, otherwise returns nil.
 func (converter *DockerAPIConverter) handleVolumeSource(hostConfig *container.HostConfig, volume core.Volume, volumeMount core.VolumeMount) error {
 	if volume.VolumeSource.ConfigMap != nil {
-		configMap, err := converter.configMapStore.GetConfigMap(volume.VolumeSource.ConfigMap.Name)
+		configMap, err := converter.store.GetConfigMap(volume.VolumeSource.ConfigMap.Name)
 		if err != nil {
 			return fmt.Errorf("unable to get configmap %s: %w", volume.VolumeSource.ConfigMap.Name, err)
 		}
 
-		binds, err := converter.configMapStore.GetConfigMapBinds(configMap)
-		if err != nil {
-			return fmt.Errorf("unable to get binds for configmap %s: %w", volume.VolumeSource.ConfigMap.Name, err)
-		}
-
-		for _, bind := range binds {
-
-			b := fmt.Sprintf("%s:%s", bind, path.Join(volumeMount.MountPath, filepath.Base(bind)))
-			zap.S().Debugf("Adding configmap bind: %s", b)
-			hostConfig.Binds = append(hostConfig.Binds, b)
-
-			// hostConfig.Binds = append(hostConfig.Binds, fmt.Sprintf("%s:%s", bind, volumeMount.MountPath))
-		}
+		converter.setBindsFromAnnotations(hostConfig, configMap.Annotations, volumeMount, "configmap.k2d.io/")
 	} else if volume.VolumeSource.Secret != nil {
-		secret, err := converter.secretStore.GetSecret(volume.VolumeSource.Secret.SecretName)
+		secret, err := converter.store.GetSecret(volume.VolumeSource.Secret.SecretName)
 		if err != nil {
 			return fmt.Errorf("unable to get secret %s: %w", volume.VolumeSource.Secret.SecretName, err)
 		}
 
-		binds, err := converter.secretStore.GetSecretBinds(secret)
-		if err != nil {
-			return fmt.Errorf("unable to get binds for secrets %s: %w", volume.VolumeSource.ConfigMap.Name, err)
-		}
-
-		for _, bind := range binds {
-			b := fmt.Sprintf("%s:%s", bind, path.Join(volumeMount.MountPath, filepath.Base(bind)))
-			zap.S().Debugf("Adding secret bind: %s", b)
-			hostConfig.Binds = append(hostConfig.Binds, b)
-
-			// hostConfig.Binds = append(hostConfig.Binds, fmt.Sprintf("%s:%s", bind, volumeMount.MountPath))
-		}
+		converter.setBindsFromAnnotations(hostConfig, secret.Annotations, volumeMount, "secret.k2d.io/")
 	} else if volume.HostPath != nil {
 		bind := fmt.Sprintf("%s:%s", volume.HostPath.Path, volumeMount.MountPath)
 		hostConfig.Binds = append(hostConfig.Binds, bind)
 	}
 	return nil
+}
+
+// setBindsFromAnnotations manages volume annotations for Docker containers.
+// It receives a pointer to the host configuration, a map of annotations, a Kubernetes volume mount, and an annotation prefix.
+func (converter *DockerAPIConverter) setBindsFromAnnotations(hostConfig *container.HostConfig, annotations map[string]string, volumeMount core.VolumeMount, prefix string) {
+	for key, value := range annotations {
+		if strings.HasPrefix(key, prefix) {
+			bind := fmt.Sprintf("%s:%s", value, volumeMount.MountPath)
+			hostConfig.Binds = append(hostConfig.Binds, bind)
+		}
+	}
 }

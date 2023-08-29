@@ -82,9 +82,10 @@ func main() {
 	}
 
 	kubeDockerAdapterOptions := &adapter.KubeDockerAdapterOptions{
-		K2DConfig:           &cfg,
-		Logger:              logger,
+		DataPath:            cfg.DataPath,
+		DockerClientTimeout: cfg.DockerClientTimeout,
 		ServerConfiguration: serverConfiguration,
+		Logger:              logger,
 	}
 
 	kubeDockerAdapter, err := adapter.NewKubeDockerAdapter(kubeDockerAdapterOptions)
@@ -100,11 +101,6 @@ func main() {
 	err = kubeDockerAdapter.EnsureRequiredDockerResourcesExist(ctx)
 	if err != nil {
 		logger.Fatalf("unable to ensure required docker resources exist: %s", err)
-	}
-
-	err = kubeDockerAdapter.StoreSystemSecret(tokenPath, ssl.SSLCAPath(cfg.DataPath))
-	if err != nil {
-		logger.Fatalf("unable to store system secret: %s", err)
 	}
 
 	if cfg.PortainerEdgeKey != "" {

@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/emicklei/go-restful/v3"
-	storeerr "github.com/portainer/k2d/internal/adapter/store/errors"
+	"github.com/portainer/k2d/internal/adapter"
 	"github.com/portainer/k2d/internal/api/utils"
 	httputils "github.com/portainer/k2d/pkg/http"
 	corev1 "k8s.io/api/core/v1"
@@ -31,14 +31,14 @@ func (svc SecretService) PutSecret(r *restful.Request, w *restful.Response) {
 
 	// TODO: this is a temporary hack to to wait for secrets to be created
 	// by clients that are sending rapid requests such as Helm
-	// To work around this, we introduce a retry mechanism that will
+	// To work around this, we will introduce a retry mechanism that will
 	// look for the secret every second and retry for 10 seconds
+
 	timeoutCh := time.After(10 * time.Second)
 
 	for {
 		_, err := svc.adapter.GetSecret(secretName)
 		if err == nil {
-			// The secret has been found, we can update it
 			err = svc.adapter.CreateSecret(secret)
 			if err != nil {
 				utils.HttpError(r, w, http.StatusInternalServerError, fmt.Errorf("unable to update secret: %w", err))
@@ -49,7 +49,7 @@ func (svc SecretService) PutSecret(r *restful.Request, w *restful.Response) {
 			return
 		}
 
-		if err != nil && !errors.Is(err, storeerr.ErrResourceNotFound) {
+		if err != nil && !errors.Is(err, adapter.ErrSecretNotFound) {
 			utils.HttpError(r, w, http.StatusInternalServerError, fmt.Errorf("unable to get secret: %w", err))
 			return
 		}
