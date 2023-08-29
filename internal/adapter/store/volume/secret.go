@@ -167,24 +167,31 @@ func (s *VolumeStore) StoreSecret(secret *corev1.Secret) error {
 // Each secret is stored as a Docker volume using the following naming convention:
 // secret-[namespace]-[secret-name]
 func buildSecretVolumeName(configMapName, namespace string) string {
-	return fmt.Sprintf("%s%s-%s", ConfigMapVolumePrefix, namespace, configMapName)
+	return fmt.Sprintf("%s%s-%s", SecretVolumePrefix, namespace, configMapName)
+}
+
+func getSecretNameFromVolumeName(volumeName, namespace string) string {
+	return strings.TrimPrefix(volumeName, fmt.Sprintf("%s%s-", SecretVolumePrefix, namespace))
 }
 
 // buildSecretFromVolume constructs a Kubernetes Secret object from a Docker volume.
 // Returns a Secret object, and an error if any occurs (e.g., if the volume's creation timestamp is not parseable).
 func buildSecretFromVolume(volume *volume.Volume) (core.Secret, error) {
+	namespace := volume.Labels[NamespaceNameLabelKey]
+
 	secret := core.Secret{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Secret",
 			APIVersion: "v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        strings.TrimPrefix(volume.Name, SecretVolumePrefix),
+			Name:        getSecretNameFromVolumeName(volume.Name, namespace),
 			Annotations: map[string]string{},
-			Namespace:   volume.Labels[NamespaceNameLabelKey],
+			Namespace:   namespace,
 			Labels:      volume.Labels,
 		},
 		Data: map[string][]byte{},
+		Type: core.SecretTypeOpaque,
 	}
 
 	secret.Labels[VolumeNameLabelKey] = volume.Name
