@@ -69,12 +69,14 @@ func (s *FileSystemStore) DeleteSecret(secretName string) error {
 
 // The filesystem implementation will return a list of files that needs to be mounted
 // for a specific Secret. This list is built from the store.k2d.io/filesystem/path/* annotations of the Secret.
-func (s *FileSystemStore) GetSecretBinds(secret *core.Secret) ([]string, error) {
-	binds := []string{}
+// Each bind contains the filename of the file to mount inside the container and the path to the file on the host.
+// The format of each bind is: filename:/path/to/matching/file
+func (s *FileSystemStore) GetSecretBinds(secret *core.Secret) (map[string]string, error) {
+	binds := map[string]string{}
 
 	for key, value := range secret.Annotations {
 		if strings.HasPrefix(key, FilePathAnnotationKey) {
-			binds = append(binds, value)
+			binds[strings.TrimPrefix(key, FilePathAnnotationKey+"/")] = value
 		}
 	}
 
@@ -134,7 +136,8 @@ func (s *FileSystemStore) GetSecret(secretName string) (*core.Secret, error) {
 
 			// The path to the file is stored in the annotation so that it can be mounted
 			// inside a container by reading the store.k2d.io/filesystem/path/* annotations.
-			secret.ObjectMeta.Annotations[fmt.Sprintf("%s/%s", FilePathAnnotationKey, file.Name())] = path.Join(s.secretPath, file.Name())
+			// See the GetSecretBinds function for more details.
+			secret.ObjectMeta.Annotations[fmt.Sprintf("%s/%s", FilePathAnnotationKey, strings.TrimPrefix(file.Name(), filePrefix))] = path.Join(s.secretPath, file.Name())
 		}
 	}
 

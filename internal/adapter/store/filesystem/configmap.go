@@ -70,12 +70,14 @@ func (s *FileSystemStore) DeleteConfigMap(configMapName string) error {
 
 // The filesystem implementation will return a list of files that needs to be mounted
 // for a specific ConfigMap. This list is built from the store.k2d.io/filesystem/path/* annotations of the ConfigMap.
-func (s *FileSystemStore) GetConfigMapBinds(configMap *core.ConfigMap) ([]string, error) {
-	binds := []string{}
+// Each bind contains the filename of the file to mount inside the container and the path to the file on the host.
+// The format of each bind is: filename:/path/to/matching/file
+func (s *FileSystemStore) GetConfigMapBinds(configMap *core.ConfigMap) (map[string]string, error) {
+	binds := map[string]string{}
 
 	for key, value := range configMap.Annotations {
 		if strings.HasPrefix(key, FilePathAnnotationKey) {
-			binds = append(binds, value)
+			binds[strings.TrimPrefix(key, FilePathAnnotationKey+"/")] = value
 		}
 	}
 
@@ -134,7 +136,8 @@ func (s *FileSystemStore) GetConfigMap(configMapName string) (*core.ConfigMap, e
 
 			// The path to the file is stored in the annotation so that it can be mounted
 			// inside a container by reading the store.k2d.io/filesystem/path/* annotations.
-			configMap.ObjectMeta.Annotations[fmt.Sprintf("%s/%s", FilePathAnnotationKey, file.Name())] = path.Join(s.configMapPath, file.Name())
+			// See the GetConfigMapBinds function for more details.
+			configMap.ObjectMeta.Annotations[fmt.Sprintf("%s/%s", FilePathAnnotationKey, strings.TrimPrefix(file.Name(), filePrefix))] = path.Join(s.configMapPath, file.Name())
 		}
 	}
 

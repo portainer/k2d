@@ -55,7 +55,7 @@ type VolumeStore struct {
 	copyImageName string
 }
 
-// TODO: comments
+// VolumeStoreOptions represents options used to create a new VolumeStore.
 type VolumeStoreOptions struct {
 	DockerCli     *client.Client
 	CopyImageName string

@@ -88,7 +88,7 @@ func NewKubeDockerAdapter(options *KubeDockerAdapterOptions) (*KubeDockerAdapter
 		},
 	}
 
-	configMapStore, secretStore, err := store.InitStoreBackend(storeOptions)
+	configMapStore, secretStore, err := store.ConfigureStore(storeOptions)
 	if err != nil {
 		return nil, fmt.Errorf("unable to initialize store backends: %w", err)
 	}

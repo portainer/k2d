@@ -29,7 +29,7 @@ type (
 	}
 )
 
-// TODO: comments
+// FileSystemStoreOptions represents options used to create a new FileSystemStore.
 type FileSystemStoreOptions struct {
 	DataPath string
 }

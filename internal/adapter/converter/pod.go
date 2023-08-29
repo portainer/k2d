@@ -3,7 +3,6 @@ package converter
 import (
 	"fmt"
 	"path"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -13,7 +12,6 @@ import (
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/go-connections/nat"
 	k2dtypes "github.com/portainer/k2d/internal/adapter/types"
-	"go.uber.org/zap"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/apis/core"
 )
@@ -90,19 +88,14 @@ func (converter *DockerAPIConverter) ConvertPodSpecToContainerConfiguration(spec
 	}
 
 	hostConfig := &container.HostConfig{
-		// TODO: add the ability to load these from a system secret
-		// Binds: []string{
-		// 	fmt.Sprintf("%s:%s", converter.k2dServerConfiguration.CaPath, "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"),
-		// 	fmt.Sprintf("%s:%s", converter.k2dServerConfiguration.TokenPath, "/var/run/secrets/kubernetes.io/serviceaccount/token"),
-		// },
 		ExtraHosts: []string{
 			fmt.Sprintf("kubernetes.default.svc:%s", converter.k2dServerConfiguration.ServerIpAddr),
 		},
 	}
 
-	// if err := converter.setTokenAndCAFromSecret(hostConfig); err != nil {
-	// 	return ContainerConfiguration{}, err
-	// }
+	if err := converter.setServiceAccountTokenAndCACert(hostConfig); err != nil {
+		return ContainerConfiguration{}, err
+	}
 
 	if err := converter.setHostPorts(containerConfig, hostConfig, containerSpec.Ports); err != nil {
 		return ContainerConfiguration{}, err
@@ -162,22 +155,32 @@ func (converter *DockerAPIConverter) setResourceRequirements(hostConfig *contain
 	hostConfig.Resources = resourceRequirements
 }
 
-// TODO: comment
-func (converter *DockerAPIConverter) setTokenAndCAFromSecret(hostConfig *container.HostConfig) error {
-	secret, err := converter.secretStore.GetSecret(k2dtypes.SystemSecretName)
+// setServiceAccountTokenAndCACert configures the Docker container to have access to the service account token
+// and CA certificate stored in a Kubernetes Secret. The function performs the following steps:
+//  1. Fetches the service account Secret from Kubernetes using the provided secretStore.
+//  2. Obtains the filesystem bind mappings for the Secret using the secretStore's GetSecretBinds method.
+//  3. Modifies the hostConfig's Binds field to include the service account token and CA certificate by
+//     mapping the host file system paths to the container's "/var/run/secrets/kubernetes.io/serviceaccount/" directory.
+//
+// Parameters:
+//   - hostConfig: The Docker container's host configuration that will be modified to include the service
+//     account token and CA certificate binds.
+//
+// It returns an error if any occurred fetching the Secret or obtaining the bind mappings fails.
+func (converter *DockerAPIConverter) setServiceAccountTokenAndCACert(hostConfig *container.HostConfig) error {
+	secret, err := converter.secretStore.GetSecret(k2dtypes.K2dServiceAccountSecretName)
 	if err != nil {
-		return fmt.Errorf("unable to get secret %s: %w", k2dtypes.SystemSecretName, err)
+		return fmt.Errorf("unable to get secret %s: %w", k2dtypes.K2dServiceAccountSecretName, err)
 	}
 
 	binds, err := converter.secretStore.GetSecretBinds(secret)
 	if err != nil {
-		return fmt.Errorf("unable to get binds for secrets %s: %w", k2dtypes.SystemSecretName, err)
+		return fmt.Errorf("unable to get binds for secrets %s: %w", k2dtypes.K2dServiceAccountSecretName, err)
 	}
 
-	for _, bind := range binds {
-		b := fmt.Sprintf("%s:%s", bind, "/var/run/secrets/kubernetes.io/serviceaccount/")
-		zap.S().Debugf("Adding bind: %s", b)
-		hostConfig.Binds = append(hostConfig.Binds, b)
+	for containerBind, hostBind := range binds {
+		bind := fmt.Sprintf("%s:%s", hostBind, path.Join("/var/run/secrets/kubernetes.io/serviceaccount/", containerBind))
+		hostConfig.Binds = append(hostConfig.Binds, bind)
 	}
 
 	return nil
@@ -389,13 +392,9 @@ func (converter *DockerAPIConverter) handleVolumeSource(hostConfig *container.Ho
 			return fmt.Errorf("unable to get binds for configmap %s: %w", volume.VolumeSource.ConfigMap.Name, err)
 		}
 
-		for _, bind := range binds {
-
-			b := fmt.Sprintf("%s:%s", bind, path.Join(volumeMount.MountPath, filepath.Base(bind)))
-			zap.S().Debugf("Adding configmap bind: %s", b)
-			hostConfig.Binds = append(hostConfig.Binds, b)
-
-			// hostConfig.Binds = append(hostConfig.Binds, fmt.Sprintf("%s:%s", bind, volumeMount.MountPath))
+		for containerBind, hostBind := range binds {
+			bind := fmt.Sprintf("%s:%s", hostBind, path.Join(volumeMount.MountPath, containerBind))
+			hostConfig.Binds = append(hostConfig.Binds, bind)
 		}
 	} else if volume.VolumeSource.Secret != nil {
 		secret, err := converter.secretStore.GetSecret(volume.VolumeSource.Secret.SecretName)
@@ -408,12 +407,9 @@ func (converter *DockerAPIConverter) handleVolumeSource(hostConfig *container.Ho
 			return fmt.Errorf("unable to get binds for secrets %s: %w", volume.VolumeSource.ConfigMap.Name, err)
 		}
 
-		for _, bind := range binds {
-			b := fmt.Sprintf("%s:%s", bind, path.Join(volumeMount.MountPath, filepath.Base(bind)))
-			zap.S().Debugf("Adding secret bind: %s", b)
-			hostConfig.Binds = append(hostConfig.Binds, b)
-
-			// hostConfig.Binds = append(hostConfig.Binds, fmt.Sprintf("%s:%s", bind, volumeMount.MountPath))
+		for containerBind, hostBind := range binds {
+			bind := fmt.Sprintf("%s:%s", hostBind, path.Join(volumeMount.MountPath, containerBind))
+			hostConfig.Binds = append(hostConfig.Binds, bind)
 		}
 	} else if volume.HostPath != nil {
 		bind := fmt.Sprintf("%s:%s", volume.HostPath.Path, volumeMount.MountPath)

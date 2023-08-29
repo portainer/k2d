@@ -33,10 +33,10 @@ func (s *VolumeStore) DeleteSecret(secretName string) error {
 
 // GetSecretBinds returns the volume names that need to be mounted for a given Secret.
 // The volume name is derived from the labels on the Secret.
-// Returns a slice of string containing volume names, and an error if any occurs.
-func (s *VolumeStore) GetSecretBinds(secret *core.Secret) ([]string, error) {
-	return []string{
-		secret.Labels[VolumeNameLabelKey],
+// It returns a single bind with an empty key (representing the file name in the container) and the volume name as value.
+func (s *VolumeStore) GetSecretBinds(secret *core.Secret) (map[string]string, error) {
+	return map[string]string{
+		"": secret.Labels[VolumeNameLabelKey],
 	}, nil
 }
 

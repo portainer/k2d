@@ -40,8 +40,8 @@ func (s *InMemoryStore) DeleteSecret(secretName string) error {
 }
 
 // The secret implementation does not support filesystem bindings.
-func (s *InMemoryStore) GetSecretBinds(secret *core.Secret) ([]string, error) {
-	return []string{}, errors.New("in-memory store does not support filesystem bindings")
+func (s *InMemoryStore) GetSecretBinds(secret *core.Secret) (map[string]string, error) {
+	return map[string]string{}, errors.New("in-memory store does not support filesystem bindings")
 }
 
 // GetSecret gets a secret from the in-memory store

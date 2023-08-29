@@ -32,10 +32,10 @@ func (store *VolumeStore) DeleteConfigMap(configMapName string) error {
 
 // GetConfigMapBinds returns the volume names that need to be mounted for a given ConfigMap.
 // The volume name is derived from the labels on the ConfigMap.
-// Returns a slice of string containing volume names, and an error if any occurs.
-func (s *VolumeStore) GetConfigMapBinds(configMap *core.ConfigMap) ([]string, error) {
-	return []string{
-		configMap.Labels[VolumeNameLabelKey],
+// It returns a single bind with an empty key (representing the file name in the container) and the volume name as value.
+func (s *VolumeStore) GetConfigMapBinds(configMap *core.ConfigMap) (map[string]string, error) {
+	return map[string]string{
+		"": configMap.Labels[VolumeNameLabelKey],
 	}, nil
 }
 

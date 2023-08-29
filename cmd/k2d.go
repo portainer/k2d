@@ -102,7 +102,7 @@ func main() {
 		logger.Fatalf("unable to ensure required docker resources exist: %s", err)
 	}
 
-	err = kubeDockerAdapter.StoreSystemSecret(tokenPath, ssl.SSLCAPath(cfg.DataPath))
+	err = kubeDockerAdapter.StoreServiceAccountSecret(tokenPath, ssl.SSLCAPath(cfg.DataPath))
 	if err != nil {
 		logger.Fatalf("unable to store system secret: %s", err)
 	}
