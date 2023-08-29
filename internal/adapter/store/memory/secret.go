@@ -13,8 +13,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core"
 )
 
-// TODO: implement namespace support
-
 type secretData struct {
 	Data map[string][]byte
 	Type string
