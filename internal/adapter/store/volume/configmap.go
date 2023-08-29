@@ -152,18 +152,24 @@ func buildConfigMapVolumeName(configMapName, namespace string) string {
 	return fmt.Sprintf("%s%s-%s", ConfigMapVolumePrefix, namespace, configMapName)
 }
 
+func getConfigMapNameFromVolumeName(volumeName, namespace string) string {
+	return strings.TrimPrefix(volumeName, fmt.Sprintf("%s%s-", ConfigMapVolumePrefix, namespace))
+}
+
 // buildConfigMapFromVolume constructs a Kubernetes ConfigMap object from a Docker volume.
 // Returns a ConfigMap object, and an error if any occurs (e.g., if the volume's creation timestamp is not parseable).
 func buildConfigMapFromVolume(volume *volume.Volume) (core.ConfigMap, error) {
+	namespace := volume.Labels[NamespaceNameLabelKey]
+
 	configMap := core.ConfigMap{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "ConfigMap",
 			APIVersion: "v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        strings.TrimPrefix(volume.Name, ConfigMapVolumePrefix),
+			Name:        getConfigMapNameFromVolumeName(volume.Name, namespace),
 			Annotations: map[string]string{},
-			Namespace:   volume.Labels[NamespaceNameLabelKey],
+			Namespace:   namespace,
 			Labels:      volume.Labels,
 		},
 		Data: map[string]string{},
