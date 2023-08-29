@@ -9,10 +9,10 @@ import (
 )
 
 func (svc DeploymentService) GetDeployment(r *restful.Request, w *restful.Response) {
+	namespace := utils.NamespaceParameter(r)
 	deploymentName := r.PathParameter("name")
-	namespaceName := r.PathParameter("namespace")
 
-	deployment, err := svc.adapter.GetDeployment(r.Request.Context(), deploymentName, namespaceName)
+	deployment, err := svc.adapter.GetDeployment(r.Request.Context(), deploymentName, namespace)
 	if err != nil {
 		utils.HttpError(r, w, http.StatusInternalServerError, fmt.Errorf("unable to get deployment: %w", err))
 		return

@@ -9,6 +9,7 @@ import (
 )
 
 func (svc ServiceService) GetService(r *restful.Request, w *restful.Response) {
+	// TODO: namespace?
 	serviceName := r.PathParameter("name")
 
 	service, err := svc.adapter.GetService(r.Request.Context(), serviceName)

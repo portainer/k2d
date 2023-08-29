@@ -8,6 +8,9 @@ import (
 	"github.com/portainer/k2d/pkg/filesystem"
 )
 
+// TODO: this package requires a lot of refactoring to make it more readable and maintainable
+// configmap.go and secret.go share a lot of commonalities
+
 // Constants representing folder names and separators used in file paths.
 const (
 	ConfigMapFolder       = "configmaps"
@@ -15,6 +18,11 @@ const (
 	FilePathAnnotationKey = "store.k2d.io/filesystem/path"
 	SecretFolder          = "secrets"
 	SecretSeparator       = "-k2dsec-"
+
+	// NamespaceNameLabelKey is the key used to store the namespace of a Configmap or Secret resource
+	// in the associated metadata file
+	// It is used to identify the namespace associated with a ConfigMap or a Secret
+	NamespaceNameLabelKey = "store.k2d.io/filesystem/namespace-name"
 )
 
 // FileSystemStore is a structure that represents a file system store.

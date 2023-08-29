@@ -11,9 +11,10 @@ import (
 )
 
 func (svc ConfigMapService) GetConfigMap(r *restful.Request, w *restful.Response) {
+	namespace := utils.NamespaceParameter(r)
 	configMapName := r.PathParameter("name")
 
-	configMap, err := svc.adapter.GetConfigMap(configMapName)
+	configMap, err := svc.adapter.GetConfigMap(configMapName, namespace)
 	if err != nil && errors.Is(err, storeerr.ErrResourceNotFound) {
 		w.WriteHeader(http.StatusNotFound)
 		return

@@ -56,10 +56,10 @@ type SecretStore interface {
 
 // ConfigMapStore is an interface for interacting with Kubernetes ConfigMaps.
 type ConfigMapStore interface {
-	DeleteConfigMap(configMapName string) error
+	DeleteConfigMap(configMapName, namespace string) error
 	GetConfigMapBinds(configMap *core.ConfigMap) (map[string]string, error)
-	GetConfigMap(configMapName string) (*core.ConfigMap, error)
-	GetConfigMaps() (core.ConfigMapList, error)
+	GetConfigMap(configMapName, namespace string) (*core.ConfigMap, error)
+	GetConfigMaps(namespace string) (core.ConfigMapList, error)
 	StoreConfigMap(configMap *corev1.ConfigMap) error
 }
 

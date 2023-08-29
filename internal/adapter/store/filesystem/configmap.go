@@ -8,20 +8,28 @@ import (
 
 	"github.com/portainer/k2d/internal/adapter/store/errors"
 	"github.com/portainer/k2d/pkg/filesystem"
+	"github.com/portainer/k2d/pkg/maputils"
 	str "github.com/portainer/k2d/pkg/strings"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/apis/core"
 )
 
-// TODO: this package requires a lot of refactoring to make it more readable and maintainable
-// It shares a lot of commonalities with the secret.go file
+// TODO: add function comments
 
-func buildConfigMapMetadataFileName(configMapName string) string {
-	return fmt.Sprintf("%s-k2dcm.metadata", configMapName)
+// Each configmap has its own metadata file using the following naming convention:
+// [namespace]-[configmap-name]-k2dcm.metadata
+func buildConfigMapMetadataFileName(configMapName, namespace string) string {
+	return fmt.Sprintf("%s-%s-k2dcm.metadata", namespace, configMapName)
 }
 
-func (s *FileSystemStore) DeleteConfigMap(configMapName string) error {
+// Each key of a configmap is stored in a separate file using the following naming convention:
+// [namespace]-[configmap-name]-k2dcm-[key]
+func buildConfigMapFilePrefix(configMapName, namespace string) string {
+	return fmt.Sprintf("%s-%s%s", namespace, configMapName, ConfigMapSeparator)
+}
+
+func (s *FileSystemStore) DeleteConfigMap(configMapName, namespace string) error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
@@ -30,38 +38,33 @@ func (s *FileSystemStore) DeleteConfigMap(configMapName string) error {
 		return fmt.Errorf("unable to read configmap directory: %w", err)
 	}
 
-	fileNames := []string{}
+	filePrefix := buildConfigMapFilePrefix(configMapName, namespace)
+
+	// TODO: centralize this logic into a function hasMatchingConfigMapFile(files []os.FileInfo, filePrefix string) bool
+	hasMatchingConfigMapFile := false
 	for _, file := range files {
-		fileNames = append(fileNames, file.Name())
+		if strings.HasPrefix(file.Name(), filePrefix) {
+			hasMatchingConfigMapFile = true
+			break
+		}
 	}
 
-	uniqueNames := str.UniquePrefixes(fileNames, ConfigMapSeparator)
-
-	if !str.IsStringInSlice(configMapName, uniqueNames) {
-		return fmt.Errorf("configmap %s not found", configMapName)
+	if !hasMatchingConfigMapFile {
+		return errors.ErrResourceNotFound
 	}
 
-	filePrefix := fmt.Sprintf("%s%s", configMapName, ConfigMapSeparator)
+	metadataFileName := buildConfigMapMetadataFileName(configMapName, namespace)
+	err = os.Remove(path.Join(s.configMapPath, metadataFileName))
+	if err != nil {
+		return fmt.Errorf("unable to remove metadata file %s: %w", metadataFileName, err)
+	}
 
 	for _, file := range files {
 		if strings.HasPrefix(file.Name(), filePrefix) {
 			err := os.Remove(path.Join(s.configMapPath, file.Name()))
 			if err != nil {
-				return fmt.Errorf("unable to remove file %s: %w", file.Name(), err)
+				return fmt.Errorf("unable to remove data file %s: %w", file.Name(), err)
 			}
-		}
-	}
-
-	metadataFileName := buildConfigMapMetadataFileName(configMapName)
-	metadataFileFound, err := filesystem.FileExists(path.Join(s.configMapPath, metadataFileName))
-	if err != nil {
-		return fmt.Errorf("unable to check if metadata file exists: %w", err)
-	}
-
-	if metadataFileFound {
-		err := os.Remove(path.Join(s.configMapPath, metadataFileName))
-		if err != nil {
-			return fmt.Errorf("unable to remove file %s: %w", metadataFileName, err)
 		}
 	}
 
@@ -84,7 +87,13 @@ func (s *FileSystemStore) GetConfigMapBinds(configMap *core.ConfigMap) (map[stri
 	return binds, nil
 }
 
-func (s *FileSystemStore) GetConfigMap(configMapName string) (*core.ConfigMap, error) {
+// In order to find a configMap, we need to list all the files in the configmap directory
+// This will return something like this:
+// default-app-config-k2dcm-APP_SETTING  default-app-config-k2dcm-APP_UI_SETTING
+// We then need to validate that the map that we are looking for have at least one corresponding file
+// If not we return an error not found
+// To verify that we have at least one file matching the configmap name,
+func (s *FileSystemStore) GetConfigMap(configMapName, namespace string) (*core.ConfigMap, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
@@ -93,14 +102,17 @@ func (s *FileSystemStore) GetConfigMap(configMapName string) (*core.ConfigMap, e
 		return nil, fmt.Errorf("unable to read configmap directory: %w", err)
 	}
 
-	fileNames := []string{}
+	filePrefix := buildConfigMapFilePrefix(configMapName, namespace)
+
+	hasMatchingConfigMapFile := false
 	for _, file := range files {
-		fileNames = append(fileNames, file.Name())
+		if strings.HasPrefix(file.Name(), filePrefix) {
+			hasMatchingConfigMapFile = true
+			break
+		}
 	}
 
-	uniqueNames := str.UniquePrefixes(fileNames, ConfigMapSeparator)
-
-	if !str.IsStringInSlice(configMapName, uniqueNames) {
+	if !hasMatchingConfigMapFile {
 		return nil, errors.ErrResourceNotFound
 	}
 
@@ -112,12 +124,18 @@ func (s *FileSystemStore) GetConfigMap(configMapName string) (*core.ConfigMap, e
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        configMapName,
 			Annotations: map[string]string{},
-			Namespace:   "default",
 		},
 		Data: map[string]string{},
 	}
 
-	filePrefix := fmt.Sprintf("%s%s", configMapName, ConfigMapSeparator)
+	metadataFileName := buildConfigMapMetadataFileName(configMapName, namespace)
+	metadata, err := filesystem.LoadMetadataFromDisk(s.configMapPath, metadataFileName)
+	if err != nil {
+		return nil, fmt.Errorf("unable to load configmap metadata from disk: %w", err)
+	}
+
+	configMap.Labels = metadata
+	configMap.ObjectMeta.Namespace = metadata[NamespaceNameLabelKey]
 
 	for _, file := range files {
 		if strings.HasPrefix(file.Name(), filePrefix) {
@@ -127,6 +145,9 @@ func (s *FileSystemStore) GetConfigMap(configMapName string) (*core.ConfigMap, e
 			}
 
 			configMap.Data[strings.TrimPrefix(file.Name(), configMapName+ConfigMapSeparator)] = string(data)
+
+			// TODO: instead of relying on os.Stat for the creation timestamp, we should store it in the metadata file
+			// when the configmap is created as a unix timestamp
 			info, err := os.Stat(path.Join(s.configMapPath, file.Name()))
 			if err != nil {
 				return nil, fmt.Errorf("unable to get file info for %s: %w", file.Name(), err)
@@ -141,25 +162,10 @@ func (s *FileSystemStore) GetConfigMap(configMapName string) (*core.ConfigMap, e
 		}
 	}
 
-	metadataFileName := buildConfigMapMetadataFileName(configMapName)
-	metadataFileFound, err := filesystem.FileExists(path.Join(s.configMapPath, metadataFileName))
-	if err != nil {
-		return nil, fmt.Errorf("unable to check if metadata file exists: %w", err)
-	}
-
-	if metadataFileFound {
-		metadata, err := filesystem.LoadMetadataFromDisk(s.configMapPath, metadataFileName)
-		if err != nil {
-			return nil, fmt.Errorf("unable to load configmap metadata from disk: %w", err)
-		}
-
-		configMap.Labels = metadata
-	}
-
 	return &configMap, nil
 }
 
-func (s *FileSystemStore) GetConfigMaps() (core.ConfigMapList, error) {
+func (s *FileSystemStore) GetConfigMaps(namespace string) (core.ConfigMapList, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
@@ -174,51 +180,54 @@ func (s *FileSystemStore) GetConfigMaps() (core.ConfigMapList, error) {
 	}
 
 	uniqueNames := str.UniquePrefixes(fileNames, ConfigMapSeparator)
+	uniqueNames = str.FilterStringsByPrefix(uniqueNames, namespace)
 	uniqueNames = str.RemoveItemsWithSuffix(uniqueNames, ".metadata")
 
 	configMaps := []core.ConfigMap{}
 	for _, name := range uniqueNames {
+
 		configMap := core.ConfigMap{
 			TypeMeta: metav1.TypeMeta{
 				Kind:       "ConfigMap",
 				APIVersion: "v1",
 			},
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      name,
-				Namespace: "default",
-			},
-			Data: map[string]string{},
+			ObjectMeta: metav1.ObjectMeta{},
+			Data:       map[string]string{},
 		}
 
+		// We lookup for the metadata file first, it contains the labels associated to the configmap
+		// and that includes a specific label that is used to identify the namespace associated to the configmap
+
+		// at this stage name = default-app-config
+		// e.g. [namespace]-[configmap-name]
+
+		// TODO: find a better way to do this, this is dirty as it doesn't rely on the buildConfigMapMetadataFileName function
+		metadataFileName := fmt.Sprintf("%s-k2dcm.metadata", name)
+		metadata, err := filesystem.LoadMetadataFromDisk(s.configMapPath, metadataFileName)
+		if err != nil {
+			return core.ConfigMapList{}, fmt.Errorf("unable to load configmap metadata from disk: %w", err)
+		}
+
+		configMap.Labels = metadata
+		configMap.ObjectMeta.Namespace = metadata[NamespaceNameLabelKey]
+		configMap.ObjectMeta.Name = strings.TrimPrefix(name, configMap.ObjectMeta.Namespace+"-")
+
+		// We then lookup for the data files and build the data map
+		filePrefix := buildConfigMapFilePrefix(configMap.ObjectMeta.Name, configMap.ObjectMeta.Namespace)
 		for _, file := range files {
-			if strings.HasPrefix(file.Name(), fmt.Sprintf("%s%s", name, ConfigMapSeparator)) {
+			if strings.HasPrefix(file.Name(), filePrefix) {
 				data, err := os.ReadFile(path.Join(s.configMapPath, file.Name()))
 				if err != nil {
 					return core.ConfigMapList{}, fmt.Errorf("unable to read file %s: %w", file.Name(), err)
 				}
 
-				configMap.Data[strings.TrimPrefix(file.Name(), name+ConfigMapSeparator)] = string(data)
+				configMap.Data[strings.TrimPrefix(file.Name(), filePrefix)] = string(data)
 				info, err := os.Stat(path.Join(s.configMapPath, file.Name()))
 				if err != nil {
 					return core.ConfigMapList{}, fmt.Errorf("unable to get file info for %s: %w", file.Name(), err)
 				}
 				configMap.ObjectMeta.CreationTimestamp = metav1.NewTime(info.ModTime())
 			}
-		}
-
-		metadataFileName := buildConfigMapMetadataFileName(name)
-		metadataFileFound, err := filesystem.FileExists(path.Join(s.configMapPath, metadataFileName))
-		if err != nil {
-			return core.ConfigMapList{}, fmt.Errorf("unable to check if metadata file exists: %w", err)
-		}
-
-		if metadataFileFound {
-			metadata, err := filesystem.LoadMetadataFromDisk(s.configMapPath, metadataFileName)
-			if err != nil {
-				return core.ConfigMapList{}, fmt.Errorf("unable to load configmap metadata from disk: %w", err)
-			}
-
-			configMap.Labels = metadata
 		}
 
 		configMaps = append(configMaps, configMap)
@@ -237,18 +246,21 @@ func (s *FileSystemStore) StoreConfigMap(configMap *corev1.ConfigMap) error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	filePrefix := fmt.Sprintf("%s%s", configMap.Name, ConfigMapSeparator)
-	err := filesystem.StoreDataMapOnDisk(s.configMapPath, filePrefix, configMap.Data)
+	labels := map[string]string{
+		NamespaceNameLabelKey: configMap.Namespace,
+	}
+	maputils.MergeMapsInPlace(labels, configMap.Labels)
+
+	metadataFileName := buildConfigMapMetadataFileName(configMap.Name, configMap.Namespace)
+	err := filesystem.StoreMetadataOnDisk(s.configMapPath, metadataFileName, labels)
 	if err != nil {
 		return err
 	}
 
-	if len(configMap.Labels) != 0 {
-		metadataFileName := buildConfigMapMetadataFileName(configMap.Name)
-		err = filesystem.StoreMetadataOnDisk(s.configMapPath, metadataFileName, configMap.Labels)
-		if err != nil {
-			return err
-		}
+	filePrefix := buildConfigMapFilePrefix(configMap.Name, configMap.Namespace)
+	err = filesystem.StoreDataMapOnDisk(s.configMapPath, filePrefix, configMap.Data)
+	if err != nil {
+		return err
 	}
 
 	return nil

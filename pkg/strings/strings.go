@@ -4,6 +4,8 @@ import (
 	"strings"
 )
 
+// TODO: get rid of this function
+
 // UniquePrefixes returns a slice of unique prefixes from a slice of strings
 // Prefixes are retrieved based on the specified separator
 func UniquePrefixes(data []string, separator string) []string {
@@ -22,6 +24,8 @@ func UniquePrefixes(data []string, separator string) []string {
 	return uniqueSlice
 }
 
+// TODO: get rid of this function
+
 // IsStringInSlice checks if the target string is present in the provided slice of strings.
 // It returns true if the target string is found in the slice, and false otherwise.
 func IsStringInSlice(target string, slice []string) bool {
@@ -33,6 +37,7 @@ func IsStringInSlice(target string, slice []string) bool {
 	return false
 }
 
+// TODO: check if this is still useful and add comment
 func RemoveItemsWithSuffix(items []string, suffix string) []string {
 	var result []string
 	for _, s := range items {
@@ -41,4 +46,16 @@ func RemoveItemsWithSuffix(items []string, suffix string) []string {
 		}
 	}
 	return result
+}
+
+// FilterStringsByPrefix takes a slice of strings and a prefix, and returns a new slice
+// containing only the strings that start with the specified prefix.
+func FilterStringsByPrefix(strs []string, prefix string) []string {
+	var filtered []string
+	for _, str := range strs {
+		if strings.HasPrefix(str, prefix) {
+			filtered = append(filtered, str)
+		}
+	}
+	return filtered
 }

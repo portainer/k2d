@@ -13,6 +13,8 @@ import (
 )
 
 func (svc SecretService) CreateSecret(r *restful.Request, w *restful.Response) {
+	namespace := utils.NamespaceParameter(r)
+
 	secret := &corev1.Secret{}
 
 	err := httputils.ParseJSONBody(r.Request, &secret)
@@ -20,6 +22,8 @@ func (svc SecretService) CreateSecret(r *restful.Request, w *restful.Response) {
 		utils.HttpError(r, w, http.StatusBadRequest, fmt.Errorf("unable to parse request body: %w", err))
 		return
 	}
+
+	secret.Namespace = namespace
 
 	dryRun := r.QueryParameter("dryRun") != ""
 	if dryRun {

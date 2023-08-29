@@ -101,7 +101,8 @@ func (converter *DockerAPIConverter) ConvertPodSpecToContainerConfiguration(spec
 		return ContainerConfiguration{}, err
 	}
 
-	if err := converter.setEnvVars(containerConfig, containerSpec.Env, containerSpec.EnvFrom); err != nil {
+	// TODO: networkName has been injected everywhere but the function comments where not updated
+	if err := converter.setEnvVars(networkName, containerConfig, containerSpec.Env, containerSpec.EnvFrom); err != nil {
 		return ContainerConfiguration{}, err
 	}
 
@@ -110,11 +111,12 @@ func (converter *DockerAPIConverter) ConvertPodSpecToContainerConfiguration(spec
 	setSecurityContext(containerConfig, hostConfig, spec.SecurityContext, containerSpec.SecurityContext)
 	converter.setResourceRequirements(hostConfig, containerSpec.Resources)
 
-	if err := converter.setVolumeMounts(hostConfig, spec.Volumes, containerSpec.VolumeMounts); err != nil {
+	if err := converter.setVolumeMounts(networkName, hostConfig, spec.Volumes, containerSpec.VolumeMounts); err != nil {
 		return ContainerConfiguration{}, err
 	}
 
-	// ensure the default namespaces points to the default k2d_net network
+	// TODO: review why
+	// ensure the default namespace points to the default k2d_net network
 	if networkName == "default" {
 		networkName = "k2d_net"
 	}
@@ -226,11 +228,11 @@ func (converter *DockerAPIConverter) setHostPorts(containerConfig *container.Con
 // setEnvVars handles setting the environment variables for the Docker container configuration.
 // It receives a pointer to the container configuration and an array of Kubernetes environment variables.
 // It returns an error if the setting of environment variables fails.
-func (converter *DockerAPIConverter) setEnvVars(containerConfig *container.Config, envs []core.EnvVar, envFrom []core.EnvFromSource) error {
+func (converter *DockerAPIConverter) setEnvVars(networkName string, containerConfig *container.Config, envs []core.EnvVar, envFrom []core.EnvFromSource) error {
 	for _, env := range envs {
 
 		if env.ValueFrom != nil {
-			if err := converter.handleValueFromEnvVars(containerConfig, env); err != nil {
+			if err := converter.handleValueFromEnvVars(networkName, containerConfig, env); err != nil {
 				return err
 			}
 		} else {
@@ -239,7 +241,7 @@ func (converter *DockerAPIConverter) setEnvVars(containerConfig *container.Confi
 	}
 
 	for _, env := range envFrom {
-		if err := converter.handleValueFromEnvFromSource(containerConfig, env); err != nil {
+		if err := converter.handleValueFromEnvFromSource(networkName, containerConfig, env); err != nil {
 			return err
 		}
 	}
@@ -257,9 +259,9 @@ func (converter *DockerAPIConverter) setEnvVars(containerConfig *container.Confi
 // If the EnvFromSource object points to a ConfigMap, the function retrieves the ConfigMap and adds its data as
 // environment variables to the Docker container configuration. Similarly, if the EnvFromSource points to a Secret,
 // the function retrieves the Secret and adds its data as environment variables.
-func (converter *DockerAPIConverter) handleValueFromEnvFromSource(containerConfig *container.Config, env core.EnvFromSource) error {
+func (converter *DockerAPIConverter) handleValueFromEnvFromSource(networkName string, containerConfig *container.Config, env core.EnvFromSource) error {
 	if env.ConfigMapRef != nil {
-		configMap, err := converter.configMapStore.GetConfigMap(env.ConfigMapRef.Name)
+		configMap, err := converter.configMapStore.GetConfigMap(env.ConfigMapRef.Name, networkName)
 		if err != nil {
 			return fmt.Errorf("unable to get configmap %s: %w", env.ConfigMapRef.Name, err)
 		}
@@ -284,9 +286,9 @@ func (converter *DockerAPIConverter) handleValueFromEnvFromSource(containerConfi
 // handleValueFromEnvVars manages environment variables that are defined through ConfigMap or Secret references.
 // It receives a pointer to the container configuration and a Kubernetes environment variable.
 // It returns an error if the sourcing of the environment variables fails.
-func (converter *DockerAPIConverter) handleValueFromEnvVars(containerConfig *container.Config, env core.EnvVar) error {
+func (converter *DockerAPIConverter) handleValueFromEnvVars(networkName string, containerConfig *container.Config, env core.EnvVar) error {
 	if env.ValueFrom.ConfigMapKeyRef != nil {
-		configMap, err := converter.configMapStore.GetConfigMap(env.ValueFrom.ConfigMapKeyRef.Name)
+		configMap, err := converter.configMapStore.GetConfigMap(env.ValueFrom.ConfigMapKeyRef.Name, networkName)
 		if err != nil {
 			return fmt.Errorf("unable to get configmap %s: %w", env.ValueFrom.ConfigMapKeyRef.Name, err)
 		}
@@ -353,11 +355,11 @@ func setSecurityContext(config *container.Config, hostConfig *container.HostConf
 // setVolumeMounts manages volume mounts for the Docker container.
 // It receives a pointer to the host configuration, an array of Kubernetes volumes, and an array of Kubernetes volume mounts.
 // It returns an error if the handling of volume mounts fails.
-func (converter *DockerAPIConverter) setVolumeMounts(hostConfig *container.HostConfig, volumes []core.Volume, volumeMounts []core.VolumeMount) error {
+func (converter *DockerAPIConverter) setVolumeMounts(networkName string, hostConfig *container.HostConfig, volumes []core.Volume, volumeMounts []core.VolumeMount) error {
 	for _, volume := range volumes {
 		for _, volumeMount := range volumeMounts {
 			if volumeMount.Name == volume.Name {
-				if err := converter.handleVolumeSource(hostConfig, volume, volumeMount); err != nil {
+				if err := converter.handleVolumeSource(networkName, hostConfig, volume, volumeMount); err != nil {
 					return err
 				}
 				break
@@ -385,9 +387,9 @@ func (converter *DockerAPIConverter) setVolumeMounts(hostConfig *container.HostC
 //
 // Returns:
 // An error if fetching the ConfigMap or Secret from the store fails; otherwise, it returns nil.
-func (converter *DockerAPIConverter) handleVolumeSource(hostConfig *container.HostConfig, volume core.Volume, volumeMount core.VolumeMount) error {
+func (converter *DockerAPIConverter) handleVolumeSource(networkName string, hostConfig *container.HostConfig, volume core.Volume, volumeMount core.VolumeMount) error {
 	if volume.VolumeSource.ConfigMap != nil {
-		configMap, err := converter.configMapStore.GetConfigMap(volume.VolumeSource.ConfigMap.Name)
+		configMap, err := converter.configMapStore.GetConfigMap(volume.VolumeSource.ConfigMap.Name, networkName)
 		if err != nil {
 			return fmt.Errorf("unable to get configmap %s: %w", volume.VolumeSource.ConfigMap.Name, err)
 		}
