@@ -16,6 +16,7 @@ import (
 
 func (svc NamespaceService) PatchNamespace(r *restful.Request, w *restful.Response) {
 	namespaceName := r.PathParameter("name")
+	// TODO: check if watch is used
 	watch := r.PathParameter("watch")
 
 	patch, err := io.ReadAll(r.Request.Body)

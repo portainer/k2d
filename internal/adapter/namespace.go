@@ -22,33 +22,33 @@ func (adapter *KubeDockerAdapter) CreateNetworkFromNamespace(ctx context.Context
 
 	if network != nil {
 		return fmt.Errorf("network %s already exists", namespace.Name)
-	} else {
-		if namespace.Labels["app.kubernetes.io/managed-by"] == "Helm" {
-			namespaceData, err := json.Marshal(namespace)
-			if err != nil {
-				return fmt.Errorf("unable to marshal deployment: %w", err)
-			}
-			namespace.ObjectMeta.Annotations["kubectl.kubernetes.io/last-applied-configuration"] = string(namespaceData)
-		}
+	}
 
-		lastAppliedConfiguration := ""
-		if namespace.ObjectMeta.Annotations["kubectl.kubernetes.io/last-applied-configuration"] != "" {
-			lastAppliedConfiguration = namespace.ObjectMeta.Annotations["kubectl.kubernetes.io/last-applied-configuration"]
-		}
-
-		_, err := adapter.cli.NetworkCreate(ctx, namespace.Name, types.NetworkCreate{
-			Driver: "bridge",
-			Labels: map[string]string{
-				k2dtypes.NamespaceLabelKey:                  namespace.Name,
-				k2dtypes.NamespaceLastAppliedConfigLabelKey: lastAppliedConfiguration,
-			},
-			Options: map[string]string{
-				"com.docker.network.bridge.name": namespace.Name,
-			},
-		})
+	if namespace.Labels["app.kubernetes.io/managed-by"] == "Helm" {
+		namespaceData, err := json.Marshal(namespace)
 		if err != nil {
-			return fmt.Errorf("unable to create network %s: %w", namespace.Name, err)
+			return fmt.Errorf("unable to marshal deployment: %w", err)
 		}
+		namespace.ObjectMeta.Annotations["kubectl.kubernetes.io/last-applied-configuration"] = string(namespaceData)
+	}
+
+	lastAppliedConfiguration := ""
+	if namespace.ObjectMeta.Annotations["kubectl.kubernetes.io/last-applied-configuration"] != "" {
+		lastAppliedConfiguration = namespace.ObjectMeta.Annotations["kubectl.kubernetes.io/last-applied-configuration"]
+	}
+
+	_, err = adapter.cli.NetworkCreate(ctx, namespace.Name, types.NetworkCreate{
+		Driver: "bridge",
+		Labels: map[string]string{
+			k2dtypes.NamespaceLabelKey:                  namespace.Name,
+			k2dtypes.NamespaceLastAppliedConfigLabelKey: lastAppliedConfiguration,
+		},
+		Options: map[string]string{
+			"com.docker.network.bridge.name": namespace.Name,
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("unable to create network %s: %w", namespace.Name, err)
 	}
 
 	return nil
@@ -81,6 +81,7 @@ func (adapter *KubeDockerAdapter) GetNamespace(ctx context.Context, namespaceNam
 		return &corev1.Namespace{}, fmt.Errorf("unable to get the namespaces: %w", err)
 	}
 
+	// TODO: investigate if ErrResourceNotFound equivalent is available in docker
 	if network == nil {
 		return nil, nil
 	}

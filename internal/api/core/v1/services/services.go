@@ -31,7 +31,7 @@ func (svc ServiceService) RegisterServiceAPI(ws *restful.WebService) {
 
 	ws.Route(ws.POST("/v1/namespaces/{namespace}/services").
 		To(svc.CreateService).
-		Param(ws.PathParameter("namespace", "namespace of the service").DataType("string")).
+		Param(ws.PathParameter("namespace", "namespace name").DataType("string")).
 		Param(ws.QueryParameter("dryRun", "when present, indicates that modifications should not be persisted").DataType("string")))
 
 	ws.Route(ws.GET("/v1/services").
@@ -39,7 +39,7 @@ func (svc ServiceService) RegisterServiceAPI(ws *restful.WebService) {
 
 	ws.Route(ws.GET("/v1/namespaces/{namespace}/services").
 		To(svc.ListServices).
-		Param(ws.PathParameter("namespace", "namespace of the service").DataType("string")))
+		Param(ws.PathParameter("namespace", "namespace name").DataType("string")))
 
 	ws.Route(ws.DELETE("/v1/services/{name}").
 		To(svc.DeleteService).
@@ -47,7 +47,7 @@ func (svc ServiceService) RegisterServiceAPI(ws *restful.WebService) {
 
 	ws.Route(ws.DELETE("/v1/namespaces/{namespace}/services/{name}").
 		To(svc.DeleteService).
-		Param(ws.PathParameter("namespace", "namespace of the service").DataType("string")).
+		Param(ws.PathParameter("namespace", "namespace name").DataType("string")).
 		Param(ws.PathParameter("name", "name of the service").DataType("string")))
 
 	ws.Route(ws.GET("/v1/services/{name}").
@@ -56,19 +56,19 @@ func (svc ServiceService) RegisterServiceAPI(ws *restful.WebService) {
 
 	ws.Route(ws.GET("/v1/namespaces/{namespace}/services/{name}").
 		To(svc.GetService).
-		Param(ws.PathParameter("namespace", "namespace of the service").DataType("string")).
+		Param(ws.PathParameter("namespace", "namespace name").DataType("string")).
 		Param(ws.PathParameter("name", "name of the service").DataType("string")))
 
 	ws.Route(ws.PATCH("/v1/services/{name}").
 		To(svc.PatchService).
+		Param(ws.PathParameter("name", "name of the service").DataType("string")).
 		Param(ws.QueryParameter("dryRun", "when present, indicates that modifications should not be persisted").DataType("string")).
-		AddExtension("x-kubernetes-group-version-kind", serviceGVKExtension).
-		Param(ws.PathParameter("name", "name of the service").DataType("string")))
+		AddExtension("x-kubernetes-group-version-kind", serviceGVKExtension))
 
 	ws.Route(ws.PATCH("/v1/namespaces/{namespace}/services/{name}").
 		To(svc.PatchService).
+		Param(ws.PathParameter("namespace", "namespace name").DataType("string")).
+		Param(ws.PathParameter("name", "name of the service").DataType("string")).
 		Param(ws.QueryParameter("dryRun", "when present, indicates that modifications should not be persisted").DataType("string")).
-		AddExtension("x-kubernetes-group-version-kind", serviceGVKExtension).
-		Param(ws.PathParameter("namespace", "namespace of the service").DataType("string")).
-		Param(ws.PathParameter("name", "name of the service").DataType("string")))
+		AddExtension("x-kubernetes-group-version-kind", serviceGVKExtension))
 }

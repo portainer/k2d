@@ -32,6 +32,7 @@ func (svc NamespaceService) RegisterNamespaceAPI(ws *restful.WebService) {
 	ws.Route(ws.GET("/v1/namespaces").
 		To(svc.ListNamespaces))
 
+	// TODO: check if watch is required
 	ws.Route(ws.GET("/v1/namespaces/{name}").
 		To(svc.GetNamespace).
 		Param(ws.PathParameter("name", "name of the namespace").DataType("string")).
@@ -39,9 +40,9 @@ func (svc NamespaceService) RegisterNamespaceAPI(ws *restful.WebService) {
 
 	ws.Route(ws.PATCH("/v1/namespaces/{name}").
 		To(svc.PatchNamespace).
+		Param(ws.PathParameter("name", "name of the namespace").DataType("string")).
 		Param(ws.QueryParameter("dryRun", "when present, indicates that modifications should not be persisted").DataType("string")).
-		AddExtension("x-kubernetes-group-version-kind", namespaceGVKExtension).
-		Param(ws.PathParameter("name", "name of the namespace").DataType("string")))
+		AddExtension("x-kubernetes-group-version-kind", namespaceGVKExtension))
 
 	ws.Route(ws.DELETE("/v1/namespaces/{name}").
 		To(svc.DeleteNamespace).
