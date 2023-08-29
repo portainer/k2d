@@ -175,7 +175,8 @@ func (converter *DockerAPIConverter) setResourceRequirements(hostConfig *contain
 //
 // It returns an error if any occurred fetching the Secret or obtaining the bind mappings fails.
 func (converter *DockerAPIConverter) setServiceAccountTokenAndCACert(hostConfig *container.HostConfig) error {
-	secret, err := converter.secretStore.GetSecret(k2dtypes.K2dServiceAccountSecretName)
+	// TODO: should this secret be relocated to another namespace?
+	secret, err := converter.secretStore.GetSecret(k2dtypes.K2dServiceAccountSecretName, "default")
 	if err != nil {
 		return fmt.Errorf("unable to get secret %s: %w", k2dtypes.K2dServiceAccountSecretName, err)
 	}
@@ -270,7 +271,7 @@ func (converter *DockerAPIConverter) handleValueFromEnvFromSource(networkName st
 			containerConfig.Env = append(containerConfig.Env, fmt.Sprintf("%s=%s", key, value))
 		}
 	} else if env.SecretRef != nil {
-		secret, err := converter.secretStore.GetSecret(env.SecretRef.Name)
+		secret, err := converter.secretStore.GetSecret(env.SecretRef.Name, networkName)
 		if err != nil {
 			return fmt.Errorf("unable to get secret %s: %w", env.SecretRef.Name, err)
 		}
@@ -295,7 +296,7 @@ func (converter *DockerAPIConverter) handleValueFromEnvVars(networkName string, 
 
 		containerConfig.Env = append(containerConfig.Env, fmt.Sprintf("%s=%s", env.Name, configMap.Data[env.ValueFrom.ConfigMapKeyRef.Key]))
 	} else if env.ValueFrom.SecretKeyRef != nil {
-		secret, err := converter.secretStore.GetSecret(env.ValueFrom.SecretKeyRef.Name)
+		secret, err := converter.secretStore.GetSecret(env.ValueFrom.SecretKeyRef.Name, networkName)
 		if err != nil {
 			return fmt.Errorf("unable to get secret %s: %w", env.ValueFrom.SecretKeyRef.Name, err)
 		}
@@ -404,7 +405,7 @@ func (converter *DockerAPIConverter) handleVolumeSource(networkName string, host
 			hostConfig.Binds = append(hostConfig.Binds, bind)
 		}
 	} else if volume.VolumeSource.Secret != nil {
-		secret, err := converter.secretStore.GetSecret(volume.VolumeSource.Secret.SecretName)
+		secret, err := converter.secretStore.GetSecret(volume.VolumeSource.Secret.SecretName, networkName)
 		if err != nil {
 			return fmt.Errorf("unable to get secret %s: %w", volume.VolumeSource.Secret.SecretName, err)
 		}

@@ -12,6 +12,7 @@ import (
 )
 
 func (svc SecretService) ListSecrets(r *restful.Request, w *restful.Response) {
+	namespace := utils.NamespaceParameter(r)
 	selectorParam := r.QueryParameter("labelSelector")
 
 	selector, err := labels.Parse(selectorParam)
@@ -24,10 +25,10 @@ func (svc SecretService) ListSecrets(r *restful.Request, w *restful.Response) {
 		r,
 		w,
 		func(ctx context.Context) (interface{}, error) {
-			return svc.adapter.ListSecrets(selector)
+			return svc.adapter.ListSecrets(namespace, selector)
 		},
 		func(ctx context.Context) (*metav1.Table, error) {
-			return svc.adapter.GetSecretTable(selector)
+			return svc.adapter.GetSecretTable(namespace, selector)
 		},
 	)
 }

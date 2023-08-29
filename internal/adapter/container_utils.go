@@ -242,7 +242,7 @@ func (adapter *KubeDockerAdapter) createContainerFromPodSpec(ctx context.Context
 		}
 	}
 
-	registryAuth, err := adapter.getRegistryCredentials(options.podSpec, containerCfg.ContainerConfig.Image)
+	registryAuth, err := adapter.getRegistryCredentials(options.podSpec, options.networkName, containerCfg.ContainerConfig.Image)
 	if err != nil {
 		return fmt.Errorf("unable to get registry credentials: %w", err)
 	}
@@ -295,7 +295,8 @@ func (adapter *KubeDockerAdapter) DeleteContainer(ctx context.Context, container
 // from the obtained username and password and returns its base64-encoded JSON representation.
 //
 // If any step fails, an error is returned.
-func (adapter *KubeDockerAdapter) getRegistryCredentials(podSpec corev1.PodSpec, imageName string) (string, error) {
+// TODO: update docs with namespace
+func (adapter *KubeDockerAdapter) getRegistryCredentials(podSpec corev1.PodSpec, namespace, imageName string) (string, error) {
 	if podSpec.ImagePullSecrets == nil {
 		return "", nil
 	}
@@ -319,7 +320,7 @@ func (adapter *KubeDockerAdapter) getRegistryCredentials(podSpec corev1.PodSpec,
 	// We only support a single image pull secret for now
 	pullSecret := podSpec.ImagePullSecrets[0]
 
-	registrySecret, err := adapter.registrySecretStore.GetSecret(pullSecret.Name)
+	registrySecret, err := adapter.registrySecretStore.GetSecret(pullSecret.Name, namespace)
 	if err != nil {
 		return "", fmt.Errorf("unable to get registry secret: %w", err)
 	}
