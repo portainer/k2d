@@ -10,10 +10,11 @@ import (
 
 // Constants representing folder names and separators used in file paths.
 const (
-	CONFIGMAP_FOLDER    = "configmaps"
-	SECRET_FOLDER       = "secrets"
-	CONFIGMAP_SEPARATOR = "-k2dcm-"
-	SECRET_SEPARATOR    = "-k2dsec-"
+	ConfigMapFolder       = "configmaps"
+	ConfigMapSeparator    = "-k2dcm-"
+	FilePathAnnotationKey = "store.k2d.io/filesystem/path"
+	SecretFolder          = "secrets"
+	SecretSeparator       = "-k2dsec-"
 )
 
 // FileSystemStore is a structure that represents a file system store.
@@ -28,22 +29,27 @@ type (
 	}
 )
 
+// FileSystemStoreOptions represents options used to create a new FileSystemStore.
+type FileSystemStoreOptions struct {
+	DataPath string
+}
+
 // NewFileSystemStore creates and returns a new FileSystemStore.
 // It receives a data path where the directories for configMaps and secrets are created.
 // If the directories cannot be created, an error is returned.
-func NewFileSystemStore(dataPath string) (*FileSystemStore, error) {
-	folders := []string{CONFIGMAP_FOLDER, SECRET_FOLDER}
+func NewFileSystemStore(opts FileSystemStoreOptions) (*FileSystemStore, error) {
+	folders := []string{ConfigMapFolder, SecretFolder}
 
 	for _, folder := range folders {
-		err := filesystem.CreateDir(path.Join(dataPath, folder))
+		err := filesystem.CreateDir(path.Join(opts.DataPath, folder))
 		if err != nil {
 			return nil, fmt.Errorf("unable to create directory %s: %w", folder, err)
 		}
 	}
 
 	return &FileSystemStore{
-		configMapPath: path.Join(dataPath, CONFIGMAP_FOLDER),
-		secretPath:    path.Join(dataPath, SECRET_FOLDER),
+		configMapPath: path.Join(opts.DataPath, ConfigMapFolder),
+		secretPath:    path.Join(opts.DataPath, SecretFolder),
 		mutex:         sync.Mutex{},
 	}, nil
 }

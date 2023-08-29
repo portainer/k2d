@@ -8,7 +8,7 @@ import (
 	"net/http"
 
 	"github.com/emicklei/go-restful/v3"
-	"github.com/portainer/k2d/internal/adapter"
+	storeerr "github.com/portainer/k2d/internal/adapter/store/errors"
 	"github.com/portainer/k2d/internal/api/utils"
 	"github.com/portainer/k2d/internal/controller"
 	"github.com/portainer/k2d/internal/types"
@@ -27,7 +27,7 @@ func (svc SecretService) PatchSecret(r *restful.Request, w *restful.Response) {
 	}
 
 	secret, err := svc.adapter.GetSecret(secretName)
-	if err != nil && errors.Is(err, adapter.ErrSecretNotFound) {
+	if err != nil && errors.Is(err, storeerr.ErrResourceNotFound) {
 		w.WriteHeader(http.StatusNotFound)
 		return
 	} else if err != nil {

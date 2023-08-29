@@ -9,6 +9,8 @@ import (
 	"github.com/portainer/k2d/internal/adapter/store"
 	"github.com/portainer/k2d/internal/adapter/store/filesystem"
 	"github.com/portainer/k2d/internal/adapter/store/memory"
+	"github.com/portainer/k2d/internal/adapter/store/volume"
+	"github.com/portainer/k2d/internal/config"
 	"github.com/portainer/k2d/internal/types"
 	"go.uber.org/zap"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -19,35 +21,47 @@ import (
 )
 
 type (
-	// KubeDockerAdapter is used to interact with the Docker API and to convert Kubernetes objects to Docker objects
-	// It stores some Kubernetes objects in a filesystem store.
-	// It contains a conversion scheme that is used to convert Kubernetes across different versions.
-	// It registers its start time to be used as the creation timestamp of some Kubernetes objects such as the default namespace
-	// and the (single) Kubernetes node.
-	// It also contains the configuration of the k2d server to be used by some resources that are created by the adapter.
+	// KubeDockerAdapter serves as a bridge between the Docker API and Kubernetes resources.
+	// This struct performs multiple roles:
+	// - Interacts with the Docker API: It uses the Docker client to perform operations like
+	//   pulling images, starting containers, and more.
+	//
+	// - Converts Kubernetes Objects: It utilizes a conversion scheme to translate Kubernetes
+	//   objects into their corresponding Docker objects, supporting multiple Kubernetes versions.
+	//
+	// - ConfigMap and Secret storage: It manages the storage of ConfigMaps and Secrets. It
+	//   supports multiple storage backends, including in-memory, Docker volumes and on-disk.
+	//   This includes Kubernetes ConfigMaps, Secrets, and Registry Secrets.
+	//
+	// - Logging: For debugging and operational insight, it utilizes a logging framework.
+	//
+	// - Time-Tracking: The `startTime` field records when this adapter was initialized. This
+	//   timestamp is used as the creation time for certain Kubernetes resources.
+	//
+	// - Server Configuration: Contains configuration related to the k2d server, which is used when
+	//   creating certain resources.
+	//
+	// This struct is a comprehensive utility for managing the interactions between Docker and Kubernetes.
 	KubeDockerAdapter struct {
 		cli                    *client.Client
-		converter              *converter.DockerAPIConverter
 		configMapStore         store.ConfigMapStore
-		secretStore            store.SecretStore
-		registrySecretStore    store.SecretStore
-		logger                 *zap.SugaredLogger
+		converter              *converter.DockerAPIConverter
 		conversionScheme       *runtime.Scheme
-		startTime              time.Time
 		k2dServerConfiguration *types.K2DServerConfiguration
+		logger                 *zap.SugaredLogger
+		registrySecretStore    store.SecretStore
+		startTime              time.Time
+		secretStore            store.SecretStore
 	}
 
 	// KubeDockerAdapterOptions represents options that can be used to configure a new KubeDockerAdapter
 	KubeDockerAdapterOptions struct {
-		// DataPath is the path to the data directory where the configmaps and secrets will be stored
-		DataPath string
-		// DockerClientTimeout is the timeout that will be used when communicating with the Docker API with the Docker client
-		// It is responsible for the timeout of the Docker API calls such as creating a container, pulling an image...
-		DockerClientTimeout time.Duration
-		// K2DServerConfiguration is the configuration of the k2d server
-		ServerConfiguration *types.K2DServerConfiguration
+		// K2DConfig is the global configuration of k2d
+		K2DConfig *config.Config
 		// Logger is the logger that will be used by the adapter
 		Logger *zap.SugaredLogger
+		// K2DServerConfiguration is the configuration of the k2d HTTP server
+		ServerConfiguration *types.K2DServerConfiguration
 	}
 )
 
@@ -56,15 +70,27 @@ func NewKubeDockerAdapter(options *KubeDockerAdapterOptions) (*KubeDockerAdapter
 	cli, err := client.NewClientWithOpts(
 		client.FromEnv,
 		client.WithAPIVersionNegotiation(),
-		client.WithTimeout(options.DockerClientTimeout),
+		client.WithTimeout(options.K2DConfig.DockerClientTimeout),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create docker client: %w", err)
 	}
 
-	filesystemStore, err := filesystem.NewFileSystemStore(options.DataPath)
+	storeOptions := store.StoreOptions{
+		Backend: options.K2DConfig.StoreBackend,
+		Logger:  options.Logger,
+		Filesystem: filesystem.FileSystemStoreOptions{
+			DataPath: options.K2DConfig.DataPath,
+		},
+		Volume: volume.VolumeStoreOptions{
+			DockerCli:     cli,
+			CopyImageName: options.K2DConfig.StoreVolumeCopyImageName,
+		},
+	}
+
+	configMapStore, secretStore, err := store.ConfigureStore(storeOptions)
 	if err != nil {
-		return nil, fmt.Errorf("unable to create filesystem store: %w", err)
+		return nil, fmt.Errorf("unable to initialize store backends: %w", err)
 	}
 
 	scheme := runtime.NewScheme()
@@ -76,14 +102,14 @@ func NewKubeDockerAdapter(options *KubeDockerAdapterOptions) (*KubeDockerAdapter
 
 	return &KubeDockerAdapter{
 		cli:                    cli,
-		converter:              converter.NewDockerAPIConverter(filesystemStore, options.ServerConfiguration),
-		configMapStore:         filesystemStore,
-		secretStore:            filesystemStore,
-		registrySecretStore:    memory.NewInMemoryStore(),
-		logger:                 options.Logger,
+		converter:              converter.NewDockerAPIConverter(configMapStore, secretStore, options.ServerConfiguration),
 		conversionScheme:       scheme,
-		startTime:              time.Now(),
+		configMapStore:         configMapStore,
 		k2dServerConfiguration: options.ServerConfiguration,
+		logger:                 options.Logger,
+		registrySecretStore:    memory.NewInMemoryStore(),
+		secretStore:            secretStore,
+		startTime:              time.Now(),
 	}, nil
 }
 

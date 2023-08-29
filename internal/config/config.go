@@ -61,4 +61,15 @@ type Config struct {
 	// the kubeconfig. If it is not provided through an environment variable named K2D_SECRET,
 	// a random secret will be generated.
 	Secret string `env:"K2D_SECRET"`
+
+	// StoreBackend represents the backend used to store secrets and configmaps.
+	// If not provided through an environment variable named K2D_STORE_BACKEND,
+	// the default value is set to disk.
+	StoreBackend string `env:"K2D_STORE_BACKEND,default=disk"`
+
+	// StoreVolumeCopyImageName represents the name of the container image used to copy and read from volumes
+	// when using the volume store for secrets and configmaps.
+	// If not provided through an environment variable named K2D_STORE_VOLUME_COPY_IMAGE_NAME,
+	// the default value is set to docker.io/library/alpine:latest.
+	StoreVolumeCopyImageName string `env:"K2D_STORE_VOLUME_COPY_IMAGE_NAME,default=docker.io/library/alpine:latest"`
 }

@@ -53,3 +53,4 @@ image-multiarch:
 clean:
 	rm -rf $(dist)/*
 	rm -rf /opt/dev-toolkit/k2d/*
+	rm -rf /var/lib/k2d

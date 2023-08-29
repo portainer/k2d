@@ -20,7 +20,7 @@ func (adapter *KubeDockerAdapter) DeleteConfigMap(configMapName string) error {
 func (adapter *KubeDockerAdapter) GetConfigMap(configMapName string) (*corev1.ConfigMap, error) {
 	configMap, err := adapter.configMapStore.GetConfigMap(configMapName)
 	if err != nil {
-		return &corev1.ConfigMap{}, fmt.Errorf("unable to get configmap: %w", err)
+		return nil, fmt.Errorf("unable to get configmap: %w", err)
 	}
 
 	versionedConfigMap := corev1.ConfigMap{
