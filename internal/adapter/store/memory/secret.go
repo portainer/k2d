@@ -11,6 +11,8 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core"
 )
 
+// TODO: implement namespace support
+
 type secretData struct {
 	Data map[string][]byte
 	Type string
@@ -32,7 +34,7 @@ func NewInMemoryStore() *InMemoryStore {
 }
 
 // DeleteSecret deletes a secret from the in-memory store
-func (s *InMemoryStore) DeleteSecret(secretName string) error {
+func (s *InMemoryStore) DeleteSecret(secretName, namespace string) error {
 	s.m.Lock()
 	defer s.m.Unlock()
 	delete(s.secretMap, secretName)
@@ -45,7 +47,7 @@ func (s *InMemoryStore) GetSecretBinds(secret *core.Secret) (map[string]string, 
 }
 
 // GetSecret gets a secret from the in-memory store
-func (s *InMemoryStore) GetSecret(secretName string) (*core.Secret, error) {
+func (s *InMemoryStore) GetSecret(secretName, namespace string) (*core.Secret, error) {
 	s.m.RLock()
 	defer s.m.RUnlock()
 	data, found := s.secretMap[secretName]
@@ -69,7 +71,7 @@ func (s *InMemoryStore) GetSecret(secretName string) (*core.Secret, error) {
 }
 
 // GetSecrets gets all secrets from the in-memory store
-func (s *InMemoryStore) GetSecrets(selector labels.Selector) (core.SecretList, error) {
+func (s *InMemoryStore) GetSecrets(namespace string, selector labels.Selector) (core.SecretList, error) {
 	s.m.RLock()
 	defer s.m.RUnlock()
 	var secrets []core.Secret

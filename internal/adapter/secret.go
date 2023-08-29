@@ -20,12 +20,12 @@ func (adapter *KubeDockerAdapter) CreateSecret(secret *corev1.Secret) error {
 	return adapter.secretStore.StoreSecret(secret)
 }
 
-func (adapter *KubeDockerAdapter) DeleteSecret(secretName string) error {
-	return adapter.secretStore.DeleteSecret(secretName)
+func (adapter *KubeDockerAdapter) DeleteSecret(secretName, namespace string) error {
+	return adapter.secretStore.DeleteSecret(secretName, namespace)
 }
 
-func (adapter *KubeDockerAdapter) GetSecret(secretName string) (*corev1.Secret, error) {
-	secret, err := adapter.getSecret(secretName)
+func (adapter *KubeDockerAdapter) GetSecret(secretName, namespace string) (*corev1.Secret, error) {
+	secret, err := adapter.getSecret(secretName, namespace)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get secret: %w", err)
 	}
@@ -47,8 +47,8 @@ func (adapter *KubeDockerAdapter) GetSecret(secretName string) (*corev1.Secret, 
 	return &versionedSecret, nil
 }
 
-func (adapter *KubeDockerAdapter) GetSecretTable(selector labels.Selector) (*metav1.Table, error) {
-	secretList, err := adapter.listSecrets(selector)
+func (adapter *KubeDockerAdapter) GetSecretTable(namespace string, selector labels.Selector) (*metav1.Table, error) {
+	secretList, err := adapter.listSecrets(namespace, selector)
 	if err != nil {
 		return &metav1.Table{}, fmt.Errorf("unable to list secrets: %w", err)
 	}
@@ -56,8 +56,8 @@ func (adapter *KubeDockerAdapter) GetSecretTable(selector labels.Selector) (*met
 	return k8s.GenerateTable(&secretList)
 }
 
-func (adapter *KubeDockerAdapter) ListSecrets(selector labels.Selector) (corev1.SecretList, error) {
-	secretList, err := adapter.listSecrets(selector)
+func (adapter *KubeDockerAdapter) ListSecrets(namespace string, selector labels.Selector) (corev1.SecretList, error) {
+	secretList, err := adapter.listSecrets(namespace, selector)
 	if err != nil {
 		return corev1.SecretList{}, fmt.Errorf("unable to list secrets: %w", err)
 	}
@@ -79,8 +79,8 @@ func (adapter *KubeDockerAdapter) ListSecrets(selector labels.Selector) (corev1.
 
 // when fetching a secret, we first try to get it from the secret store
 // if it's not found, we try to get it from the registry secret store
-func (adapter *KubeDockerAdapter) getSecret(secretName string) (*core.Secret, error) {
-	secret, err := adapter.secretStore.GetSecret(secretName)
+func (adapter *KubeDockerAdapter) getSecret(secretName, namespace string) (*core.Secret, error) {
+	secret, err := adapter.secretStore.GetSecret(secretName, namespace)
 	if err != nil && !errors.Is(err, storeerr.ErrResourceNotFound) {
 		return nil, fmt.Errorf("unable to get secret: %w", err)
 	}
@@ -88,7 +88,7 @@ func (adapter *KubeDockerAdapter) getSecret(secretName string) (*core.Secret, er
 		return secret, nil
 	}
 
-	registrySecret, err := adapter.registrySecretStore.GetSecret(secretName)
+	registrySecret, err := adapter.registrySecretStore.GetSecret(secretName, namespace)
 	if err != nil && !errors.Is(err, storeerr.ErrResourceNotFound) {
 		return nil, fmt.Errorf("unable to get registry secret: %w", err)
 	}
@@ -99,13 +99,13 @@ func (adapter *KubeDockerAdapter) getSecret(secretName string) (*core.Secret, er
 	return nil, storeerr.ErrResourceNotFound
 }
 
-func (adapter *KubeDockerAdapter) listSecrets(selector labels.Selector) (core.SecretList, error) {
-	secretList, err := adapter.secretStore.GetSecrets(selector)
+func (adapter *KubeDockerAdapter) listSecrets(namespace string, selector labels.Selector) (core.SecretList, error) {
+	secretList, err := adapter.secretStore.GetSecrets(namespace, selector)
 	if err != nil {
 		return core.SecretList{}, fmt.Errorf("unable to list secrets: %w", err)
 	}
 
-	registrySecretList, err := adapter.registrySecretStore.GetSecrets(selector)
+	registrySecretList, err := adapter.registrySecretStore.GetSecrets(namespace, selector)
 	if err != nil {
 		return core.SecretList{}, fmt.Errorf("unable to list registry secrets: %w", err)
 	}

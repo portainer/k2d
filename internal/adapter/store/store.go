@@ -47,10 +47,10 @@ import (
 
 // SecretStore is an interface for interacting with Kubernetes Secrets.
 type SecretStore interface {
-	DeleteSecret(secretName string) error
+	DeleteSecret(secretName, namespace string) error
 	GetSecretBinds(secret *core.Secret) (map[string]string, error)
-	GetSecret(secretName string) (*core.Secret, error)
-	GetSecrets(selector labels.Selector) (core.SecretList, error)
+	GetSecret(secretName, namespace string) (*core.Secret, error)
+	GetSecrets(namespace string, selector labels.Selector) (core.SecretList, error)
 	StoreSecret(secret *corev1.Secret) error
 }
 

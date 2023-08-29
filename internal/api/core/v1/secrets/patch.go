@@ -18,6 +18,7 @@ import (
 )
 
 func (svc SecretService) PatchSecret(r *restful.Request, w *restful.Response) {
+	namespace := utils.NamespaceParameter(r)
 	secretName := r.PathParameter("name")
 
 	patch, err := io.ReadAll(r.Request.Body)
@@ -26,7 +27,7 @@ func (svc SecretService) PatchSecret(r *restful.Request, w *restful.Response) {
 		return
 	}
 
-	secret, err := svc.adapter.GetSecret(secretName)
+	secret, err := svc.adapter.GetSecret(secretName, namespace)
 	if err != nil && errors.Is(err, storeerr.ErrResourceNotFound) {
 		w.WriteHeader(http.StatusNotFound)
 		return

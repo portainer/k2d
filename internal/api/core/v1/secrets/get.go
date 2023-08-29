@@ -11,10 +11,10 @@ import (
 )
 
 func (svc SecretService) GetSecret(r *restful.Request, w *restful.Response) {
-	// namespaceName := r.PathParameter("namespace")
+	namespace := utils.NamespaceParameter(r)
 	secretName := r.PathParameter("name")
 
-	secret, err := svc.adapter.GetSecret(secretName)
+	secret, err := svc.adapter.GetSecret(secretName, namespace)
 	if err != nil && errors.Is(err, storeerr.ErrResourceNotFound) {
 		w.WriteHeader(http.StatusNotFound)
 		return

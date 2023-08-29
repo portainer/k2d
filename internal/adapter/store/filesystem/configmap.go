@@ -56,14 +56,14 @@ func (s *FileSystemStore) DeleteConfigMap(configMapName, namespace string) error
 	metadataFileName := buildConfigMapMetadataFileName(configMapName, namespace)
 	err = os.Remove(path.Join(s.configMapPath, metadataFileName))
 	if err != nil {
-		return fmt.Errorf("unable to remove metadata file %s: %w", metadataFileName, err)
+		return fmt.Errorf("unable to remove configmap metadata file %s: %w", metadataFileName, err)
 	}
 
 	for _, file := range files {
 		if strings.HasPrefix(file.Name(), filePrefix) {
 			err := os.Remove(path.Join(s.configMapPath, file.Name()))
 			if err != nil {
-				return fmt.Errorf("unable to remove data file %s: %w", file.Name(), err)
+				return fmt.Errorf("unable to remove configmap data file %s: %w", file.Name(), err)
 			}
 		}
 	}
@@ -123,6 +123,7 @@ func (s *FileSystemStore) GetConfigMap(configMapName, namespace string) (*core.C
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        configMapName,
+			Namespace:   namespace,
 			Annotations: map[string]string{},
 		},
 		Data: map[string]string{},
@@ -135,7 +136,6 @@ func (s *FileSystemStore) GetConfigMap(configMapName, namespace string) (*core.C
 	}
 
 	configMap.Labels = metadata
-	configMap.ObjectMeta.Namespace = metadata[NamespaceNameLabelKey]
 
 	for _, file := range files {
 		if strings.HasPrefix(file.Name(), filePrefix) {
@@ -144,7 +144,7 @@ func (s *FileSystemStore) GetConfigMap(configMapName, namespace string) (*core.C
 				return nil, fmt.Errorf("unable to read file %s: %w", file.Name(), err)
 			}
 
-			configMap.Data[strings.TrimPrefix(file.Name(), configMapName+ConfigMapSeparator)] = string(data)
+			configMap.Data[strings.TrimPrefix(file.Name(), filePrefix)] = string(data)
 
 			// TODO: instead of relying on os.Stat for the creation timestamp, we should store it in the metadata file
 			// when the configmap is created as a unix timestamp
@@ -179,8 +179,13 @@ func (s *FileSystemStore) GetConfigMaps(namespace string) (core.ConfigMapList, e
 		fileNames = append(fileNames, file.Name())
 	}
 
+	// We first need to find all the unique configmap names
 	uniqueNames := str.UniquePrefixes(fileNames, ConfigMapSeparator)
+
+	// We then need to filter out the configmaps that are not in the namespace
 	uniqueNames = str.FilterStringsByPrefix(uniqueNames, namespace)
+
+	// We also need to filter out the metadata files
 	uniqueNames = str.RemoveItemsWithSuffix(uniqueNames, ".metadata")
 
 	configMaps := []core.ConfigMap{}
@@ -254,13 +259,13 @@ func (s *FileSystemStore) StoreConfigMap(configMap *corev1.ConfigMap) error {
 	metadataFileName := buildConfigMapMetadataFileName(configMap.Name, configMap.Namespace)
 	err := filesystem.StoreMetadataOnDisk(s.configMapPath, metadataFileName, labels)
 	if err != nil {
-		return err
+		return fmt.Errorf("unable to store configmap metadata on disk: %w", err)
 	}
 
 	filePrefix := buildConfigMapFilePrefix(configMap.Name, configMap.Namespace)
 	err = filesystem.StoreDataMapOnDisk(s.configMapPath, filePrefix, configMap.Data)
 	if err != nil {
-		return err
+		return fmt.Errorf("unable to store configmap data on disk: %w", err)
 	}
 
 	return nil

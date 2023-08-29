@@ -14,7 +14,9 @@ import (
 )
 
 func (svc SecretService) PutSecret(r *restful.Request, w *restful.Response) {
+	namespace := utils.NamespaceParameter(r)
 	secretName := r.PathParameter("name")
+
 	secret := &corev1.Secret{}
 
 	err := httputils.ParseJSONBody(r.Request, &secret)
@@ -36,7 +38,7 @@ func (svc SecretService) PutSecret(r *restful.Request, w *restful.Response) {
 	timeoutCh := time.After(10 * time.Second)
 
 	for {
-		_, err := svc.adapter.GetSecret(secretName)
+		_, err := svc.adapter.GetSecret(secretName, namespace)
 		if err == nil {
 			// The secret has been found, we can update it
 			err = svc.adapter.CreateSecret(secret)
