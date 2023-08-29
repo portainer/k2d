@@ -10,8 +10,9 @@ import (
 
 func (svc NamespaceService) GetNamespace(r *restful.Request, w *restful.Response) {
 	name := r.PathParameter("name")
+	watch := r.PathParameter("watch")
 
-	namespace, err := svc.adapter.GetNamespace(r.Request.Context(), name)
+	namespace, err := svc.adapter.GetNamespace(r.Request.Context(), name, watch)
 	if err != nil {
 		utils.HttpError(r, w, http.StatusInternalServerError, fmt.Errorf("unable to get namespace: %w", err))
 		return

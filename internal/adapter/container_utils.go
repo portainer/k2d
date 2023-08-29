@@ -253,11 +253,11 @@ func (adapter *KubeDockerAdapter) createContainerFromPodSpec(ctx context.Context
 
 // DeleteContainer removes a Docker container given its ID or name.
 // This function will force the removal of the container, regardless if it's running or not.
-// It will return an error if the Docker client fails to remove the container for any reason.
+// It will log a warning if it fails to delete the container.
 func (adapter *KubeDockerAdapter) DeleteContainer(ctx context.Context, containerID string) error {
 	err := adapter.cli.ContainerRemove(ctx, containerID, types.ContainerRemoveOptions{Force: true})
 	if err != nil {
-		return fmt.Errorf("unable to remove container: %w", err)
+		adapter.logger.Warnf("unable to remove container: %s", err)
 	}
 
 	return nil

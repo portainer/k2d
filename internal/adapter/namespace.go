@@ -75,7 +75,7 @@ func (adapter *KubeDockerAdapter) ListNamespaces(ctx context.Context) (corev1.Na
 	return versionedNamespaceList, nil
 }
 
-func (adapter *KubeDockerAdapter) GetNamespace(ctx context.Context, namespaceName string) (*corev1.Namespace, error) {
+func (adapter *KubeDockerAdapter) GetNamespace(ctx context.Context, namespaceName string, watchFlag string) (*corev1.Namespace, error) {
 	network, err := adapter.GetNetwork(ctx, namespaceName)
 	if err != nil {
 		return &corev1.Namespace{}, fmt.Errorf("unable to get the namespaces: %w", err)
@@ -144,29 +144,24 @@ func (adapter *KubeDockerAdapter) listNamespaces(ctx context.Context) (core.Name
 }
 
 func (adapter *KubeDockerAdapter) DeleteNamespace(ctx context.Context, namespaceName string) error {
-	filter := filters.NewArgs()
-	filter.Add("name", namespaceName)
-	filter.Add("label", k2dtypes.NamespaceLabelKey+"="+namespaceName)
+	labelFilter := filters.NewArgs()
+	labelFilter.Add("label", fmt.Sprintf("%s=%s", k2dtypes.NamespaceLabelKey, namespaceName))
 
-	network, err := adapter.cli.NetworkList(ctx, types.NetworkListOptions{Filters: filter})
+	containers, err := adapter.cli.ContainerList(ctx, types.ContainerListOptions{All: true, Filters: labelFilter})
 	if err != nil {
-		return fmt.Errorf("unable to list networks: %w", err)
+		return fmt.Errorf("unable to list containers: %w", err)
 	}
 
-	if len(network) == 0 {
-		return nil
-	}
-
-	networkIspect, err := adapter.cli.NetworkInspect(ctx, namespaceName, types.NetworkInspectOptions{})
-	if err != nil {
-		return fmt.Errorf("unable to inspect network %s: %w", namespaceName, err)
-	}
-
-	if len(networkIspect.Containers) == 0 {
-		err = adapter.cli.NetworkRemove(ctx, namespaceName)
+	for _, container := range containers {
+		err := adapter.DeleteContainer(ctx, container.ID)
 		if err != nil {
-			return fmt.Errorf("unable to delete network %s: %w", namespaceName, err)
+			continue
 		}
+	}
+
+	err = adapter.cli.NetworkRemove(ctx, namespaceName)
+	if err != nil {
+		return fmt.Errorf("unable to delete network %s: %w", namespaceName, err)
 	}
 
 	return nil
