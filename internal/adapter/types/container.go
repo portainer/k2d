@@ -11,4 +11,6 @@ const (
 	PodLastAppliedConfigLabelKey = "pod.k2d.io/last-applied-configuration"
 	// ServiceNameLabelKey is the key used to store the service name in the container labels
 	ServiceNameLabelKey = "workload.k2d.io/service-name"
+	// ServiceStatusErrorMessage is the key used to store the service status error message in the container labels
+	ServiceStatusErrorMessage = "service.k2d.io/status-error-message"
 )

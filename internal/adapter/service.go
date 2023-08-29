@@ -157,6 +157,16 @@ func (adapter *KubeDockerAdapter) GetService(ctx context.Context, serviceName st
 
 	for _, container := range containers {
 		if container.Labels[k2dtypes.ServiceNameLabelKey] == serviceName {
+			// run an inspect to fetch the error state
+			containerInspect, err := adapter.cli.ContainerInspect(ctx, container.ID)
+			if err != nil {
+				return nil, fmt.Errorf("unable to inspect container for filling in the service status: %w", err)
+			}
+
+			if containerInspect.State.Error != "" {
+				container.Labels[k2dtypes.ServiceStatusErrorMessage] = containerInspect.State.Error
+			}
+
 			service, err := adapter.getService(container)
 			if err != nil {
 				return nil, fmt.Errorf("unable to get service: %w", err)
