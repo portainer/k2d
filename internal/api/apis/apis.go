@@ -6,6 +6,7 @@ import (
 	"github.com/portainer/k2d/internal/api/apis/apps"
 	"github.com/portainer/k2d/internal/api/apis/authorization.k8s.io"
 	"github.com/portainer/k2d/internal/api/apis/events.k8s.io"
+	"github.com/portainer/k2d/internal/api/apis/storage.k8s.io"
 	"github.com/portainer/k2d/internal/controller"
 )
 
@@ -14,6 +15,7 @@ type (
 		apps          apps.AppsService
 		events        events.EventsService
 		authorization authorization.AuthorizationService
+		storage       storage.StorageService
 	}
 )
 
@@ -22,6 +24,7 @@ func NewApisAPI(adapter *adapter.KubeDockerAdapter, operations chan controller.O
 		apps:          apps.NewAppsService(operations, adapter),
 		events:        events.NewEventsService(adapter),
 		authorization: authorization.NewAuthorizationService(),
+		storage:       storage.NewStorageService(adapter),
 	}
 }
 
@@ -36,6 +39,25 @@ func (api ApisAPI) APIs() *restful.WebService {
 	routes.Route(routes.GET("").
 		To(ListAPIGroups))
 
+	return routes
+}
+
+// /apis/storage.k8s.io
+func (api ApisAPI) Storages() *restful.WebService {
+	routes := new(restful.WebService).
+		Path("/apis/storage.k8s.io").
+		Consumes(restful.MIME_JSON).
+		Produces(restful.MIME_JSON)
+
+	// which versions are served by this api
+	routes.Route(routes.GET("").
+		To(api.storage.GetAPIVersions))
+
+	// which resources are available under /apis/storage.k8s.io/v1
+	routes.Route(routes.GET("/v1").
+		To(api.storage.ListAPIResources))
+
+	api.storage.RegisterStorageAPI(routes)
 	return routes
 }
 
