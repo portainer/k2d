@@ -175,7 +175,7 @@ func (s *FileSystemStore) GetSecrets(namespace string, selector labels.Selector)
 	}
 
 	// We first need to find all the unique secret names
-	uniqueNames := str.UniquePrefixes(fileNames, SecretSeparator)
+	uniqueNames := str.RetrieveUniquePrefixes(fileNames, SecretSeparator)
 
 	// We then need to filter out the secrets that are not in the namespace
 	uniqueNames = str.FilterStringsByPrefix(uniqueNames, namespace)

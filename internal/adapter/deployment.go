@@ -134,7 +134,6 @@ func (adapter *KubeDockerAdapter) ListDeployments(ctx context.Context, namespace
 }
 
 func (adapter *KubeDockerAdapter) buildDeploymentFromContainer(container types.Container) (*apps.Deployment, error) {
-
 	if container.Labels[k2dtypes.WorkloadLastAppliedConfigLabelKey] == "" {
 		return nil, fmt.Errorf("unable to build deployment, missing %s label on container %s", k2dtypes.WorkloadLastAppliedConfigLabelKey, container.Names[0])
 	}
