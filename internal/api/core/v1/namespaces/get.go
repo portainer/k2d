@@ -6,7 +6,7 @@ import (
 	"net/http"
 
 	"github.com/emicklei/go-restful/v3"
-	"github.com/portainer/k2d/internal/adapter"
+	adaptererr "github.com/portainer/k2d/internal/adapter/errors"
 	"github.com/portainer/k2d/internal/api/utils"
 )
 
@@ -15,7 +15,7 @@ func (svc NamespaceService) GetNamespace(r *restful.Request, w *restful.Response
 
 	namespace, err := svc.adapter.GetNamespace(r.Request.Context(), name)
 	if err != nil {
-		if errors.Is(err, adapter.ErrNetworkNotFound) {
+		if errors.Is(err, adaptererr.ErrResourceNotFound) {
 			w.WriteHeader(http.StatusNotFound)
 			return
 		}

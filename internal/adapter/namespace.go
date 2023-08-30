@@ -9,6 +9,7 @@ import (
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
+	adaptererr "github.com/portainer/k2d/internal/adapter/errors"
 	k2dtypes "github.com/portainer/k2d/internal/adapter/types"
 	"github.com/portainer/k2d/internal/k8s"
 	corev1 "k8s.io/api/core/v1"
@@ -18,7 +19,7 @@ import (
 
 func (adapter *KubeDockerAdapter) CreateNetworkFromNamespace(ctx context.Context, namespace *corev1.Namespace) error {
 	network, err := adapter.GetNetwork(ctx, namespace.Name)
-	if err != nil && !errors.Is(err, ErrNetworkNotFound) {
+	if err != nil && !errors.Is(err, adaptererr.ErrResourceNotFound) {
 		return fmt.Errorf("unable to check for network existence: %w", err)
 	}
 
