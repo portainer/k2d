@@ -6,7 +6,7 @@ import (
 	"strings"
 	"sync"
 
-	storeerr "github.com/portainer/k2d/internal/adapter/store/errors"
+	adaptererr "github.com/portainer/k2d/internal/adapter/errors"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -62,7 +62,7 @@ func (s *InMemoryStore) GetSecret(secretName, namespace string) (*core.Secret, e
 	defer s.m.RUnlock()
 	data, found := s.secretMap[buildSecretKey(secretName, namespace)]
 	if !found {
-		return nil, storeerr.ErrResourceNotFound
+		return nil, adaptererr.ErrResourceNotFound
 	}
 
 	return &core.Secret{

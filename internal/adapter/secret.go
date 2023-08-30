@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	storeerr "github.com/portainer/k2d/internal/adapter/store/errors"
+	adaptererr "github.com/portainer/k2d/internal/adapter/errors"
 	"github.com/portainer/k2d/internal/k8s"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -81,7 +81,7 @@ func (adapter *KubeDockerAdapter) ListSecrets(namespace string, selector labels.
 // if it's not found, we try to get it from the registry secret store
 func (adapter *KubeDockerAdapter) getSecret(secretName, namespace string) (*core.Secret, error) {
 	secret, err := adapter.secretStore.GetSecret(secretName, namespace)
-	if err != nil && !errors.Is(err, storeerr.ErrResourceNotFound) {
+	if err != nil && !errors.Is(err, adaptererr.ErrResourceNotFound) {
 		return nil, fmt.Errorf("unable to get secret: %w", err)
 	}
 	if secret != nil {
@@ -89,14 +89,14 @@ func (adapter *KubeDockerAdapter) getSecret(secretName, namespace string) (*core
 	}
 
 	registrySecret, err := adapter.registrySecretStore.GetSecret(secretName, namespace)
-	if err != nil && !errors.Is(err, storeerr.ErrResourceNotFound) {
+	if err != nil && !errors.Is(err, adaptererr.ErrResourceNotFound) {
 		return nil, fmt.Errorf("unable to get registry secret: %w", err)
 	}
 	if registrySecret != nil {
 		return registrySecret, nil
 	}
 
-	return nil, storeerr.ErrResourceNotFound
+	return nil, adaptererr.ErrResourceNotFound
 }
 
 func (adapter *KubeDockerAdapter) listSecrets(namespace string, selector labels.Selector) (core.SecretList, error) {

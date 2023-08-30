@@ -9,7 +9,7 @@ import (
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/volume"
 	"github.com/docker/docker/errdefs"
-	"github.com/portainer/k2d/internal/adapter/store/errors"
+	"github.com/portainer/k2d/internal/adapter/errors"
 	"github.com/portainer/k2d/pkg/maputils"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

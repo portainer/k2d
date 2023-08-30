@@ -19,12 +19,8 @@ func (svc NamespaceService) GetNamespace(r *restful.Request, w *restful.Response
 			w.WriteHeader(http.StatusNotFound)
 			return
 		}
-		utils.HttpError(r, w, http.StatusInternalServerError, fmt.Errorf("unable to get namespace: %w", err))
-		return
-	}
 
-	if namespace == nil {
-		w.WriteHeader(http.StatusNotFound)
+		utils.HttpError(r, w, http.StatusInternalServerError, fmt.Errorf("unable to get namespace: %w", err))
 		return
 	}
 

@@ -219,27 +219,26 @@ func (adapter *KubeDockerAdapter) getContainerFromServiceName(ctx context.Contex
 }
 
 func (adapter *KubeDockerAdapter) buildServiceFromContainer(container types.Container) (*core.Service, error) {
-	service := core.Service{}
-
-	if container.Labels[k2dtypes.ServiceLastAppliedConfigLabelKey] != "" {
-		serviceData := container.Labels[k2dtypes.ServiceLastAppliedConfigLabelKey]
-
-		versionedService := corev1.Service{}
-
-		err := json.Unmarshal([]byte(serviceData), &versionedService)
-		if err != nil {
-			return nil, fmt.Errorf("unable to unmarshal versioned service: %w", err)
-		}
-
-		err = adapter.ConvertK8SResource(&versionedService, &service)
-		if err != nil {
-			return nil, fmt.Errorf("unable to convert versioned service spec to internal service spec: %w", err)
-		}
-
-		adapter.converter.UpdateServiceFromContainerInfo(&service, container)
-	} else {
+	if container.Labels[k2dtypes.ServiceLastAppliedConfigLabelKey] == "" {
 		return nil, fmt.Errorf("unable to build service, missing %s label on container %s", k2dtypes.ServiceLastAppliedConfigLabelKey, container.Names[0])
 	}
+
+	serviceData := container.Labels[k2dtypes.ServiceLastAppliedConfigLabelKey]
+
+	versionedService := corev1.Service{}
+
+	err := json.Unmarshal([]byte(serviceData), &versionedService)
+	if err != nil {
+		return nil, fmt.Errorf("unable to unmarshal versioned service: %w", err)
+	}
+
+	service := core.Service{}
+	err = adapter.ConvertK8SResource(&versionedService, &service)
+	if err != nil {
+		return nil, fmt.Errorf("unable to convert versioned service spec to internal service spec: %w", err)
+	}
+
+	adapter.converter.UpdateServiceFromContainerInfo(&service, container)
 
 	return &service, nil
 }

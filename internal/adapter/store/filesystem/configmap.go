@@ -6,7 +6,7 @@ import (
 	"path"
 	"strings"
 
-	"github.com/portainer/k2d/internal/adapter/store/errors"
+	"github.com/portainer/k2d/internal/adapter/errors"
 	"github.com/portainer/k2d/pkg/filesystem"
 	"github.com/portainer/k2d/pkg/maputils"
 	str "github.com/portainer/k2d/pkg/strings"
