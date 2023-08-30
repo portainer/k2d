@@ -40,7 +40,7 @@ func (adapter *KubeDockerAdapter) StoreServiceAccountSecret(tokenPath, caPath st
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        types.K2dServiceAccountSecretName,
 			Annotations: map[string]string{},
-			Namespace:   "default",
+			Namespace:   types.K2DNamespaceName,
 		},
 		Type: corev1.SecretTypeOpaque,
 		StringData: map[string]string{

@@ -15,6 +15,8 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core"
 )
 
+// TODO: update comments with namespace
+
 // ConvertContainerToPod tries to convert a Docker container into a Kubernetes Pod.
 // It only implements partial conversion at the moment.
 func (converter *DockerAPIConverter) ConvertContainerToPod(container types.Container) core.Pod {
@@ -74,7 +76,7 @@ func (converter *DockerAPIConverter) ConvertContainerToPod(container types.Conta
 // ConvertPodSpecToContainerConfiguration converts a Kubernetes PodSpec into a Docker container configuration.
 // It receives a Kubernetes PodSpec and a map of labels.
 // It returns a ContainerConfiguration struct, or an error if the conversion fails.
-func (converter *DockerAPIConverter) ConvertPodSpecToContainerConfiguration(spec core.PodSpec, networkName string, labels map[string]string) (ContainerConfiguration, error) {
+func (converter *DockerAPIConverter) ConvertPodSpecToContainerConfiguration(spec core.PodSpec, namespace string, labels map[string]string) (ContainerConfiguration, error) {
 	containerSpec := spec.Containers[0]
 
 	containerConfig := &container.Config{
@@ -100,8 +102,7 @@ func (converter *DockerAPIConverter) ConvertPodSpecToContainerConfiguration(spec
 		return ContainerConfiguration{}, err
 	}
 
-	// TODO: networkName has been injected everywhere but the function comments where not updated
-	if err := converter.setEnvVars(networkName, containerConfig, containerSpec.Env, containerSpec.EnvFrom); err != nil {
+	if err := converter.setEnvVars(namespace, containerConfig, containerSpec.Env, containerSpec.EnvFrom); err != nil {
 		return ContainerConfiguration{}, err
 	}
 
@@ -110,16 +111,11 @@ func (converter *DockerAPIConverter) ConvertPodSpecToContainerConfiguration(spec
 	setSecurityContext(containerConfig, hostConfig, spec.SecurityContext, containerSpec.SecurityContext)
 	converter.setResourceRequirements(hostConfig, containerSpec.Resources)
 
-	if err := converter.setVolumeMounts(networkName, hostConfig, spec.Volumes, containerSpec.VolumeMounts); err != nil {
+	if err := converter.setVolumeMounts(namespace, hostConfig, spec.Volumes, containerSpec.VolumeMounts); err != nil {
 		return ContainerConfiguration{}, err
 	}
 
-	// ensure the default namespace points to the default k2d_net network
-	// TODO: this should probably be injected somewhere else
-	if networkName == "default" {
-		networkName = "k2d_net"
-	}
-
+	networkName := labels[k2dtypes.NetworkNameLabelKey]
 	return ContainerConfiguration{
 		ContainerConfig: containerConfig,
 		HostConfig:      hostConfig,
@@ -174,9 +170,7 @@ func (converter *DockerAPIConverter) setResourceRequirements(hostConfig *contain
 //
 // It returns an error if any occurred fetching the Secret or obtaining the bind mappings fails.
 func (converter *DockerAPIConverter) setServiceAccountTokenAndCACert(hostConfig *container.HostConfig) error {
-	// TODO: should this secret be relocated to another namespace? after prefix is implemented
-	// Should be stored in the k2d namespace. Good to document that k2d has no limitation of cross namespace access to secret/configmaps.
-	secret, err := converter.secretStore.GetSecret(k2dtypes.K2dServiceAccountSecretName, "default")
+	secret, err := converter.secretStore.GetSecret(k2dtypes.K2dServiceAccountSecretName, k2dtypes.K2DNamespaceName)
 	if err != nil {
 		return fmt.Errorf("unable to get secret %s: %w", k2dtypes.K2dServiceAccountSecretName, err)
 	}
@@ -229,11 +223,11 @@ func (converter *DockerAPIConverter) setHostPorts(containerConfig *container.Con
 // setEnvVars handles setting the environment variables for the Docker container configuration.
 // It receives a pointer to the container configuration and an array of Kubernetes environment variables.
 // It returns an error if the setting of environment variables fails.
-func (converter *DockerAPIConverter) setEnvVars(networkName string, containerConfig *container.Config, envs []core.EnvVar, envFrom []core.EnvFromSource) error {
+func (converter *DockerAPIConverter) setEnvVars(namespace string, containerConfig *container.Config, envs []core.EnvVar, envFrom []core.EnvFromSource) error {
 	for _, env := range envs {
 
 		if env.ValueFrom != nil {
-			if err := converter.handleValueFromEnvVars(networkName, containerConfig, env); err != nil {
+			if err := converter.handleValueFromEnvVars(namespace, containerConfig, env); err != nil {
 				return err
 			}
 		} else {
@@ -242,7 +236,7 @@ func (converter *DockerAPIConverter) setEnvVars(networkName string, containerCon
 	}
 
 	for _, env := range envFrom {
-		if err := converter.handleValueFromEnvFromSource(networkName, containerConfig, env); err != nil {
+		if err := converter.handleValueFromEnvFromSource(namespace, containerConfig, env); err != nil {
 			return err
 		}
 	}
@@ -260,9 +254,9 @@ func (converter *DockerAPIConverter) setEnvVars(networkName string, containerCon
 // If the EnvFromSource object points to a ConfigMap, the function retrieves the ConfigMap and adds its data as
 // environment variables to the Docker container configuration. Similarly, if the EnvFromSource points to a Secret,
 // the function retrieves the Secret and adds its data as environment variables.
-func (converter *DockerAPIConverter) handleValueFromEnvFromSource(networkName string, containerConfig *container.Config, env core.EnvFromSource) error {
+func (converter *DockerAPIConverter) handleValueFromEnvFromSource(namespace string, containerConfig *container.Config, env core.EnvFromSource) error {
 	if env.ConfigMapRef != nil {
-		configMap, err := converter.configMapStore.GetConfigMap(env.ConfigMapRef.Name, networkName)
+		configMap, err := converter.configMapStore.GetConfigMap(env.ConfigMapRef.Name, namespace)
 		if err != nil {
 			return fmt.Errorf("unable to get configmap %s: %w", env.ConfigMapRef.Name, err)
 		}
@@ -271,7 +265,7 @@ func (converter *DockerAPIConverter) handleValueFromEnvFromSource(networkName st
 			containerConfig.Env = append(containerConfig.Env, fmt.Sprintf("%s=%s", key, value))
 		}
 	} else if env.SecretRef != nil {
-		secret, err := converter.secretStore.GetSecret(env.SecretRef.Name, networkName)
+		secret, err := converter.secretStore.GetSecret(env.SecretRef.Name, namespace)
 		if err != nil {
 			return fmt.Errorf("unable to get secret %s: %w", env.SecretRef.Name, err)
 		}
@@ -287,16 +281,16 @@ func (converter *DockerAPIConverter) handleValueFromEnvFromSource(networkName st
 // handleValueFromEnvVars manages environment variables that are defined through ConfigMap or Secret references.
 // It receives a pointer to the container configuration and a Kubernetes environment variable.
 // It returns an error if the sourcing of the environment variables fails.
-func (converter *DockerAPIConverter) handleValueFromEnvVars(networkName string, containerConfig *container.Config, env core.EnvVar) error {
+func (converter *DockerAPIConverter) handleValueFromEnvVars(namespace string, containerConfig *container.Config, env core.EnvVar) error {
 	if env.ValueFrom.ConfigMapKeyRef != nil {
-		configMap, err := converter.configMapStore.GetConfigMap(env.ValueFrom.ConfigMapKeyRef.Name, networkName)
+		configMap, err := converter.configMapStore.GetConfigMap(env.ValueFrom.ConfigMapKeyRef.Name, namespace)
 		if err != nil {
 			return fmt.Errorf("unable to get configmap %s: %w", env.ValueFrom.ConfigMapKeyRef.Name, err)
 		}
 
 		containerConfig.Env = append(containerConfig.Env, fmt.Sprintf("%s=%s", env.Name, configMap.Data[env.ValueFrom.ConfigMapKeyRef.Key]))
 	} else if env.ValueFrom.SecretKeyRef != nil {
-		secret, err := converter.secretStore.GetSecret(env.ValueFrom.SecretKeyRef.Name, networkName)
+		secret, err := converter.secretStore.GetSecret(env.ValueFrom.SecretKeyRef.Name, namespace)
 		if err != nil {
 			return fmt.Errorf("unable to get secret %s: %w", env.ValueFrom.SecretKeyRef.Name, err)
 		}
@@ -356,11 +350,11 @@ func setSecurityContext(config *container.Config, hostConfig *container.HostConf
 // setVolumeMounts manages volume mounts for the Docker container.
 // It receives a pointer to the host configuration, an array of Kubernetes volumes, and an array of Kubernetes volume mounts.
 // It returns an error if the handling of volume mounts fails.
-func (converter *DockerAPIConverter) setVolumeMounts(networkName string, hostConfig *container.HostConfig, volumes []core.Volume, volumeMounts []core.VolumeMount) error {
+func (converter *DockerAPIConverter) setVolumeMounts(namespace string, hostConfig *container.HostConfig, volumes []core.Volume, volumeMounts []core.VolumeMount) error {
 	for _, volume := range volumes {
 		for _, volumeMount := range volumeMounts {
 			if volumeMount.Name == volume.Name {
-				if err := converter.handleVolumeSource(networkName, hostConfig, volume, volumeMount); err != nil {
+				if err := converter.handleVolumeSource(namespace, hostConfig, volume, volumeMount); err != nil {
 					return err
 				}
 				break
@@ -388,9 +382,9 @@ func (converter *DockerAPIConverter) setVolumeMounts(networkName string, hostCon
 //
 // Returns:
 // An error if fetching the ConfigMap or Secret from the store fails; otherwise, it returns nil.
-func (converter *DockerAPIConverter) handleVolumeSource(networkName string, hostConfig *container.HostConfig, volume core.Volume, volumeMount core.VolumeMount) error {
+func (converter *DockerAPIConverter) handleVolumeSource(namespace string, hostConfig *container.HostConfig, volume core.Volume, volumeMount core.VolumeMount) error {
 	if volume.VolumeSource.ConfigMap != nil {
-		configMap, err := converter.configMapStore.GetConfigMap(volume.VolumeSource.ConfigMap.Name, networkName)
+		configMap, err := converter.configMapStore.GetConfigMap(volume.VolumeSource.ConfigMap.Name, namespace)
 		if err != nil {
 			return fmt.Errorf("unable to get configmap %s: %w", volume.VolumeSource.ConfigMap.Name, err)
 		}
@@ -405,7 +399,7 @@ func (converter *DockerAPIConverter) handleVolumeSource(networkName string, host
 			hostConfig.Binds = append(hostConfig.Binds, bind)
 		}
 	} else if volume.VolumeSource.Secret != nil {
-		secret, err := converter.secretStore.GetSecret(volume.VolumeSource.Secret.SecretName, networkName)
+		secret, err := converter.secretStore.GetSecret(volume.VolumeSource.Secret.SecretName, namespace)
 		if err != nil {
 			return fmt.Errorf("unable to get secret %s: %w", volume.VolumeSource.Secret.SecretName, err)
 		}

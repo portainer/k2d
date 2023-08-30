@@ -25,7 +25,7 @@ type PodLogOptions struct {
 func (adapter *KubeDockerAdapter) CreateContainerFromPod(ctx context.Context, pod *corev1.Pod) error {
 	opts := ContainerCreationOptions{
 		containerName: pod.Name,
-		networkName:   pod.Namespace,
+		namespace:     pod.Namespace,
 		podSpec:       pod.Spec,
 		labels:        pod.Labels,
 	}

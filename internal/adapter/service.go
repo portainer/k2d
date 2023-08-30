@@ -37,12 +37,7 @@ func (adapter *KubeDockerAdapter) DeleteService(ctx context.Context, serviceName
 	delete(cfg.ContainerConfig.Labels, k2dtypes.ServiceNameLabelKey)
 	delete(cfg.ContainerConfig.Labels, k2dtypes.ServiceLastAppliedConfigLabelKey)
 
-	networkName := cfg.ContainerConfig.Labels[k2dtypes.NamespaceLabelKey]
-	// TODO: handle this case after introducing prefix
-	if networkName == "default" {
-		networkName = "k2d_net"
-	}
-
+	networkName := buildNetworkName(namespace)
 	cfg.NetworkConfig.EndpointsConfig[networkName].Aliases = []string{}
 
 	return adapter.reCreateContainerWithNewConfiguration(ctx, container.ID, cfg)
@@ -124,14 +119,8 @@ func (adapter *KubeDockerAdapter) CreateContainerFromService(ctx context.Context
 		return fmt.Errorf("unable to convert service spec into container configuration: %w", err)
 	}
 
-	// TODO: handle this after introducing prefix
-	// Should probably look for all the if network == default
-	network := service.Namespace
-	if network == "default" {
-		network = "k2d_net"
-	}
-
-	cfg.NetworkConfig.EndpointsConfig[network].Aliases = []string{
+	networkName := buildNetworkName(service.Namespace)
+	cfg.NetworkConfig.EndpointsConfig[networkName].Aliases = []string{
 		service.Name,
 		fmt.Sprintf("%s.%s", service.Name, service.Namespace),
 		fmt.Sprintf("%s.%s.svc", service.Name, service.Namespace),

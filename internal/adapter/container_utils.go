@@ -150,12 +150,13 @@ func (adapter *KubeDockerAdapter) buildContainerConfigurationFromExistingContain
 // TODO: update with namespace support
 type ContainerCreationOptions struct {
 	containerName            string
-	networkName              string
+	namespace                string
 	podSpec                  corev1.PodSpec
 	labels                   map[string]string
 	lastAppliedConfiguration string
 }
 
+// TODO: update with namespace support
 // createContainerFromPodSpec creates a new Docker container from a given Kubernetes PodSpec.
 // The function first initializes labels if they are not provided and adds the last applied configuration
 // to the labels if it's specified. It then converts the versioned pod spec to an internal pod spec
@@ -184,10 +185,6 @@ type ContainerCreationOptions struct {
 // If there is an error at any point in the process (e.g., conversion failure, image pull failure, container removal or creation),
 // the function returns the error, wrapped with a description of the step that failed.
 func (adapter *KubeDockerAdapter) createContainerFromPodSpec(ctx context.Context, options ContainerCreationOptions) error {
-	if options.labels == nil {
-		options.labels = map[string]string{}
-	}
-
 	if options.lastAppliedConfiguration != "" {
 		options.labels[k2dtypes.WorkloadLastAppliedConfigLabelKey] = options.lastAppliedConfiguration
 	}
@@ -203,14 +200,15 @@ func (adapter *KubeDockerAdapter) createContainerFromPodSpec(ctx context.Context
 		return fmt.Errorf("unable to marshal internal pod spec: %w", err)
 	}
 	options.labels[k2dtypes.PodLastAppliedConfigLabelKey] = string(internalPodSpecData)
-	options.labels[k2dtypes.NamespaceLabelKey] = options.networkName
+	options.labels[k2dtypes.NamespaceLabelKey] = options.namespace
 	options.labels[k2dtypes.WorkloadNameLabelKey] = options.containerName
+	options.labels[k2dtypes.NetworkNameLabelKey] = buildNetworkName(options.namespace)
 
-	containerCfg, err := adapter.converter.ConvertPodSpecToContainerConfiguration(internalPodSpec, options.networkName, options.labels)
+	containerCfg, err := adapter.converter.ConvertPodSpecToContainerConfiguration(internalPodSpec, options.namespace, options.labels)
 	if err != nil {
 		return fmt.Errorf("unable to build container configuration from pod spec: %w", err)
 	}
-	containerCfg.ContainerName = buildContainerName(options.containerName, options.networkName)
+	containerCfg.ContainerName = buildContainerName(options.containerName, options.namespace)
 
 	//TODO: I think this should be reviewed, there is no need to list all containers with a filter
 
@@ -236,9 +234,11 @@ func (adapter *KubeDockerAdapter) createContainerFromPodSpec(ctx context.Context
 			options.labels[k2dtypes.ServiceLastAppliedConfigLabelKey] = container.Labels[k2dtypes.ServiceLastAppliedConfigLabelKey]
 		}
 
-		if len(container.NetworkSettings.Networks[k2dtypes.K2DNetworkName].Aliases) > 0 {
-			containerCfg.NetworkConfig.EndpointsConfig[k2dtypes.K2DNetworkName].Aliases = container.NetworkSettings.Networks[k2dtypes.K2DNetworkName].Aliases
-		}
+		// TODO: I think this can be removed as all conainers previously used the same network
+		// k2dNetworkName := buildNetworkName(k2dtypes.K2DNamespaceName)
+		// if len(container.NetworkSettings.Networks[k2dNetworkName].Aliases) > 0 {
+		// 	containerCfg.NetworkConfig.EndpointsConfig[k2dNetworkName].Aliases = container.NetworkSettings.Networks[k2dNetworkName].Aliases
+		// }
 
 		err := adapter.cli.ContainerRemove(ctx, container.ID, types.ContainerRemoveOptions{Force: true})
 		if err != nil {
@@ -246,7 +246,7 @@ func (adapter *KubeDockerAdapter) createContainerFromPodSpec(ctx context.Context
 		}
 	}
 
-	registryAuth, err := adapter.getRegistryCredentials(options.podSpec, options.networkName, containerCfg.ContainerConfig.Image)
+	registryAuth, err := adapter.getRegistryCredentials(options.podSpec, options.namespace, containerCfg.ContainerConfig.Image)
 	if err != nil {
 		return fmt.Errorf("unable to get registry credentials: %w", err)
 	}
@@ -419,9 +419,10 @@ func (adapter *KubeDockerAdapter) DeployPortainerEdgeAgent(ctx context.Context, 
 		},
 	}
 
+	networkName := buildNetworkName(k2dtypes.K2DNamespaceName)
 	networkConfig := &network.NetworkingConfig{
 		EndpointsConfig: map[string]*network.EndpointSettings{
-			k2dtypes.K2DNetworkName: {},
+			networkName: {},
 		},
 	}
 
