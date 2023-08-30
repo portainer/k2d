@@ -32,11 +32,9 @@ func (svc NamespaceService) RegisterNamespaceAPI(ws *restful.WebService) {
 	ws.Route(ws.GET("/v1/namespaces").
 		To(svc.ListNamespaces))
 
-	// TODO: check if watch is required
 	ws.Route(ws.GET("/v1/namespaces/{name}").
 		To(svc.GetNamespace).
-		Param(ws.PathParameter("name", "name of the namespace").DataType("string")).
-		Param(ws.PathParameter("watch", "watch for changes").DataType("boolean")))
+		Param(ws.PathParameter("name", "name of the namespace").DataType("string")))
 
 	ws.Route(ws.PATCH("/v1/namespaces/{name}").
 		To(svc.PatchNamespace).
