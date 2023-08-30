@@ -182,7 +182,7 @@ func (s *FileSystemStore) GetConfigMaps(namespace string) (core.ConfigMapList, e
 	}
 
 	// We first need to find all the unique configmap names
-	uniqueNames := str.UniquePrefixes(fileNames, ConfigMapSeparator)
+	uniqueNames := str.RetrieveUniquePrefixes(fileNames, ConfigMapSeparator)
 
 	// We then need to filter out the configmaps that are not in the namespace
 	uniqueNames = str.FilterStringsByPrefix(uniqueNames, namespace)

@@ -141,21 +141,39 @@ func (adapter *KubeDockerAdapter) buildContainerConfigurationFromExistingContain
 	}, nil
 }
 
-// ContainerCreationOptions is a struct used to provide parameters for creating a container.
-// It includes the containerName which is a string indicating the name of the container to be created,
-// a PodSpec which represents the desired state of the Pod from the parent Kubernetes object,
-// and labels which is a map of key-value pairs.
-// It also includes a string representation of the last applied configuration of the parent Kubernetes object.
-// TODO: update with namespace support
+// ContainerCreationOptions serves as a parameter object for container creation operations.
+// The struct encapsulates various attributes required for configuring a container, as described below:
+//
+//   - containerName: Specifies the name of the container to be created.
+//   - labels: A map representing key-value pairs of labels that will be attached to the container.
+//     These labels are useful for organizational and operational tasks like filtering and grouping.
+//   - lastAppliedConfiguration: A string containing the serialized state of the last applied configuration
+//     for the parent Kubernetes object. This is used to manage updates and rollbacks.
+//   - namespace: Indicates the Kubernetes namespace within which the container should reside.
+//     This is used to ensure that the container is created in the correct network.
+//   - podSpec: Holds the corev1.PodSpec object representing the desired state of the associated Pod.
+//     This includes configurations like the container image, environment variables, and volume mounts.
 type ContainerCreationOptions struct {
 	containerName            string
-	namespace                string
-	podSpec                  corev1.PodSpec
 	labels                   map[string]string
 	lastAppliedConfiguration string
+	namespace                string
+	podSpec                  corev1.PodSpec
 }
 
-// TODO: comment
+// getContainer inspects the specified container and returns its details in the form of a pointer to a types.ContainerJSON object.
+// This is a handy wrapper around the Docker SDK's ContainerInspect function that allows us to easily check if a container exists.
+// The function takes two parameters:
+//
+// - ctx: The context within which this operation should be executed, useful for timeout and cancellation.
+// - containerName: The name (or ID) of the container that needs to be inspected.
+//
+// The function has two return values:
+//
+//   - *types.ContainerJSON: A pointer to the object that holds the inspected details of the container.
+//     This pointer will be nil if the container with the specified name is not found.
+//   - error: An error object that will be returned in case of failure to inspect the container.
+//     It will wrap the original error message with additional context, if any.
 func (adapter *KubeDockerAdapter) getContainer(ctx context.Context, containerName string) (*types.ContainerJSON, error) {
 	containerDetails, err := adapter.cli.ContainerInspect(ctx, containerName)
 	if err != nil {
@@ -169,34 +187,32 @@ func (adapter *KubeDockerAdapter) getContainer(ctx context.Context, containerNam
 	return &containerDetails, nil
 }
 
-// TODO: update with namespace support
-// createContainerFromPodSpec creates a new Docker container from a given Kubernetes PodSpec.
-// The function first initializes labels if they are not provided and adds the last applied configuration
-// to the labels if it's specified. It then converts the versioned pod spec to an internal pod spec
-// and serializes it to JSON to be stored as a label on the Docker container.
+// createContainerFromPodSpec orchestrates the creation of a Docker container based on a given Kubernetes PodSpec.
+// The function goes through several key steps in the container creation lifecycle:
 //
-// It attempts to convert the internal PodSpec to a Docker container configuration and lists existing
-// Docker containers to check if a container with the specified name already exists.
-//
-// If a matching container is found and has the same last applied configuration, the update is skipped.
-// If the existing container has a different configuration, it is removed, and its network aliases and
-// service last applied configuration label are preserved if present.
-//
-// The function then pulls the necessary image using the registry credentials obtained for the image
-// in the provided pod spec. If successful, it creates and starts the new Docker container, attaching
-// it to a predefined Docker network.
+//  1. Initializes and updates container labels using the last applied configuration if provided.
+//  2. Converts the provided Kubernetes PodSpec into an internal PodSpec, which is then serialized to JSON.
+//     This serialized form is stored as a label on the Docker container for future reference.
+//  3. Constructs a Docker container configuration from the internal PodSpec.
+//  4. Checks for an existing Docker container with the same name:
+//     - If found with an identical last applied configuration, skips the update.
+//     - If found but but with a different last applied configuration, removes the existing container.
+//  5. Pulls the necessary Docker image using registry credentials from the Kubernetes PodSpec.
+//  6. Creates and starts the Docker container.
 //
 // Parameters:
-// ctx - The context within which the function works. Used for timeout and cancellation signals.
-// options - ContainerCreationOptions struct, contains parameters needed for container creation:
-//   - containerName: Name of the container.
-//   - podSpec: Kubernetes PodSpec to base the Docker container on.
-//   - labels: Map of labels to be attached to the Docker container.
-//   - lastAppliedConfiguration: String representation of the last applied configuration of the parent Kubernetes object.
-//     This field is stored as a label on the Docker container.
+// - ctx: The operational context within which the function runs. Used for timeouts and cancellation signals.
+// - options: A ContainerCreationOptions struct containing the necessary parameters for container creation.
+//   - containerName: Specifies the name of the Docker container to create.
+//   - labels: A map of labels to attach to the Docker container.
+//   - lastAppliedConfiguration: Stores the last configuration applied to the parent Kubernetes object.
+//     This is saved as a label on the Docker container.
+//   - namespace: Used to determine the network in which the container should be created.
+//   - podSpec: The Kubernetes PodSpec that serves as the template for the Docker container.
 //
-// If there is an error at any point in the process (e.g., conversion failure, image pull failure, container removal or creation),
-// the function returns the error, wrapped with a description of the step that failed.
+// Returns:
+//   - If any step in the container creation process fails (such as PodSpec conversion, image pull, or container creation),
+//     the function returns an error wrapped with a description of the failed step.
 func (adapter *KubeDockerAdapter) createContainerFromPodSpec(ctx context.Context, options ContainerCreationOptions) error {
 	if options.lastAppliedConfiguration != "" {
 		options.labels[k2dtypes.WorkloadLastAppliedConfigLabelKey] = options.lastAppliedConfiguration
@@ -275,33 +291,57 @@ func (adapter *KubeDockerAdapter) createContainerFromPodSpec(ctx context.Context
 	return adapter.cli.ContainerStart(ctx, containerCreateResponse.ID, types.ContainerStartOptions{})
 }
 
-//TODO: function comment with namespace
+// DeleteContainer attempts to remove a Docker container based on its name and associated namespace.
+// The container name is fully qualified by appending the namespace to it using the buildContainerName function.
+// This function forcefully removes the container, regardless of whether it is running or not.
+//
+// The function performs the following steps:
+// 1. Constructs the fully qualified container name by appending the namespace to the provided container name.
+// 2. Calls the Docker API's ContainerRemove method to forcefully remove the container.
+//
+// If there is an error during the container removal process, a warning message will be logged.
+//
+// Parameters:
+// - ctx: The context within which the function operates, useful for timeout and cancellation signals.
+// - containerName: The base name of the Docker container to be removed.
+// - namespace: The Kubernetes namespace associated with the container, used for constructing the fully qualified container name.
+//
+// Returns:
+//   - This function does not return any value or error. Failures in container removal are only logged as warnings.
+//     This is because the container may not exist anymore, and the function should not fail in that case.
+func (adapter *KubeDockerAdapter) DeleteContainer(ctx context.Context, containerName, namespace string) {
+	containerName = buildContainerName(containerName, namespace)
 
-// DeleteContainer removes a Docker container given its ID or name.
-// This function will force the removal of the container, regardless if it's running or not.
-// It will log a warning if it fails to delete the container.
-func (adapter *KubeDockerAdapter) DeleteContainer(ctx context.Context, containerName, namespace string) error {
-	err := adapter.cli.ContainerRemove(ctx, buildContainerName(containerName, namespace), types.ContainerRemoveOptions{Force: true})
+	err := adapter.cli.ContainerRemove(ctx, containerName, types.ContainerRemoveOptions{Force: true})
 	if err != nil {
 		adapter.logger.Warnf("unable to remove container: %s", err)
 	}
-
-	return nil
 }
 
-// getRegistryCredentials retrieves the registry credentials for a given image name
-// within the specified pod specification. If the podSpec's ImagePullSecrets are nil,
-// it returns an empty string without an error.
+// getRegistryCredentials attempts to retrieve the Docker registry credentials for a given image name
+// within the specified Kubernetes PodSpec and namespace.
 //
-// The function first normalizes the image name by adding the "docker.io/" prefix if it
-// lacks a registry domain. Then, it parses the image name to obtain the registry URL.
+// The function performs the following steps:
+// 1. Checks if podSpec.ImagePullSecrets is nil. If it is, the function returns an empty string without an error.
+// 2. Normalizes the image name by prefixing it with "docker.io/" if it lacks a registry domain.
+// 3. Parses the normalized image name to extract the registry URL.
+// 4. Logs an info message indicating the retrieval of registry credentials.
+// 5. Fetches the first pull secret from podSpec.ImagePullSecrets and retrieves the associated Kubernetes Secret.
+// 6. Decodes the Kubernetes Secret to get the username and password for the Docker registry.
+// 7. Constructs a Docker AuthConfig structure using the obtained username and password.
+// 8. Serializes the AuthConfig to JSON and encodes it to a base64 string.
 //
-// Using the first pull secret from podSpec.ImagePullSecrets, the function fetches the registry
-// secret and decodes it using the given registry URL. It constructs an authentication config
-// from the obtained username and password and returns its base64-encoded JSON representation.
+// Parameters:
+// - podSpec: The Kubernetes PodSpec containing the ImagePullSecrets.
+// - namespace: The Kubernetes namespace in which to look for the ImagePullSecret.
+// - imageName: The name of the Docker image for which to retrieve registry credentials.
 //
-// If any step fails, an error is returned.
-// TODO: update docs with namespace
+// Returns:
+//   - A base64-encoded JSON string containing the Docker registry credentials, or an empty string if ImagePullSecrets is nil.
+//   - An error if any step in the process fails, such as parsing the image name, fetching the Kubernetes Secret, decoding the Secret,
+//     or serializing the AuthConfig.
+//
+// Note: Currently, the function only supports a single ImagePullSecret.
 func (adapter *KubeDockerAdapter) getRegistryCredentials(podSpec corev1.PodSpec, namespace, imageName string) (string, error) {
 	if podSpec.ImagePullSecrets == nil {
 		return "", nil
@@ -318,12 +358,11 @@ func (adapter *KubeDockerAdapter) getRegistryCredentials(podSpec corev1.PodSpec,
 
 	registryURL := reference.Domain(parsed)
 
-	adapter.logger.Debugw("retrieving private registry credentials",
+	adapter.logger.Infof("retrieving private registry credentials",
 		"container_image", imageName,
 		"registry", registryURL,
 	)
 
-	// We only support a single image pull secret for now
 	pullSecret := podSpec.ImagePullSecrets[0]
 
 	registrySecret, err := adapter.registrySecretStore.GetSecret(pullSecret.Name, namespace)

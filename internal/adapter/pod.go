@@ -47,7 +47,7 @@ func (adapter *KubeDockerAdapter) CreateContainerFromPod(ctx context.Context, po
 // when inspecting a container and listing containers.
 // The logic used to build a pod from a container is based on the type returned by the list operation (types.Container)
 // and not the inspect operation (types.ContainerJSON).
-// This is because using the inspect operation would be more expensive overall.
+// This is because using the inspect operation everywhere would be more expensive overall.
 func (adapter *KubeDockerAdapter) GetPod(ctx context.Context, podName string, namespaceName string) (*corev1.Pod, error) {
 	labelFilter := filters.NewArgs()
 	labelFilter.Add("label", fmt.Sprintf("%s=%s", k2dtypes.NamespaceLabelKey, namespaceName))
@@ -139,11 +139,6 @@ func (adapter *KubeDockerAdapter) ListPods(ctx context.Context, namespaceName st
 	return versionedPodList, nil
 }
 
-// TODO: this needs an update as it won't be supported anymore
-// Retrieving a pod uses a different approach than the other resources.
-// We build a Pod object from the container details by default and then we replace
-// the pod spec with the one stored in the container labels if it exists.
-// This is to keep the ability to list pods that were created outside of k2d (such as via docker run).
 func (adapter *KubeDockerAdapter) buildPodFromContainer(container types.Container) (*core.Pod, error) {
 	pod := adapter.converter.ConvertContainerToPod(container)
 
