@@ -3,6 +3,8 @@ package types
 const (
 	// WorkloadLabelKey is the key used to store the workload type in the container labels
 	WorkloadLabelKey = "workload.k2d.io/type"
+	// WorkloadNameLabelKey is the key used to store the workload name in the container labels
+	WorkloadNameLabelKey = "workload.k2d.io/name"
 	// WorkloadLabelValueDeployment is the key used to store the last applied configuration in the container labels
 	WorkloadLastAppliedConfigLabelKey = "workload.k2d.io/last-applied-configuration"
 	// ServiceLastAppliedConfigLabelKey is the key used to store the service specific last applied configuration in the container labels

@@ -10,7 +10,8 @@ import (
 	k2dtypes "github.com/portainer/k2d/internal/adapter/types"
 )
 
-var errNetworkNotFound = errors.New("network not found")
+// TODO: potentially need an errors package in the adapter package
+var ErrNetworkNotFound = errors.New("network not found")
 
 // TODO: update comment
 // EnsureRequiredDockerResourcesExist verifies the existence of required Docker resources
@@ -22,7 +23,7 @@ var errNetworkNotFound = errors.New("network not found")
 // It returns an error if it fails to list Docker networks or if it fails to create the required Docker network.
 func (adapter *KubeDockerAdapter) EnsureRequiredDockerResourcesExist(ctx context.Context) error {
 	k2dNetwork, err := adapter.GetNetwork(ctx, "default")
-	if err != nil && !errors.Is(err, errNetworkNotFound) {
+	if err != nil && !errors.Is(err, ErrNetworkNotFound) {
 		return fmt.Errorf("unable to retrieve network: %w", err)
 	}
 
@@ -55,7 +56,7 @@ func (adapter *KubeDockerAdapter) GetNetwork(ctx context.Context, networkName st
 	network, err := adapter.cli.NetworkInspect(ctx, networkName, types.NetworkInspectOptions{})
 	if err != nil {
 		if errdefs.IsNotFound(err) {
-			return nil, errNetworkNotFound
+			return nil, ErrNetworkNotFound
 		}
 		return nil, fmt.Errorf("unable to inspect network %s: %w", networkName, err)
 	}

@@ -14,6 +14,7 @@ func (svc ConfigMapService) GetConfigMap(r *restful.Request, w *restful.Response
 	namespace := utils.NamespaceParameter(r)
 	configMapName := r.PathParameter("name")
 
+	// TODO: refactor all this to use the if err != nil pattern and then if errors.Is(err, storeerr.ErrResourceNotFound) { ... }
 	configMap, err := svc.adapter.GetConfigMap(configMapName, namespace)
 	if err != nil && errors.Is(err, storeerr.ErrResourceNotFound) {
 		w.WriteHeader(http.StatusNotFound)
