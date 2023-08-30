@@ -9,6 +9,7 @@ import (
 )
 
 func (svc NodeService) GetNode(r *restful.Request, w *restful.Response) {
+	// TODO: introduce get node with name support
 	node, err := svc.adapter.GetNode(r.Request.Context())
 	if err != nil {
 		utils.HttpError(r, w, http.StatusInternalServerError, fmt.Errorf("unable to get node: %w", err))

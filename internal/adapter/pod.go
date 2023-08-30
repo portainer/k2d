@@ -8,6 +8,7 @@ import (
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
+	"github.com/portainer/k2d/internal/adapter/errors"
 	k2dtypes "github.com/portainer/k2d/internal/adapter/types"
 	"github.com/portainer/k2d/internal/k8s"
 	corev1 "k8s.io/api/core/v1"
@@ -68,7 +69,8 @@ func (adapter *KubeDockerAdapter) GetPod(ctx context.Context, podName string, na
 	}
 
 	if container == nil {
-		return nil, fmt.Errorf("unable to find container for pod %s in namespace %s", podName, namespaceName)
+		adapter.logger.Errorf("unable to find container for pod %s in namespace %s", podName, namespaceName)
+		return nil, errors.ErrResourceNotFound
 	}
 
 	pod, err := adapter.buildPodFromContainer(*container)

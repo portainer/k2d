@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/emicklei/go-restful/v3"
-	storeerr "github.com/portainer/k2d/internal/adapter/store/errors"
+	adaptererr "github.com/portainer/k2d/internal/adapter/errors"
 	"github.com/portainer/k2d/internal/api/utils"
 	httputils "github.com/portainer/k2d/pkg/http"
 	corev1 "k8s.io/api/core/v1"
@@ -51,7 +51,7 @@ func (svc SecretService) PutSecret(r *restful.Request, w *restful.Response) {
 			return
 		}
 
-		if err != nil && !errors.Is(err, storeerr.ErrResourceNotFound) {
+		if err != nil && !errors.Is(err, adaptererr.ErrResourceNotFound) {
 			utils.HttpError(r, w, http.StatusInternalServerError, fmt.Errorf("unable to get secret: %w", err))
 			return
 		}

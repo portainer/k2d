@@ -20,12 +20,8 @@ func (svc ServiceService) GetService(r *restful.Request, w *restful.Response) {
 			w.WriteHeader(http.StatusNotFound)
 			return
 		}
-		utils.HttpError(r, w, http.StatusInternalServerError, fmt.Errorf("unable to get service: %w", err))
-		return
-	}
 
-	if service == nil {
-		w.WriteHeader(http.StatusNotFound)
+		utils.HttpError(r, w, http.StatusInternalServerError, fmt.Errorf("unable to get service: %w", err))
 		return
 	}
 

@@ -10,6 +10,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/apis/apps"
 
+	adaptererr "github.com/portainer/k2d/internal/adapter/errors"
 	k2dtypes "github.com/portainer/k2d/internal/adapter/types"
 	"github.com/portainer/k2d/internal/k8s"
 	appsv1 "k8s.io/api/apps/v1"
@@ -54,27 +55,37 @@ func (adapter *KubeDockerAdapter) CreateContainerFromDeployment(ctx context.Cont
 	return adapter.createContainerFromPodSpec(ctx, opts)
 }
 
-func (adapter *KubeDockerAdapter) GetDeployment(ctx context.Context, deploymentName string, namespaceName string) (*appsv1.Deployment, error) {
+func (adapter *KubeDockerAdapter) getContainerFromDeploymentName(ctx context.Context, deploymentName, namespace string) (types.Container, error) {
 	labelFilter := filters.NewArgs()
-	labelFilter.Add("name", "/"+deploymentName)
-	labelFilter.Add("label", fmt.Sprintf("%s=%s", k2dtypes.NamespaceLabelKey, namespaceName))
+	labelFilter.Add("label", fmt.Sprintf("%s=%s", k2dtypes.WorkloadLabelKey, DeploymentWorkloadType))
+	labelFilter.Add("label", fmt.Sprintf("%s=%s", k2dtypes.NamespaceLabelKey, namespace))
+	labelFilter.Add("label", fmt.Sprintf("%s=%s", k2dtypes.WorkloadNameLabelKey, deploymentName))
 
-	container, err := adapter.cli.ContainerList(ctx, types.ContainerListOptions{All: true, Filters: labelFilter})
+	containers, err := adapter.cli.ContainerList(ctx, types.ContainerListOptions{All: true, Filters: labelFilter})
 	if err != nil {
-		return nil, fmt.Errorf("unable to list containers: %w", err)
+		return types.Container{}, fmt.Errorf("unable to list containers: %w", err)
 	}
 
-	if len(container) == 0 {
-		return nil, nil
+	if len(containers) == 0 {
+		return types.Container{}, adaptererr.ErrResourceNotFound
 	}
 
-	deployment, err := adapter.getDeployment(container[0])
+	if len(containers) > 1 {
+		return types.Container{}, fmt.Errorf("multiple containers were found with the associated deployment name %s", deploymentName)
+	}
+
+	return containers[0], nil
+}
+
+func (adapter *KubeDockerAdapter) GetDeployment(ctx context.Context, deploymentName string, namespace string) (*appsv1.Deployment, error) {
+	container, err := adapter.getContainerFromDeploymentName(ctx, deploymentName, namespace)
+	if err != nil {
+		return nil, fmt.Errorf("unable to get container from deployment name: %w", err)
+	}
+
+	deployment, err := adapter.buildDeploymentFromContainer(container)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get deployment: %w", err)
-	}
-
-	if deployment == nil {
-		return nil, nil
 	}
 
 	versionedDeployment := appsv1.Deployment{
@@ -122,30 +133,28 @@ func (adapter *KubeDockerAdapter) ListDeployments(ctx context.Context, namespace
 	return versionedDeploymentList, nil
 }
 
-func (adapter *KubeDockerAdapter) getDeployment(container types.Container) (*apps.Deployment, error) {
-	deployment := apps.Deployment{}
+func (adapter *KubeDockerAdapter) buildDeploymentFromContainer(container types.Container) (*apps.Deployment, error) {
 
-	if container.Labels[k2dtypes.WorkloadLastAppliedConfigLabelKey] != "" {
-		deploymentData := container.Labels[k2dtypes.WorkloadLastAppliedConfigLabelKey]
-
-		versionedDeployment := appsv1.Deployment{}
-
-		err := json.Unmarshal([]byte(deploymentData), &versionedDeployment)
-		if err != nil {
-			return nil, fmt.Errorf("unable to unmarshal versioned deployment: %w", err)
-		}
-
-		err = adapter.ConvertK8SResource(&versionedDeployment, &deployment)
-		if err != nil {
-			return nil, fmt.Errorf("unable to convert versioned deployment spec to internal deployment spec: %w", err)
-		}
-
-		adapter.converter.UpdateDeploymentFromContainerInfo(&deployment, container)
-
-	} else {
-		adapter.logger.Errorf("unable to build deployment, missing %s label on container %s", k2dtypes.WorkloadLastAppliedConfigLabelKey, container.Names[0])
-		return nil, nil
+	if container.Labels[k2dtypes.WorkloadLastAppliedConfigLabelKey] == "" {
+		return nil, fmt.Errorf("unable to build deployment, missing %s label on container %s", k2dtypes.WorkloadLastAppliedConfigLabelKey, container.Names[0])
 	}
+
+	deploymentData := container.Labels[k2dtypes.WorkloadLastAppliedConfigLabelKey]
+
+	versionedDeployment := appsv1.Deployment{}
+
+	err := json.Unmarshal([]byte(deploymentData), &versionedDeployment)
+	if err != nil {
+		return nil, fmt.Errorf("unable to unmarshal versioned deployment: %w", err)
+	}
+
+	deployment := apps.Deployment{}
+	err = adapter.ConvertK8SResource(&versionedDeployment, &deployment)
+	if err != nil {
+		return nil, fmt.Errorf("unable to convert versioned deployment spec to internal deployment spec: %w", err)
+	}
+
+	adapter.converter.UpdateDeploymentFromContainerInfo(&deployment, container)
 
 	return &deployment, nil
 }
@@ -163,7 +172,7 @@ func (adapter *KubeDockerAdapter) listDeployments(ctx context.Context, namespace
 	deployments := []apps.Deployment{}
 
 	for _, container := range containers {
-		deployment, err := adapter.getDeployment(container)
+		deployment, err := adapter.buildDeploymentFromContainer(container)
 		if err != nil {
 			return apps.DeploymentList{}, fmt.Errorf("unable to get deployment: %w", err)
 		}

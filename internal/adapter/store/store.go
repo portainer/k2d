@@ -9,8 +9,8 @@
 // files within containers.
 //
 // Usage Note:
-//   - The method GetConfigMap() returns a 'ErrResourceNotFound' error (from the errors package) if the underlying ConfigMap resource is not found.
-//   - The method GetSecret() returns a 'ErrResourceNotFound' error (from the errors package) if the underlying Secret resource is not found.
+//   - The method GetConfigMap() returns a 'ErrResourceNotFound' error (from the adapter/errors package) if the underlying ConfigMap resource is not found.
+//   - The method GetSecret() returns a 'ErrResourceNotFound' error (from the adapter/errors package) if the underlying Secret resource is not found.
 //   - The methods GetSecretBinds() and GetConfigMapBinds() are used to generate a list of filesystem binds that
 //     can be used by containers for mounting files.
 //
@@ -18,7 +18,7 @@
 //
 // import (
 //
-//	storeerr "github.com/portainer/k2d/internal/adapter/store/errors"
+//	adaptererr "github.com/portainer/k2d/internal/adapter/errors"
 //
 // )
 //
@@ -26,7 +26,7 @@
 // secret, err := s.GetSecret("my-secret")
 //
 //	if err != nil {
-//	   if err == storeerr.ErrResourceNotFound {
+//	   if err == adaptererr.ErrResourceNotFound {
 //	      log.Println("Secret not found")
 //	   } else {
 //	      log.Println("An error occurred:", err)
