@@ -13,12 +13,12 @@ func (adapter *KubeDockerAdapter) CreateConfigMap(configMap *corev1.ConfigMap) e
 	return adapter.configMapStore.StoreConfigMap(configMap)
 }
 
-func (adapter *KubeDockerAdapter) DeleteConfigMap(configMapName string) error {
-	return adapter.configMapStore.DeleteConfigMap(configMapName)
+func (adapter *KubeDockerAdapter) DeleteConfigMap(configMapName, namespace string) error {
+	return adapter.configMapStore.DeleteConfigMap(configMapName, namespace)
 }
 
-func (adapter *KubeDockerAdapter) GetConfigMap(configMapName string) (*corev1.ConfigMap, error) {
-	configMap, err := adapter.configMapStore.GetConfigMap(configMapName)
+func (adapter *KubeDockerAdapter) GetConfigMap(configMapName, namespace string) (*corev1.ConfigMap, error) {
+	configMap, err := adapter.configMapStore.GetConfigMap(configMapName, namespace)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get configmap: %w", err)
 	}
@@ -40,8 +40,8 @@ func (adapter *KubeDockerAdapter) GetConfigMap(configMapName string) (*corev1.Co
 	return &versionedConfigMap, nil
 }
 
-func (adapter *KubeDockerAdapter) GetConfigMapTable() (*metav1.Table, error) {
-	configMapList, err := adapter.listConfigMaps()
+func (adapter *KubeDockerAdapter) GetConfigMapTable(namespace string) (*metav1.Table, error) {
+	configMapList, err := adapter.listConfigMaps(namespace)
 	if err != nil {
 		return &metav1.Table{}, fmt.Errorf("unable to list configmaps: %w", err)
 	}
@@ -49,8 +49,8 @@ func (adapter *KubeDockerAdapter) GetConfigMapTable() (*metav1.Table, error) {
 	return k8s.GenerateTable(&configMapList)
 }
 
-func (adapter *KubeDockerAdapter) ListConfigMaps() (corev1.ConfigMapList, error) {
-	configMapList, err := adapter.listConfigMaps()
+func (adapter *KubeDockerAdapter) ListConfigMaps(namespace string) (corev1.ConfigMapList, error) {
+	configMapList, err := adapter.listConfigMaps(namespace)
 	if err != nil {
 		return corev1.ConfigMapList{}, fmt.Errorf("unable to list configmaps: %w", err)
 	}
@@ -70,6 +70,6 @@ func (adapter *KubeDockerAdapter) ListConfigMaps() (corev1.ConfigMapList, error)
 	return versionedConfigMapList, nil
 }
 
-func (adapter *KubeDockerAdapter) listConfigMaps() (core.ConfigMapList, error) {
-	return adapter.configMapStore.GetConfigMaps()
+func (adapter *KubeDockerAdapter) listConfigMaps(namespace string) (core.ConfigMapList, error) {
+	return adapter.configMapStore.GetConfigMaps(namespace)
 }

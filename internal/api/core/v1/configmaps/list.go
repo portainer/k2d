@@ -9,14 +9,16 @@ import (
 )
 
 func (svc ConfigMapService) ListConfigMaps(r *restful.Request, w *restful.Response) {
+	namespace := utils.NamespaceParameter(r)
+
 	utils.ListResources(
 		r,
 		w,
 		func(ctx context.Context) (interface{}, error) {
-			return svc.adapter.ListConfigMaps()
+			return svc.adapter.ListConfigMaps(namespace)
 		},
 		func(ctx context.Context) (*metav1.Table, error) {
-			return svc.adapter.GetConfigMapTable()
+			return svc.adapter.GetConfigMapTable(namespace)
 		},
 	)
 }

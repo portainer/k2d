@@ -9,7 +9,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// StoreServiceAccountSecret takes the paths of a service account token file and a CA certificate file,
+// storeServiceAccountSecret takes the paths of a service account token file and a CA certificate file,
 // reads their content, and stores them as a new Kubernetes Secret object. This function is specifically
 // designed to handle the system service account secret, which is used to authenticate with the Kubernetes
 // API server.
@@ -21,7 +21,7 @@ import (
 // Returns:
 //   - nil if the secret is successfully stored.
 //   - an error if reading the token or CA certificate files fails, or if storing the secret fails.
-func (adapter *KubeDockerAdapter) StoreServiceAccountSecret(tokenPath, caPath string) error {
+func (adapter *KubeDockerAdapter) storeServiceAccountSecret(tokenPath, caPath string) error {
 	token, err := filesystem.ReadFileAsString(tokenPath)
 	if err != nil {
 		return fmt.Errorf("failed to read token file: %w", err)
@@ -40,7 +40,7 @@ func (adapter *KubeDockerAdapter) StoreServiceAccountSecret(tokenPath, caPath st
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        types.K2dServiceAccountSecretName,
 			Annotations: map[string]string{},
-			Namespace:   "default",
+			Namespace:   types.K2DNamespaceName,
 		},
 		Type: corev1.SecretTypeOpaque,
 		StringData: map[string]string{

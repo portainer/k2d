@@ -10,9 +10,10 @@ import (
 )
 
 func (svc ServiceService) DeleteService(r *restful.Request, w *restful.Response) {
+	namespace := utils.NamespaceParameter(r)
 	serviceName := r.PathParameter("name")
 
-	err := svc.adapter.DeleteService(r.Request.Context(), serviceName)
+	err := svc.adapter.DeleteService(r.Request.Context(), serviceName, namespace)
 	if err != nil {
 		utils.HttpError(r, w, http.StatusInternalServerError, fmt.Errorf("unable to delete service: %w", err))
 		return

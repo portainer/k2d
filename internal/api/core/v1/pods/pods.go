@@ -31,15 +31,15 @@ func (svc PodService) RegisterPodAPI(ws *restful.WebService) {
 
 	ws.Route(ws.POST("/v1/namespaces/{namespace}/pods").
 		To(svc.CreatePod).
-		Param(ws.QueryParameter("dryRun", "when present, indicates that modifications should not be persisted").DataType("string")).
-		Param(ws.PathParameter("namespace", "namespace of the pod").DataType("string")))
+		Param(ws.PathParameter("namespace", "namespace name").DataType("string")).
+		Param(ws.QueryParameter("dryRun", "when present, indicates that modifications should not be persisted").DataType("string")))
 
 	ws.Route(ws.GET("/v1/pods").
 		To(svc.ListPods))
 
 	ws.Route(ws.GET("/v1/namespaces/{namespace}/pods").
 		To(svc.ListPods).
-		Param(ws.PathParameter("namespace", "namespace of the pod").DataType("string")))
+		Param(ws.PathParameter("namespace", "namespace name").DataType("string")))
 
 	ws.Route(ws.DELETE("/v1/pods/{name}").
 		To(svc.DeletePod).
@@ -47,7 +47,7 @@ func (svc PodService) RegisterPodAPI(ws *restful.WebService) {
 
 	ws.Route(ws.DELETE("/v1/namespaces/{namespace}/pods/{name}").
 		To(svc.DeletePod).
-		Param(ws.PathParameter("namespace", "namespace of the pod").DataType("string")).
+		Param(ws.PathParameter("namespace", "namespace name").DataType("string")).
 		Param(ws.PathParameter("name", "name of the pod").DataType("string")))
 
 	ws.Route(ws.GET("/v1/pods/{name}").
@@ -56,27 +56,27 @@ func (svc PodService) RegisterPodAPI(ws *restful.WebService) {
 
 	ws.Route(ws.GET("/v1/namespaces/{namespace}/pods/{name}").
 		To(svc.GetPod).
-		Param(ws.PathParameter("namespace", "namespace of the pod").DataType("string")).
+		Param(ws.PathParameter("namespace", "namespace name").DataType("string")).
 		Param(ws.PathParameter("name", "name of the pod").DataType("string")))
 
 	ws.Route(ws.PATCH("/v1/pods/{name}").
 		To(svc.PatchPod).
+		Param(ws.PathParameter("name", "name of the pod").DataType("string")).
 		Param(ws.QueryParameter("dryRun", "when present, indicates that modifications should not be persisted").DataType("string")).
-		AddExtension("x-kubernetes-group-version-kind", podGVKExtension).
-		Param(ws.PathParameter("name", "name of the pod").DataType("string")))
+		AddExtension("x-kubernetes-group-version-kind", podGVKExtension))
 
 	ws.Route(ws.PATCH("/v1/namespaces/{namespace}/pods/{name}").
 		To(svc.PatchPod).
+		Param(ws.PathParameter("namespace", "namespace name").DataType("string")).
+		Param(ws.PathParameter("name", "name of the pod").DataType("string")).
 		Param(ws.QueryParameter("dryRun", "when present, indicates that modifications should not be persisted").DataType("string")).
-		AddExtension("x-kubernetes-group-version-kind", podGVKExtension).
-		Param(ws.PathParameter("namespace", "namespace of the pod").DataType("string")).
-		Param(ws.PathParameter("name", "name of the pod").DataType("string")))
+		AddExtension("x-kubernetes-group-version-kind", podGVKExtension))
 
 	ws.Route(ws.GET("/v1/namespaces/{namespace}/pods/{name}/log").
 		To(svc.GetPodLogs)).
+		Param(ws.PathParameter("namespace", "namespace name").DataType("string")).
+		Param(ws.PathParameter("name", "name of the pod").DataType("string")).
 		Param(ws.QueryParameter("follow", "follow the log stream of the pod").DataType("boolean")).
 		Param(ws.QueryParameter("tailLines", "the number of lines from the end of the logs to show").DataType("integer")).
-		Param(ws.QueryParameter("timestamps", "add an RFC3339 or RFC3339Nano timestamp at the beginning of every line of log output").DataType("boolean")).
-		Param(ws.PathParameter("namespace", "namespace of the pod").DataType("string")).
-		Param(ws.PathParameter("name", "name of the pod").DataType("string"))
+		Param(ws.QueryParameter("timestamps", "add an RFC3339 or RFC3339Nano timestamp at the beginning of every line of log output").DataType("boolean"))
 }

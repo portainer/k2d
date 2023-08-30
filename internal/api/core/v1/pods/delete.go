@@ -1,7 +1,6 @@
 package pods
 
 import (
-	"fmt"
 	"net/http"
 
 	"github.com/emicklei/go-restful/v3"
@@ -10,13 +9,10 @@ import (
 )
 
 func (svc PodService) DeletePod(r *restful.Request, w *restful.Response) {
+	namespace := utils.NamespaceParameter(r)
 	podName := r.PathParameter("name")
 
-	err := svc.adapter.DeleteContainer(r.Request.Context(), podName)
-	if err != nil {
-		utils.HttpError(r, w, http.StatusInternalServerError, fmt.Errorf("unable to delete pod: %w", err))
-		return
-	}
+	svc.adapter.DeleteContainer(r.Request.Context(), podName, namespace)
 
 	w.WriteAsJson(metav1.Status{
 		TypeMeta: metav1.TypeMeta{
