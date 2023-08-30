@@ -10,9 +10,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// TODO: Should probably be part of a larger function and not exposed
-
-// ProvisionNamespace provisions a Kubernetes namespace and its corresponding Docker network.
+// provisionNamespace provisions a Kubernetes namespace and its corresponding Docker network.
 //
 // The function performs the following steps:
 // 1. Checks if the given namespace already exists by calling the GetNamespace method.
@@ -33,7 +31,7 @@ import (
 // Notes:
 // - The function logs informative messages to indicate the steps it's performing.
 // - The function is idempotent; if the namespace already exists, it will not attempt to create it again.
-func (adapter *KubeDockerAdapter) ProvisionNamespace(ctx context.Context, namespaceName string) error {
+func (adapter *KubeDockerAdapter) provisionNamespace(ctx context.Context, namespaceName string) error {
 	networkExists := true
 
 	_, err := adapter.GetNamespace(ctx, namespaceName)

@@ -11,7 +11,6 @@ import (
 	restfulspec "github.com/emicklei/go-restful-openapi/v2"
 	restful "github.com/emicklei/go-restful/v3"
 	"github.com/portainer/k2d/internal/adapter"
-	k2dtypes "github.com/portainer/k2d/internal/adapter/types"
 	"github.com/portainer/k2d/internal/api/apis"
 	"github.com/portainer/k2d/internal/api/core"
 	"github.com/portainer/k2d/internal/api/k2d"
@@ -98,20 +97,9 @@ func main() {
 		logger.Fatalf("unable to connect to local docker server, make sure the docker socket is reachable at /var/run/docker.sock: %s", err)
 	}
 
-	// TODO: should group these functions into a single one
-	err = kubeDockerAdapter.ProvisionNamespace(ctx, "default")
+	err = kubeDockerAdapter.ProvisionSystemResources(ctx, tokenPath, ssl.SSLCAPath(cfg.DataPath))
 	if err != nil {
-		logger.Fatalf("unable to provision default namespace: %s", err)
-	}
-
-	err = kubeDockerAdapter.ProvisionNamespace(ctx, k2dtypes.K2DNamespaceName)
-	if err != nil {
-		logger.Fatalf("unable to provision k2d namespace: %s", err)
-	}
-
-	err = kubeDockerAdapter.StoreServiceAccountSecret(tokenPath, ssl.SSLCAPath(cfg.DataPath))
-	if err != nil {
-		logger.Fatalf("unable to store service account secret: %s", err)
+		logger.Fatalf("unable to provision system resources: %s", err)
 	}
 
 	if cfg.PortainerEdgeKey != "" {
