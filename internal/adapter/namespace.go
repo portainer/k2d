@@ -3,6 +3,7 @@ package adapter
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/docker/docker/api/types"
@@ -16,8 +17,8 @@ import (
 
 func (adapter *KubeDockerAdapter) CreateNetworkFromNamespace(ctx context.Context, namespace *corev1.Namespace) error {
 	network, err := adapter.GetNetwork(ctx, namespace.Name)
-	if err != nil {
-		return fmt.Errorf("unable to list networks: %w", err)
+	if err != nil && !errors.Is(err, errNetworkNotFound) {
+		return fmt.Errorf("unable to check for network existence: %w", err)
 	}
 
 	if network != nil {
@@ -75,15 +76,10 @@ func (adapter *KubeDockerAdapter) ListNamespaces(ctx context.Context) (corev1.Na
 	return versionedNamespaceList, nil
 }
 
-func (adapter *KubeDockerAdapter) GetNamespace(ctx context.Context, namespaceName string, watchFlag string) (*corev1.Namespace, error) {
+func (adapter *KubeDockerAdapter) GetNamespace(ctx context.Context, namespaceName string) (*corev1.Namespace, error) {
 	network, err := adapter.GetNetwork(ctx, namespaceName)
 	if err != nil {
-		return &corev1.Namespace{}, fmt.Errorf("unable to get the namespaces: %w", err)
-	}
-
-	// TODO: investigate if ErrResourceNotFound equivalent is available in docker
-	if network == nil {
-		return nil, nil
+		return &corev1.Namespace{}, fmt.Errorf("unable to get the namespace: %w", err)
 	}
 
 	if network.Name == "k2d_net" {
