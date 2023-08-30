@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
@@ -17,7 +18,7 @@ import (
 
 func (adapter *KubeDockerAdapter) CreateNetworkFromNamespace(ctx context.Context, namespace *corev1.Namespace) error {
 	network, err := adapter.GetNetwork(ctx, namespace.Name)
-	if err != nil && !errors.Is(err, errNetworkNotFound) {
+	if err != nil && !errors.Is(err, ErrNetworkNotFound) {
 		return fmt.Errorf("unable to check for network existence: %w", err)
 	}
 
@@ -150,11 +151,15 @@ func (adapter *KubeDockerAdapter) DeleteNamespace(ctx context.Context, namespace
 	}
 
 	for _, container := range containers {
-		err := adapter.DeleteContainer(ctx, container.ID)
+		err := adapter.DeleteContainer(ctx, container.Names[0], namespaceName)
 		if err != nil {
 			continue
 		}
 	}
+
+	// This is just to make sure that the containers have been properly deleted
+	// before we try to delete the network
+	time.Sleep(3 * time.Second)
 
 	err = adapter.cli.NetworkRemove(ctx, namespaceName)
 	if err != nil {
