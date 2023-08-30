@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"path"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/docker/docker/api/types"
@@ -19,7 +18,7 @@ import (
 // ConvertContainerToPod tries to convert a Docker container into a Kubernetes Pod.
 // It only implements partial conversion at the moment.
 func (converter *DockerAPIConverter) ConvertContainerToPod(container types.Container) core.Pod {
-	containerName := strings.TrimPrefix(container.Names[0], "/")
+	containerName := container.Labels[k2dtypes.WorkloadNameLabelKey]
 	containerState := container.State
 
 	pod := core.Pod{

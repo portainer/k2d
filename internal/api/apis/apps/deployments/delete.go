@@ -10,11 +10,10 @@ import (
 )
 
 func (svc DeploymentService) DeleteDeployment(r *restful.Request, w *restful.Response) {
-	// TODO: namespace is not implemented, there might be an issue when removing a service from another namespace
-	// Same as pod, svc
+	namespace := utils.NamespaceParameter(r)
 	deploymentName := r.PathParameter("name")
 
-	err := svc.adapter.DeleteContainer(r.Request.Context(), deploymentName)
+	err := svc.adapter.DeleteContainer(r.Request.Context(), deploymentName, namespace)
 	if err != nil {
 		utils.HttpError(r, w, http.StatusInternalServerError, fmt.Errorf("unable to delete deployment: %w", err))
 		return

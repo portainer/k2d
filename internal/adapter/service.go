@@ -8,6 +8,7 @@ import (
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
+	adaptererr "github.com/portainer/k2d/internal/adapter/errors"
 	k2dtypes "github.com/portainer/k2d/internal/adapter/types"
 	"github.com/portainer/k2d/internal/k8s"
 	"github.com/portainer/k2d/internal/logging"
@@ -16,46 +17,35 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core"
 )
 
-func (adapter *KubeDockerAdapter) DeleteService(ctx context.Context, serviceName string) error {
-	containers, err := adapter.cli.ContainerList(ctx, types.ContainerListOptions{All: true})
+func (adapter *KubeDockerAdapter) DeleteService(ctx context.Context, serviceName, namespace string) error {
+	container, err := adapter.getContainerFromServiceName(ctx, serviceName, namespace)
 	if err != nil {
-		return fmt.Errorf("unable to list containers: %w", err)
+		adapter.logger.Warnf("unable to get container from service name: %w", err)
+		return nil
 	}
 
-	logger := logging.LoggerFromContext(ctx)
-
-	for _, cntr := range containers {
-		if cntr.Labels[k2dtypes.ServiceNameLabelKey] == serviceName {
-
-			logger.Infow("found the container with the associated service. The container will be re-created and the associated service configuration will be removed.",
-				"container_id", cntr.ID,
-				"service_name", serviceName,
-			)
-
-			cfg, err := adapter.buildContainerConfigurationFromExistingContainer(ctx, cntr.ID)
-			if err != nil {
-				return fmt.Errorf("unable to build container configuration from existing container: %w", err)
-			}
-
-			delete(cfg.ContainerConfig.Labels, k2dtypes.ServiceNameLabelKey)
-			delete(cfg.ContainerConfig.Labels, k2dtypes.ServiceLastAppliedConfigLabelKey)
-
-			networkName := cfg.ContainerConfig.Labels[k2dtypes.NamespaceLabelKey]
-			if networkName == "default" {
-				networkName = "k2d_net"
-			}
-
-			cfg.NetworkConfig.EndpointsConfig[networkName].Aliases = []string{}
-
-			return adapter.reCreateContainerWithNewConfiguration(ctx, cntr.ID, cfg)
-		}
-	}
-
-	logger.Infow("no container was found with the associated service.",
+	adapter.logger.Infow("found the container with the associated service. The container will be re-created and the associated service configuration will be removed.",
+		"container_id", container.ID,
 		"service_name", serviceName,
 	)
 
-	return nil
+	cfg, err := adapter.buildContainerConfigurationFromExistingContainer(ctx, container.ID)
+	if err != nil {
+		return fmt.Errorf("unable to build container configuration from existing container: %w", err)
+	}
+
+	delete(cfg.ContainerConfig.Labels, k2dtypes.ServiceNameLabelKey)
+	delete(cfg.ContainerConfig.Labels, k2dtypes.ServiceLastAppliedConfigLabelKey)
+
+	networkName := cfg.ContainerConfig.Labels[k2dtypes.NamespaceLabelKey]
+	// TODO: handle this case after introducing prefix
+	if networkName == "default" {
+		networkName = "k2d_net"
+	}
+
+	cfg.NetworkConfig.EndpointsConfig[networkName].Aliases = []string{}
+
+	return adapter.reCreateContainerWithNewConfiguration(ctx, container.ID, cfg)
 }
 
 func (adapter *KubeDockerAdapter) CreateContainerFromService(ctx context.Context, service *corev1.Service) error {
@@ -77,7 +67,7 @@ func (adapter *KubeDockerAdapter) CreateContainerFromService(ctx context.Context
 		return nil
 	}
 
-	containers, err := adapter.cli.ContainerList(ctx, types.ContainerListOptions{})
+	containers, err := adapter.cli.ContainerList(ctx, types.ContainerListOptions{All: true})
 	if err != nil {
 		return fmt.Errorf("unable to list containers: %w", err)
 	}
@@ -134,6 +124,8 @@ func (adapter *KubeDockerAdapter) CreateContainerFromService(ctx context.Context
 		return fmt.Errorf("unable to convert service spec into container configuration: %w", err)
 	}
 
+	// TODO: handle this after introducing prefix
+	// Should probably look for all the if network == default
 	network := service.Namespace
 	if network == "default" {
 		network = "k2d_net"
@@ -149,40 +141,30 @@ func (adapter *KubeDockerAdapter) CreateContainerFromService(ctx context.Context
 	return adapter.reCreateContainerWithNewConfiguration(ctx, matchingContainer.ID, cfg)
 }
 
-func (adapter *KubeDockerAdapter) GetService(ctx context.Context, serviceName string) (*corev1.Service, error) {
-	containers, err := adapter.cli.ContainerList(ctx, types.ContainerListOptions{All: true})
+func (adapter *KubeDockerAdapter) GetService(ctx context.Context, serviceName, namespace string) (*corev1.Service, error) {
+	container, err := adapter.getContainerFromServiceName(ctx, serviceName, namespace)
 	if err != nil {
-		return nil, fmt.Errorf("unable to list containers: %w", err)
+		return nil, fmt.Errorf("unable to get container from service name: %w", err)
 	}
 
-	for _, container := range containers {
-		if container.Labels[k2dtypes.ServiceNameLabelKey] == serviceName {
-			service, err := adapter.getService(container)
-			if err != nil {
-				return nil, fmt.Errorf("unable to get service: %w", err)
-			}
-
-			if service == nil {
-				return nil, nil
-			}
-
-			versionedService := corev1.Service{
-				TypeMeta: metav1.TypeMeta{
-					Kind:       "Service",
-					APIVersion: "v1",
-				},
-			}
-
-			err = adapter.ConvertK8SResource(service, &versionedService)
-			if err != nil {
-				return nil, fmt.Errorf("unable to convert internal object to versioned object: %w", err)
-			}
-
-			return &versionedService, nil
-		}
+	service, err := adapter.buildServiceFromContainer(container)
+	if err != nil {
+		return nil, fmt.Errorf("unable to build service: %w", err)
 	}
 
-	return nil, nil
+	versionedService := corev1.Service{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Service",
+			APIVersion: "v1",
+		},
+	}
+
+	err = adapter.ConvertK8SResource(service, &versionedService)
+	if err != nil {
+		return nil, fmt.Errorf("unable to convert internal object to versioned object: %w", err)
+	}
+
+	return &versionedService, nil
 }
 
 func (adapter *KubeDockerAdapter) GetServiceTable(ctx context.Context, namespaceName string) (*metav1.Table, error) {
@@ -215,7 +197,28 @@ func (adapter *KubeDockerAdapter) ListServices(ctx context.Context, namespaceNam
 	return versionedServiceList, nil
 }
 
-func (adapter *KubeDockerAdapter) getService(container types.Container) (*core.Service, error) {
+func (adapter *KubeDockerAdapter) getContainerFromServiceName(ctx context.Context, serviceName, namespace string) (types.Container, error) {
+	labelFilter := filters.NewArgs()
+	labelFilter.Add("label", fmt.Sprintf("%s=%s", k2dtypes.ServiceNameLabelKey, serviceName))
+	labelFilter.Add("label", fmt.Sprintf("%s=%s", k2dtypes.NamespaceLabelKey, namespace))
+
+	containers, err := adapter.cli.ContainerList(ctx, types.ContainerListOptions{All: true, Filters: labelFilter})
+	if err != nil {
+		return types.Container{}, fmt.Errorf("unable to list containers: %w", err)
+	}
+
+	if len(containers) == 0 {
+		return types.Container{}, adaptererr.ErrResourceNotFound
+	}
+
+	if len(containers) > 1 {
+		return types.Container{}, fmt.Errorf("multiple containers were found with the associated service %s", serviceName)
+	}
+
+	return containers[0], nil
+}
+
+func (adapter *KubeDockerAdapter) buildServiceFromContainer(container types.Container) (*core.Service, error) {
 	service := core.Service{}
 
 	if container.Labels[k2dtypes.ServiceLastAppliedConfigLabelKey] != "" {
@@ -235,8 +238,7 @@ func (adapter *KubeDockerAdapter) getService(container types.Container) (*core.S
 
 		adapter.converter.UpdateServiceFromContainerInfo(&service, container)
 	} else {
-		adapter.logger.Errorf("unable to build service, missing %s label on container %s", k2dtypes.ServiceLastAppliedConfigLabelKey, container.Names[0])
-		return nil, nil
+		return nil, fmt.Errorf("unable to build service, missing %s label on container %s", k2dtypes.ServiceLastAppliedConfigLabelKey, container.Names[0])
 	}
 
 	return &service, nil
@@ -255,7 +257,7 @@ func (adapter *KubeDockerAdapter) listServices(ctx context.Context, namespaceNam
 	services := []core.Service{}
 
 	for _, container := range containers {
-		service, err := adapter.getService(container)
+		service, err := adapter.buildServiceFromContainer(container)
 		if err != nil {
 			return core.ServiceList{}, fmt.Errorf("unable to get service: %w", err)
 		}

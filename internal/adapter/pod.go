@@ -42,62 +42,69 @@ func (adapter *KubeDockerAdapter) CreateContainerFromPod(ctx context.Context, po
 	return adapter.createContainerFromPodSpec(ctx, opts)
 }
 
+// The GetPod implementation has to use a filtered list approach as the Docker API provide different response types
+// when inspecting a container and listing containers.
+// The logic used to build a pod from a container is based on the type returned by the list operation (types.Container)
+// and not the inspect operation (types.ContainerJSON).
+// This is because using the inspect operation would be more expensive overall.
 func (adapter *KubeDockerAdapter) GetPod(ctx context.Context, podName string, namespaceName string) (*corev1.Pod, error) {
 	labelFilter := filters.NewArgs()
 	labelFilter.Add("label", fmt.Sprintf("%s=%s", k2dtypes.NamespaceLabelKey, namespaceName))
+	labelFilter.Add("label", fmt.Sprintf("%s=%s", k2dtypes.WorkloadNameLabelKey, podName))
 
 	containers, err := adapter.cli.ContainerList(ctx, types.ContainerListOptions{All: true, Filters: labelFilter})
 	if err != nil {
 		return nil, fmt.Errorf("unable to list containers: %w", err)
 	}
 
-	for _, container := range containers {
-		if container.Names[0] == "/"+podName {
-			pod, err := adapter.getPod(container)
-			if err != nil {
-				return nil, fmt.Errorf("unable to get pod: %w", err)
-			}
+	var container *types.Container
 
-			versionedPod := corev1.Pod{
-				TypeMeta: metav1.TypeMeta{
-					Kind:       "Pod",
-					APIVersion: "v1",
-				},
-			}
-
-			err = adapter.ConvertK8SResource(pod, &versionedPod)
-			if err != nil {
-				return nil, fmt.Errorf("unable to convert internal object to versioned object: %w", err)
-			}
-
-			return &versionedPod, nil
+	containerName := buildContainerName(podName, namespaceName)
+	for _, cntr := range containers {
+		if cntr.Names[0] == "/"+containerName {
+			container = &cntr
+			break
 		}
 	}
 
-	return nil, nil
+	if container == nil {
+		return nil, fmt.Errorf("unable to find container for pod %s in namespace %s", podName, namespaceName)
+	}
+
+	pod, err := adapter.buildPodFromContainer(*container)
+	if err != nil {
+		return nil, fmt.Errorf("unable to get pod: %w", err)
+	}
+
+	versionedPod := corev1.Pod{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Pod",
+			APIVersion: "v1",
+		},
+	}
+
+	err = adapter.ConvertK8SResource(pod, &versionedPod)
+	if err != nil {
+		return nil, fmt.Errorf("unable to convert internal object to versioned object: %w", err)
+	}
+
+	return &versionedPod, nil
 }
 
 func (adapter *KubeDockerAdapter) GetPodLogs(ctx context.Context, namespaceName string, podName string, opts PodLogOptions) (io.ReadCloser, error) {
-	labelFilter := filters.NewArgs()
-	labelFilter.Add("name", "/"+podName)
-	labelFilter.Add("label", fmt.Sprintf("%s=%s", k2dtypes.NamespaceLabelKey, namespaceName))
-
-	containers, err := adapter.cli.ContainerList(ctx, types.ContainerListOptions{All: true, Filters: labelFilter})
+	containerName := buildContainerName(podName, namespaceName)
+	container, err := adapter.cli.ContainerInspect(ctx, containerName)
 	if err != nil {
-		return nil, fmt.Errorf("unable to list containers: %w", err)
+		return nil, fmt.Errorf("unable to inspect container: %w", err)
 	}
 
-	if len(containers) > 0 {
-		return adapter.cli.ContainerLogs(ctx, containers[0].ID, types.ContainerLogsOptions{
-			ShowStdout: true,
-			ShowStderr: true,
-			Timestamps: opts.Timestamps,
-			Follow:     opts.Follow,
-			Tail:       opts.Tail,
-		})
-	}
-
-	return nil, nil
+	return adapter.cli.ContainerLogs(ctx, container.ID, types.ContainerLogsOptions{
+		ShowStdout: true,
+		ShowStderr: true,
+		Timestamps: opts.Timestamps,
+		Follow:     opts.Follow,
+		Tail:       opts.Tail,
+	})
 }
 
 func (adapter *KubeDockerAdapter) GetPodTable(ctx context.Context, namespaceName string) (*metav1.Table, error) {
@@ -130,11 +137,12 @@ func (adapter *KubeDockerAdapter) ListPods(ctx context.Context, namespaceName st
 	return versionedPodList, nil
 }
 
+// TODO: this needs an update as it won't be supported anymore
 // Retrieving a pod uses a different approach than the other resources.
 // We build a Pod object from the container details by default and then we replace
 // the pod spec with the one stored in the container labels if it exists.
 // This is to keep the ability to list pods that were created outside of k2d (such as via docker run).
-func (adapter *KubeDockerAdapter) getPod(container types.Container) (*core.Pod, error) {
+func (adapter *KubeDockerAdapter) buildPodFromContainer(container types.Container) (*core.Pod, error) {
 	pod := adapter.converter.ConvertContainerToPod(container)
 
 	if container.Labels[k2dtypes.PodLastAppliedConfigLabelKey] != "" {
@@ -164,7 +172,7 @@ func (adapter *KubeDockerAdapter) listPods(ctx context.Context, namespaceName st
 	pods := []core.Pod{}
 
 	for _, container := range containers {
-		pod, err := adapter.getPod(container)
+		pod, err := adapter.buildPodFromContainer(container)
 		if err != nil {
 			return core.PodList{}, fmt.Errorf("unable to get pods: %w", err)
 		}

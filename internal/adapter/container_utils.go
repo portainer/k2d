@@ -147,6 +147,7 @@ func (adapter *KubeDockerAdapter) buildContainerConfigurationFromExistingContain
 // a PodSpec which represents the desired state of the Pod from the parent Kubernetes object,
 // and labels which is a map of key-value pairs.
 // It also includes a string representation of the last applied configuration of the parent Kubernetes object.
+// TODO: update with namespace support
 type ContainerCreationOptions struct {
 	containerName            string
 	networkName              string
@@ -203,12 +204,15 @@ func (adapter *KubeDockerAdapter) createContainerFromPodSpec(ctx context.Context
 	}
 	options.labels[k2dtypes.PodLastAppliedConfigLabelKey] = string(internalPodSpecData)
 	options.labels[k2dtypes.NamespaceLabelKey] = options.networkName
+	options.labels[k2dtypes.WorkloadNameLabelKey] = options.containerName
 
 	containerCfg, err := adapter.converter.ConvertPodSpecToContainerConfiguration(internalPodSpec, options.networkName, options.labels)
 	if err != nil {
 		return fmt.Errorf("unable to build container configuration from pod spec: %w", err)
 	}
-	containerCfg.ContainerName = options.containerName
+	containerCfg.ContainerName = buildContainerName(options.containerName, options.networkName)
+
+	//TODO: I think this should be reviewed, there is no need to list all containers with a filter
 
 	labelFilter := filters.NewArgs()
 	labelFilter.Add("name", "/"+containerCfg.ContainerName)
@@ -271,11 +275,13 @@ func (adapter *KubeDockerAdapter) createContainerFromPodSpec(ctx context.Context
 	return adapter.cli.ContainerStart(ctx, containerCreateResponse.ID, types.ContainerStartOptions{})
 }
 
+//TODO: function comment with namespace
+
 // DeleteContainer removes a Docker container given its ID or name.
 // This function will force the removal of the container, regardless if it's running or not.
 // It will log a warning if it fails to delete the container.
-func (adapter *KubeDockerAdapter) DeleteContainer(ctx context.Context, containerID string) error {
-	err := adapter.cli.ContainerRemove(ctx, containerID, types.ContainerRemoveOptions{Force: true})
+func (adapter *KubeDockerAdapter) DeleteContainer(ctx context.Context, containerName, namespace string) error {
+	err := adapter.cli.ContainerRemove(ctx, buildContainerName(containerName, namespace), types.ContainerRemoveOptions{Force: true})
 	if err != nil {
 		adapter.logger.Warnf("unable to remove container: %s", err)
 	}

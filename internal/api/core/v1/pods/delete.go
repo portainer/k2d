@@ -10,14 +10,10 @@ import (
 )
 
 func (svc PodService) DeletePod(r *restful.Request, w *restful.Response) {
-	// TODO: namespace is not implemented, there might be an issue when removing a pod from another namespace
-	// E.g to check
-	// k create pod pod1 -n test1
-	// k create pod pod1 -n test2
-	// k delete pod pod1 - what happens?
+	namespace := utils.NamespaceParameter(r)
 	podName := r.PathParameter("name")
 
-	err := svc.adapter.DeleteContainer(r.Request.Context(), podName)
+	err := svc.adapter.DeleteContainer(r.Request.Context(), podName, namespace)
 	if err != nil {
 		utils.HttpError(r, w, http.StatusInternalServerError, fmt.Errorf("unable to delete pod: %w", err))
 		return
