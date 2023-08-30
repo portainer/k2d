@@ -115,8 +115,8 @@ func (converter *DockerAPIConverter) ConvertPodSpecToContainerConfiguration(spec
 		return ContainerConfiguration{}, err
 	}
 
-	// TODO: review why
 	// ensure the default namespace points to the default k2d_net network
+	// TODO: this should probably be injected somewhere else
 	if networkName == "default" {
 		networkName = "k2d_net"
 	}

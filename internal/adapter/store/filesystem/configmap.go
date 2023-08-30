@@ -17,6 +17,8 @@ import (
 
 // TODO: add function comments
 
+// TODO: introduce a naming package in each store implementation to centralize the naming logic
+
 // Each configmap has its own metadata file using the following naming convention:
 // [namespace]-[configmap-name]-k2dcm.metadata
 func buildConfigMapMetadataFileName(configMapName, namespace string) string {
@@ -207,6 +209,7 @@ func (s *FileSystemStore) GetConfigMaps(namespace string) (core.ConfigMapList, e
 		// e.g. [namespace]-[configmap-name]
 
 		// TODO: find a better way to do this, this is dirty as it doesn't rely on the buildConfigMapMetadataFileName function
+		// Need another naming function
 		metadataFileName := fmt.Sprintf("%s-k2dcm.metadata", name)
 		metadata, err := filesystem.LoadMetadataFromDisk(s.configMapPath, metadataFileName)
 		if err != nil {
