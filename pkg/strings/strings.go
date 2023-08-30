@@ -22,7 +22,7 @@ func UniquePrefixes(data []string, separator string) []string {
 	return uniqueSlice
 }
 
-// TODO: check if this is still useful and add comment
+// TODO: comment
 func RemoveItemsWithSuffix(items []string, suffix string) []string {
 	var result []string
 	for _, s := range items {

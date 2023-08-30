@@ -38,8 +38,6 @@ func NewLogger(logLevel string, json bool) (*zap.SugaredLogger, error) {
 		return nil, err
 	}
 
-	// TODO: remove stacktrace from INFO level logs
-
 	var config zap.Config
 	if json {
 		config = newJSONLoggerConfig(level)

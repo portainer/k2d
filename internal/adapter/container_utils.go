@@ -12,14 +12,13 @@ import (
 	"github.com/docker/distribution/reference"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/api/types/registry"
+	"github.com/docker/docker/errdefs"
 	"github.com/docker/go-connections/nat"
 	"github.com/portainer/k2d/internal/adapter/converter"
 	k2dtypes "github.com/portainer/k2d/internal/adapter/types"
 	"github.com/portainer/k2d/internal/k8s"
-	"github.com/portainer/k2d/internal/logging"
 	"github.com/portainer/k2d/pkg/maputils"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -156,6 +155,20 @@ type ContainerCreationOptions struct {
 	lastAppliedConfiguration string
 }
 
+// TODO: comment
+func (adapter *KubeDockerAdapter) getContainer(ctx context.Context, containerName string) (*types.ContainerJSON, error) {
+	containerDetails, err := adapter.cli.ContainerInspect(ctx, containerName)
+	if err != nil {
+		if errdefs.IsNotFound(err) {
+			return nil, nil
+		}
+
+		return nil, fmt.Errorf("unable to inspect container: %w", err)
+	}
+
+	return &containerDetails, nil
+}
+
 // TODO: update with namespace support
 // createContainerFromPodSpec creates a new Docker container from a given Kubernetes PodSpec.
 // The function first initializes labels if they are not provided and adds the last applied configuration
@@ -210,37 +223,24 @@ func (adapter *KubeDockerAdapter) createContainerFromPodSpec(ctx context.Context
 	}
 	containerCfg.ContainerName = buildContainerName(options.containerName, options.namespace)
 
-	//TODO: I think this should be reviewed, there is no need to list all containers with a filter
-
-	labelFilter := filters.NewArgs()
-	labelFilter.Add("name", "/"+containerCfg.ContainerName)
-
-	containers, err := adapter.cli.ContainerList(ctx, types.ContainerListOptions{Filters: labelFilter})
+	existingContainer, err := adapter.getContainer(ctx, containerCfg.ContainerName)
 	if err != nil {
-		return fmt.Errorf("unable to list containers: %w", err)
+		return fmt.Errorf("unable to inspect container: %w", err)
 	}
 
-	for _, container := range containers {
-		logger := logging.LoggerFromContext(ctx)
-
-		if options.lastAppliedConfiguration == container.Labels[k2dtypes.WorkloadLastAppliedConfigLabelKey] {
-			logger.Infof("container with the name %s already exists with the same configuration. The update will be skipped", containerCfg.ContainerName)
+	if existingContainer != nil {
+		if options.lastAppliedConfiguration == existingContainer.Config.Labels[k2dtypes.WorkloadLastAppliedConfigLabelKey] {
+			adapter.logger.Infof("container with the name %s already exists with the same configuration. The update will be skipped", containerCfg.ContainerName)
 			return nil
 		}
 
-		logger.Infof("container with the name %s already exists with a different configuration. The container will be recreated", containerCfg.ContainerName)
+		adapter.logger.Infof("container with the name %s already exists with a different configuration. The container will be recreated", containerCfg.ContainerName)
 
-		if container.Labels[k2dtypes.ServiceLastAppliedConfigLabelKey] != "" {
-			options.labels[k2dtypes.ServiceLastAppliedConfigLabelKey] = container.Labels[k2dtypes.ServiceLastAppliedConfigLabelKey]
+		if existingContainer.Config.Labels[k2dtypes.ServiceLastAppliedConfigLabelKey] != "" {
+			options.labels[k2dtypes.ServiceLastAppliedConfigLabelKey] = existingContainer.Config.Labels[k2dtypes.ServiceLastAppliedConfigLabelKey]
 		}
 
-		// TODO: I think this can be removed as all conainers previously used the same network
-		// k2dNetworkName := buildNetworkName(k2dtypes.K2DNamespaceName)
-		// if len(container.NetworkSettings.Networks[k2dNetworkName].Aliases) > 0 {
-		// 	containerCfg.NetworkConfig.EndpointsConfig[k2dNetworkName].Aliases = container.NetworkSettings.Networks[k2dNetworkName].Aliases
-		// }
-
-		err := adapter.cli.ContainerRemove(ctx, container.ID, types.ContainerRemoveOptions{Force: true})
+		err := adapter.cli.ContainerRemove(ctx, existingContainer.ID, types.ContainerRemoveOptions{Force: true})
 		if err != nil {
 			return fmt.Errorf("unable to remove container: %w", err)
 		}
