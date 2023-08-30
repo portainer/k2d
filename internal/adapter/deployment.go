@@ -25,7 +25,7 @@ const (
 func (adapter *KubeDockerAdapter) CreateContainerFromDeployment(ctx context.Context, deployment *appsv1.Deployment) error {
 	opts := ContainerCreationOptions{
 		containerName: deployment.Name,
-		networkName:   deployment.Namespace,
+		namespace:     deployment.Namespace,
 		podSpec:       deployment.Spec.Template.Spec,
 		labels:        deployment.Spec.Template.Labels,
 	}

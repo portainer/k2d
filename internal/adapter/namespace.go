@@ -9,6 +9,7 @@ import (
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
+	"github.com/docker/docker/errdefs"
 	adaptererr "github.com/portainer/k2d/internal/adapter/errors"
 	k2dtypes "github.com/portainer/k2d/internal/adapter/types"
 	"github.com/portainer/k2d/internal/k8s"
@@ -18,13 +19,15 @@ import (
 )
 
 func (adapter *KubeDockerAdapter) CreateNetworkFromNamespace(ctx context.Context, namespace *corev1.Namespace) error {
-	network, err := adapter.GetNetwork(ctx, namespace.Name)
+	networkName := buildNetworkName(namespace.Name)
+
+	network, err := adapter.getNetwork(ctx, networkName)
 	if err != nil && !errors.Is(err, adaptererr.ErrResourceNotFound) {
 		return fmt.Errorf("unable to check for network existence: %w", err)
 	}
 
 	if network != nil {
-		return fmt.Errorf("network %s already exists", namespace.Name)
+		return fmt.Errorf("network %s already exists", networkName)
 	}
 
 	if namespace.Labels["app.kubernetes.io/managed-by"] == "Helm" {
@@ -40,21 +43,85 @@ func (adapter *KubeDockerAdapter) CreateNetworkFromNamespace(ctx context.Context
 		lastAppliedConfiguration = namespace.ObjectMeta.Annotations["kubectl.kubernetes.io/last-applied-configuration"]
 	}
 
-	_, err = adapter.cli.NetworkCreate(ctx, namespace.Name, types.NetworkCreate{
+	networkOptions := types.NetworkCreate{
 		Driver: "bridge",
 		Labels: map[string]string{
 			k2dtypes.NamespaceLabelKey:                  namespace.Name,
 			k2dtypes.NamespaceLastAppliedConfigLabelKey: lastAppliedConfiguration,
 		},
 		Options: map[string]string{
-			"com.docker.network.bridge.name": namespace.Name,
+			"com.docker.network.bridge.name": networkName,
 		},
-	})
+	}
+
+	_, err = adapter.cli.NetworkCreate(ctx, networkName, networkOptions)
 	if err != nil {
-		return fmt.Errorf("unable to create network %s: %w", namespace.Name, err)
+		return fmt.Errorf("unable to create network %s: %w", networkName, err)
 	}
 
 	return nil
+}
+
+func (adapter *KubeDockerAdapter) DeleteNamespace(ctx context.Context, namespaceName string) error {
+	labelFilter := filters.NewArgs()
+	labelFilter.Add("label", fmt.Sprintf("%s=%s", k2dtypes.NamespaceLabelKey, namespaceName))
+
+	containers, err := adapter.cli.ContainerList(ctx, types.ContainerListOptions{All: true, Filters: labelFilter})
+	if err != nil {
+		return fmt.Errorf("unable to list containers: %w", err)
+	}
+
+	for _, container := range containers {
+		err := adapter.DeleteContainer(ctx, container.Names[0], namespaceName)
+		if err != nil {
+			continue
+		}
+	}
+
+	// This is just to make sure that the containers have been properly deleted
+	// before we try to delete the network
+	time.Sleep(3 * time.Second)
+
+	networkName := buildNetworkName(namespaceName)
+	err = adapter.cli.NetworkRemove(ctx, networkName)
+	if err != nil {
+		return fmt.Errorf("unable to delete network %s: %w", networkName, err)
+	}
+
+	return nil
+}
+
+func (adapter *KubeDockerAdapter) GetNamespace(ctx context.Context, namespaceName string) (*corev1.Namespace, error) {
+	networkName := buildNetworkName(namespaceName)
+
+	network, err := adapter.getNetwork(ctx, networkName)
+	if err != nil {
+		return nil, fmt.Errorf("unable to get namespace %s: %w", namespaceName, err)
+	}
+
+	versionedNamespace := corev1.Namespace{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Namespace",
+			APIVersion: "v1",
+		},
+	}
+
+	namespace := adapter.converter.ConvertNetworkToNamespace(namespaceName, *network)
+
+	err = adapter.ConvertK8SResource(&namespace, &versionedNamespace)
+	if err != nil {
+		return nil, fmt.Errorf("unable to convert internal object to versioned object: %w", err)
+	}
+
+	return &versionedNamespace, nil
+}
+
+func (adapter *KubeDockerAdapter) GetNamespaceTable(ctx context.Context) (*metav1.Table, error) {
+	namespaceList, err := adapter.listNamespaces(ctx)
+	if err != nil {
+		return &metav1.Table{}, fmt.Errorf("unable to list namespaces: %w", err)
+	}
+	return k8s.GenerateTable(&namespaceList)
 }
 
 func (adapter *KubeDockerAdapter) ListNamespaces(ctx context.Context) (corev1.NamespaceList, error) {
@@ -78,39 +145,16 @@ func (adapter *KubeDockerAdapter) ListNamespaces(ctx context.Context) (corev1.Na
 	return versionedNamespaceList, nil
 }
 
-func (adapter *KubeDockerAdapter) GetNamespace(ctx context.Context, namespaceName string) (*corev1.Namespace, error) {
-	network, err := adapter.GetNetwork(ctx, namespaceName)
+func (adapter *KubeDockerAdapter) getNetwork(ctx context.Context, networkName string) (*types.NetworkResource, error) {
+	network, err := adapter.cli.NetworkInspect(ctx, networkName, types.NetworkInspectOptions{})
 	if err != nil {
-		return &corev1.Namespace{}, fmt.Errorf("unable to get the namespace: %w", err)
+		if errdefs.IsNotFound(err) {
+			return nil, adaptererr.ErrResourceNotFound
+		}
+		return nil, fmt.Errorf("unable to inspect network %s: %w", networkName, err)
 	}
 
-	if network.Name == "k2d_net" {
-		network.Name = "default"
-	}
-
-	versionedNamespace := corev1.Namespace{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "Namespace",
-			APIVersion: "v1",
-		},
-	}
-
-	namespace := adapter.converter.ConvertNetworkToNamespace(network)
-
-	err = adapter.ConvertK8SResource(namespace, &versionedNamespace)
-	if err != nil {
-		return nil, fmt.Errorf("unable to convert internal object to versioned object: %w", err)
-	}
-
-	return &versionedNamespace, nil
-}
-
-func (adapter *KubeDockerAdapter) GetNamespaceTable(ctx context.Context) (*metav1.Table, error) {
-	namespaceList, err := adapter.listNamespaces(ctx)
-	if err != nil {
-		return &metav1.Table{}, fmt.Errorf("unable to list namespaces: %w", err)
-	}
-	return k8s.GenerateTable(&namespaceList)
+	return &network, nil
 }
 
 func (adapter *KubeDockerAdapter) listNamespaces(ctx context.Context) (core.NamespaceList, error) {
@@ -119,17 +163,14 @@ func (adapter *KubeDockerAdapter) listNamespaces(ctx context.Context) (core.Name
 
 	networks, err := adapter.cli.NetworkList(ctx, types.NetworkListOptions{Filters: labelFilter})
 	if err != nil {
-		adapter.logger.Errorf("unable to list networks: %v", err)
-		return core.NamespaceList{}, err
+		return core.NamespaceList{}, fmt.Errorf("unable to list networks: %w", err)
 	}
 
 	namespaceList := []core.Namespace{}
 
 	for _, network := range networks {
-		if network.Name == "k2d_net" {
-			network.Name = "default"
-		}
-		namespaceList = append(namespaceList, *adapter.converter.ConvertNetworkToNamespace(&network))
+		namespace := network.Labels[k2dtypes.NamespaceLabelKey]
+		namespaceList = append(namespaceList, adapter.converter.ConvertNetworkToNamespace(namespace, network))
 	}
 
 	return core.NamespaceList{
@@ -140,32 +181,4 @@ func (adapter *KubeDockerAdapter) listNamespaces(ctx context.Context) (core.Name
 
 		Items: namespaceList,
 	}, nil
-}
-
-func (adapter *KubeDockerAdapter) DeleteNamespace(ctx context.Context, namespaceName string) error {
-	labelFilter := filters.NewArgs()
-	labelFilter.Add("label", fmt.Sprintf("%s=%s", k2dtypes.NamespaceLabelKey, namespaceName))
-
-	containers, err := adapter.cli.ContainerList(ctx, types.ContainerListOptions{All: true, Filters: labelFilter})
-	if err != nil {
-		return fmt.Errorf("unable to list containers: %w", err)
-	}
-
-	for _, container := range containers {
-		err := adapter.DeleteContainer(ctx, container.Names[0], namespaceName)
-		if err != nil {
-			continue
-		}
-	}
-
-	// This is just to make sure that the containers have been properly deleted
-	// before we try to delete the network
-	time.Sleep(3 * time.Second)
-
-	err = adapter.cli.NetworkRemove(ctx, namespaceName)
-	if err != nil {
-		return fmt.Errorf("unable to delete network %s: %w", namespaceName, err)
-	}
-
-	return nil
 }
