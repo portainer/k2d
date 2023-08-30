@@ -174,7 +174,7 @@ func (converter *DockerAPIConverter) setResourceRequirements(hostConfig *contain
 //
 // It returns an error if any occurred fetching the Secret or obtaining the bind mappings fails.
 func (converter *DockerAPIConverter) setServiceAccountTokenAndCACert(hostConfig *container.HostConfig) error {
-	// TODO: should this secret be relocated to another namespace?
+	// TODO: should this secret be relocated to another namespace? after prefix is implemented
 	// Should be stored in the k2d namespace. Good to document that k2d has no limitation of cross namespace access to secret/configmaps.
 	secret, err := converter.secretStore.GetSecret(k2dtypes.K2dServiceAccountSecretName, "default")
 	if err != nil {
