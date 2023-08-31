@@ -31,6 +31,7 @@ func (svc SecretService) RegisterSecretAPI(ws *restful.WebService) {
 
 	ws.Route(ws.POST("/v1/namespaces/{namespace}/secrets").
 		To(svc.CreateSecret).
+		Param(ws.PathParameter("namespace", "namespace name").DataType("string")).
 		Param(ws.QueryParameter("dryRun", "when present, indicates that modifications should not be persisted").DataType("string")))
 
 	ws.Route(ws.GET("/v1/secrets").
@@ -38,6 +39,7 @@ func (svc SecretService) RegisterSecretAPI(ws *restful.WebService) {
 		To(svc.ListSecrets))
 
 	ws.Route(ws.GET("/v1/namespaces/{namespace}/secrets").
+		Param(ws.PathParameter("namespace", "namespace name").DataType("string")).
 		Param(ws.QueryParameter("labelSelector", "a selector to restrict the list of returned objects by their labels").DataType("string")).
 		To(svc.ListSecrets))
 
@@ -47,6 +49,7 @@ func (svc SecretService) RegisterSecretAPI(ws *restful.WebService) {
 
 	ws.Route(ws.DELETE("/v1/namespaces/{namespace}/secrets/{name}").
 		To(svc.DeleteSecret).
+		Param(ws.PathParameter("namespace", "namespace name").DataType("string")).
 		Param(ws.PathParameter("name", "name of the secret").DataType("string")))
 
 	ws.Route(ws.GET("/v1/secrets/{name}").
@@ -55,29 +58,32 @@ func (svc SecretService) RegisterSecretAPI(ws *restful.WebService) {
 
 	ws.Route(ws.GET("/v1/namespaces/{namespace}/secrets/{name}").
 		To(svc.GetSecret).
+		Param(ws.PathParameter("namespace", "namespace name").DataType("string")).
 		Param(ws.PathParameter("name", "name of the secret").DataType("string")))
 
 	ws.Route(ws.PATCH("/v1/secrets/{name}").
 		To(svc.PatchSecret).
+		Param(ws.PathParameter("name", "name of the secret").DataType("string")).
 		Param(ws.QueryParameter("dryRun", "when present, indicates that modifications should not be persisted").DataType("string")).
-		AddExtension("x-kubernetes-group-version-kind", secretGVKExtension).
-		Param(ws.PathParameter("name", "name of the secret").DataType("string")))
+		AddExtension("x-kubernetes-group-version-kind", secretGVKExtension))
 
 	ws.Route(ws.PATCH("/v1/namespaces/{namespace}/secrets/{name}").
 		To(svc.PatchSecret).
+		Param(ws.PathParameter("namespace", "namespace name").DataType("string")).
+		Param(ws.PathParameter("name", "name of the secret").DataType("string")).
 		Param(ws.QueryParameter("dryRun", "when present, indicates that modifications should not be persisted").DataType("string")).
-		AddExtension("x-kubernetes-group-version-kind", secretGVKExtension).
-		Param(ws.PathParameter("name", "name of the secret").DataType("string")))
+		AddExtension("x-kubernetes-group-version-kind", secretGVKExtension))
 
 	ws.Route(ws.PUT("/v1/secrets/{name}").
 		To(svc.PutSecret).
+		Param(ws.PathParameter("name", "name of the secret").DataType("string")).
 		Param(ws.QueryParameter("dryRun", "when present, indicates that modifications should not be persisted").DataType("string")).
-		AddExtension("x-kubernetes-group-version-kind", secretGVKExtension).
-		Param(ws.PathParameter("name", "name of the secret").DataType("string")))
+		AddExtension("x-kubernetes-group-version-kind", secretGVKExtension))
 
 	ws.Route(ws.PUT("/v1/namespaces/{namespace}/secrets/{name}").
 		To(svc.PutSecret).
+		Param(ws.PathParameter("namespace", "namespace name").DataType("string")).
+		Param(ws.PathParameter("name", "name of the secret").DataType("string")).
 		Param(ws.QueryParameter("dryRun", "when present, indicates that modifications should not be persisted").DataType("string")).
-		AddExtension("x-kubernetes-group-version-kind", secretGVKExtension).
-		Param(ws.PathParameter("name", "name of the secret").DataType("string")))
+		AddExtension("x-kubernetes-group-version-kind", secretGVKExtension))
 }

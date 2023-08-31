@@ -9,15 +9,16 @@ import (
 )
 
 func (svc ServiceService) ListServices(r *restful.Request, w *restful.Response) {
-	namespaceName := r.PathParameter("namespace")
+	namespace := utils.NamespaceParameter(r)
+
 	utils.ListResources(
 		r,
 		w,
 		func(ctx context.Context) (interface{}, error) {
-			return svc.adapter.ListServices(ctx, namespaceName)
+			return svc.adapter.ListServices(ctx, namespace)
 		},
 		func(ctx context.Context) (*metav1.Table, error) {
-			return svc.adapter.GetServiceTable(ctx, namespaceName)
+			return svc.adapter.GetServiceTable(ctx, namespace)
 		},
 	)
 }

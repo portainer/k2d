@@ -97,14 +97,9 @@ func main() {
 		logger.Fatalf("unable to connect to local docker server, make sure the docker socket is reachable at /var/run/docker.sock: %s", err)
 	}
 
-	err = kubeDockerAdapter.EnsureRequiredDockerResourcesExist(ctx)
+	err = kubeDockerAdapter.ProvisionSystemResources(ctx, tokenPath, ssl.SSLCAPath(cfg.DataPath))
 	if err != nil {
-		logger.Fatalf("unable to ensure required docker resources exist: %s", err)
-	}
-
-	err = kubeDockerAdapter.StoreServiceAccountSecret(tokenPath, ssl.SSLCAPath(cfg.DataPath))
-	if err != nil {
-		logger.Fatalf("unable to store system secret: %s", err)
+		logger.Fatalf("unable to provision system resources: %s", err)
 	}
 
 	if cfg.PortainerEdgeKey != "" {

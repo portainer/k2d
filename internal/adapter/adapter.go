@@ -1,6 +1,7 @@
 package adapter
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -10,6 +11,7 @@ import (
 	"github.com/portainer/k2d/internal/adapter/store/filesystem"
 	"github.com/portainer/k2d/internal/adapter/store/memory"
 	"github.com/portainer/k2d/internal/adapter/store/volume"
+	k2dtypes "github.com/portainer/k2d/internal/adapter/types"
 	"github.com/portainer/k2d/internal/config"
 	"github.com/portainer/k2d/internal/types"
 	"go.uber.org/zap"
@@ -126,4 +128,45 @@ func NewKubeDockerAdapter(options *KubeDockerAdapterOptions) (*KubeDockerAdapter
 // dest: The target object, into which the converted object will be stored
 func (adapter *KubeDockerAdapter) ConvertK8SResource(src, dest interface{}) error {
 	return adapter.conversionScheme.Convert(src, dest, nil)
+}
+
+// ProvisionSystemResources sets up the essential system resources required for the KubeDockerAdapter to operate.
+// This function takes care of provisioning two namespaces ("default" and a custom k2d namespace),
+// as well as storing service account secrets necessary for client authentication.
+//
+// Parameters:
+// - ctx: Context for managing cancellations and timeouts.
+// - tokenPath: File path where the service account token is stored.
+// - sslCACertPath: File path where the SSL CA certificate is stored.
+//
+// The function performs the following steps in order:
+// 1. Calls provisionNamespace() to create or verify the "default" namespace.
+// 2. Calls provisionNamespace() to create or verify a custom k2d namespace.
+// 3. Calls storeServiceAccountSecret() to store the service account token and SSL CA certificate at the provided paths.
+//
+// Error Handling:
+// - If provisioning of either namespace fails, an error is returned detailing which namespace failed.
+// - If storing the service account secret fails, an error is returned.
+// - In each case, the underlying error is wrapped with additional context.
+//
+// Returns:
+// - Returns nil if all resources are successfully provisioned.
+// - Returns an error if any step in the provisioning process fails.
+func (adapter *KubeDockerAdapter) ProvisionSystemResources(ctx context.Context, tokenPath, sslCACertPath string) error {
+	err := adapter.provisionNamespace(ctx, "default")
+	if err != nil {
+		return fmt.Errorf("unable to provision default namespace: %w", err)
+	}
+
+	err = adapter.provisionNamespace(ctx, k2dtypes.K2DNamespaceName)
+	if err != nil {
+		return fmt.Errorf("unable to provision k2d namespace: %w", err)
+	}
+
+	err = adapter.storeServiceAccountSecret(tokenPath, sslCACertPath)
+	if err != nil {
+		return fmt.Errorf("unable to store service account secret: %w", err)
+	}
+
+	return nil
 }

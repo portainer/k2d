@@ -9,14 +9,14 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core"
 )
 
-func (converter *DockerAPIConverter) ConvertNetworkToNamespace(network *types.NetworkResource) *core.Namespace {
-	namespace := &core.Namespace{
+func (converter *DockerAPIConverter) ConvertNetworkToNamespace(namespaceName string, network types.NetworkResource) core.Namespace {
+	return core.Namespace{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Namespace",
 			APIVersion: "v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:              network.Name,
+			Name:              namespaceName,
 			CreationTimestamp: metav1.NewTime(time.Unix(network.Created.Unix(), 0)),
 			Annotations: map[string]string{
 				"kubectl.kubernetes.io/last-applied-configuration": network.Labels[k2dtypes.NamespaceLastAppliedConfigLabelKey],
@@ -26,6 +26,4 @@ func (converter *DockerAPIConverter) ConvertNetworkToNamespace(network *types.Ne
 			Phase: core.NamespaceActive,
 		},
 	}
-
-	return namespace
 }

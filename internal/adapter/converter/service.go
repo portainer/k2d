@@ -73,12 +73,8 @@ func (converter *DockerAPIConverter) UpdateServiceFromContainerInfo(service *cor
 		service.Spec.Type = core.ServiceTypeClusterIP
 	}
 
-	network := service.Namespace
-	if network == "default" {
-		network = "k2d_net"
-	}
-
-	service.Spec.ClusterIPs = []string{container.NetworkSettings.Networks[network].IPAddress}
+	networkName := container.Labels[k2dtypes.NetworkNameLabelKey]
+	service.Spec.ClusterIPs = []string{container.NetworkSettings.Networks[networkName].IPAddress}
 
 	if service.Spec.Type != core.ServiceTypeClusterIP {
 		servicePorts := []core.ServicePort{}
@@ -107,15 +103,5 @@ func (converter *DockerAPIConverter) UpdateServiceFromContainerInfo(service *cor
 			}
 		}
 		service.Spec.Ports = servicePorts
-	}
-
-	// the following is required to update the service status based on the container inspect information
-	if container.Labels[k2dtypes.ServiceStatusErrorMessage] != "" {
-		service.Status.Conditions = []metav1.Condition{
-			{
-				Status:  "False",
-				Message: container.Labels[k2dtypes.ServiceStatusErrorMessage],
-			},
-		}
 	}
 }

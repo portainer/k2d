@@ -1,25 +1,26 @@
 package namespaces
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 
 	"github.com/emicklei/go-restful/v3"
+	adaptererr "github.com/portainer/k2d/internal/adapter/errors"
 	"github.com/portainer/k2d/internal/api/utils"
 )
 
 func (svc NamespaceService) GetNamespace(r *restful.Request, w *restful.Response) {
 	name := r.PathParameter("name")
-	watch := r.PathParameter("watch")
 
-	namespace, err := svc.adapter.GetNamespace(r.Request.Context(), name, watch)
+	namespace, err := svc.adapter.GetNamespace(r.Request.Context(), name)
 	if err != nil {
-		utils.HttpError(r, w, http.StatusInternalServerError, fmt.Errorf("unable to get namespace: %w", err))
-		return
-	}
+		if errors.Is(err, adaptererr.ErrResourceNotFound) {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
 
-	if namespace == nil {
-		w.WriteHeader(http.StatusNotFound)
+		utils.HttpError(r, w, http.StatusInternalServerError, fmt.Errorf("unable to get namespace: %w", err))
 		return
 	}
 

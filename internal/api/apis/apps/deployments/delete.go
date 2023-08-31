@@ -1,7 +1,6 @@
 package deployments
 
 import (
-	"fmt"
 	"net/http"
 
 	"github.com/emicklei/go-restful/v3"
@@ -10,13 +9,10 @@ import (
 )
 
 func (svc DeploymentService) DeleteDeployment(r *restful.Request, w *restful.Response) {
+	namespace := utils.NamespaceParameter(r)
 	deploymentName := r.PathParameter("name")
 
-	err := svc.adapter.DeleteContainer(r.Request.Context(), deploymentName)
-	if err != nil {
-		utils.HttpError(r, w, http.StatusInternalServerError, fmt.Errorf("unable to delete deployment: %w", err))
-		return
-	}
+	svc.adapter.DeleteContainer(r.Request.Context(), deploymentName, namespace)
 
 	w.WriteAsJson(metav1.Status{
 		TypeMeta: metav1.TypeMeta{

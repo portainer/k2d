@@ -9,8 +9,8 @@
 // files within containers.
 //
 // Usage Note:
-//   - The method GetConfigMap() returns a 'ErrResourceNotFound' error (from the errors package) if the underlying ConfigMap resource is not found.
-//   - The method GetSecret() returns a 'ErrResourceNotFound' error (from the errors package) if the underlying Secret resource is not found.
+//   - The method GetConfigMap() returns a 'ErrResourceNotFound' error (from the adapter/errors package) if the underlying ConfigMap resource is not found.
+//   - The method GetSecret() returns a 'ErrResourceNotFound' error (from the adapter/errors package) if the underlying Secret resource is not found.
 //   - The methods GetSecretBinds() and GetConfigMapBinds() are used to generate a list of filesystem binds that
 //     can be used by containers for mounting files.
 //
@@ -18,7 +18,7 @@
 //
 // import (
 //
-//	storeerr "github.com/portainer/k2d/internal/adapter/store/errors"
+//	adaptererr "github.com/portainer/k2d/internal/adapter/errors"
 //
 // )
 //
@@ -26,7 +26,7 @@
 // secret, err := s.GetSecret("my-secret")
 //
 //	if err != nil {
-//	   if err == storeerr.ErrResourceNotFound {
+//	   if err == adaptererr.ErrResourceNotFound {
 //	      log.Println("Secret not found")
 //	   } else {
 //	      log.Println("An error occurred:", err)
@@ -47,19 +47,19 @@ import (
 
 // SecretStore is an interface for interacting with Kubernetes Secrets.
 type SecretStore interface {
-	DeleteSecret(secretName string) error
+	DeleteSecret(secretName, namespace string) error
 	GetSecretBinds(secret *core.Secret) (map[string]string, error)
-	GetSecret(secretName string) (*core.Secret, error)
-	GetSecrets(selector labels.Selector) (core.SecretList, error)
+	GetSecret(secretName, namespace string) (*core.Secret, error)
+	GetSecrets(namespace string, selector labels.Selector) (core.SecretList, error)
 	StoreSecret(secret *corev1.Secret) error
 }
 
 // ConfigMapStore is an interface for interacting with Kubernetes ConfigMaps.
 type ConfigMapStore interface {
-	DeleteConfigMap(configMapName string) error
+	DeleteConfigMap(configMapName, namespace string) error
 	GetConfigMapBinds(configMap *core.ConfigMap) (map[string]string, error)
-	GetConfigMap(configMapName string) (*core.ConfigMap, error)
-	GetConfigMaps() (core.ConfigMapList, error)
+	GetConfigMap(configMapName, namespace string) (*core.ConfigMap, error)
+	GetConfigMaps(namespace string) (core.ConfigMapList, error)
 	StoreConfigMap(configMap *corev1.ConfigMap) error
 }
 

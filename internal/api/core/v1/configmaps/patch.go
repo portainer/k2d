@@ -8,7 +8,7 @@ import (
 	"net/http"
 
 	"github.com/emicklei/go-restful/v3"
-	storeerr "github.com/portainer/k2d/internal/adapter/store/errors"
+	adaptererr "github.com/portainer/k2d/internal/adapter/errors"
 	"github.com/portainer/k2d/internal/api/utils"
 	"github.com/portainer/k2d/internal/controller"
 	"github.com/portainer/k2d/internal/types"
@@ -17,6 +17,7 @@ import (
 )
 
 func (svc ConfigMapService) PatchConfigMap(r *restful.Request, w *restful.Response) {
+	namespace := utils.NamespaceParameter(r)
 	configMapName := r.PathParameter("name")
 
 	patch, err := io.ReadAll(r.Request.Body)
@@ -25,8 +26,8 @@ func (svc ConfigMapService) PatchConfigMap(r *restful.Request, w *restful.Respon
 		return
 	}
 
-	configMap, err := svc.adapter.GetConfigMap(configMapName)
-	if err != nil && errors.Is(err, storeerr.ErrResourceNotFound) {
+	configMap, err := svc.adapter.GetConfigMap(configMapName, namespace)
+	if err != nil && errors.Is(err, adaptererr.ErrResourceNotFound) {
 		w.WriteHeader(http.StatusNotFound)
 		return
 	} else if err != nil {

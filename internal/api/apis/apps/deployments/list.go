@@ -9,15 +9,16 @@ import (
 )
 
 func (svc DeploymentService) ListDeployments(r *restful.Request, w *restful.Response) {
-	namespaceName := r.PathParameter("namespace")
+	namespace := utils.NamespaceParameter(r)
+
 	utils.ListResources(
 		r,
 		w,
 		func(ctx context.Context) (interface{}, error) {
-			return svc.adapter.ListDeployments(ctx, namespaceName)
+			return svc.adapter.ListDeployments(ctx, namespace)
 		},
 		func(ctx context.Context) (*metav1.Table, error) {
-			return svc.adapter.GetDeploymentTable(ctx, namespaceName)
+			return svc.adapter.GetDeploymentTable(ctx, namespace)
 		},
 	)
 }

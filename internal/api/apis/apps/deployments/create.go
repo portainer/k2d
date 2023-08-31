@@ -13,7 +13,7 @@ import (
 )
 
 func (svc DeploymentService) CreateDeployment(r *restful.Request, w *restful.Response) {
-	namespace := r.PathParameter("namespace")
+	namespace := utils.NamespaceParameter(r)
 
 	deployment := &appsv1.Deployment{}
 
@@ -23,9 +23,7 @@ func (svc DeploymentService) CreateDeployment(r *restful.Request, w *restful.Res
 		return
 	}
 
-	if namespace != "" {
-		deployment.Namespace = namespace
-	}
+	deployment.Namespace = namespace
 
 	dryRun := r.QueryParameter("dryRun") != ""
 	if dryRun {

@@ -9,15 +9,16 @@ import (
 )
 
 func (svc PodService) ListPods(r *restful.Request, w *restful.Response) {
-	namespaceName := r.PathParameter("namespace")
+	namespace := utils.NamespaceParameter(r)
+
 	utils.ListResources(
 		r,
 		w,
 		func(ctx context.Context) (interface{}, error) {
-			return svc.adapter.ListPods(ctx, namespaceName)
+			return svc.adapter.ListPods(ctx, namespace)
 		},
 		func(ctx context.Context) (*metav1.Table, error) {
-			return svc.adapter.GetPodTable(ctx, namespaceName)
+			return svc.adapter.GetPodTable(ctx, namespace)
 		},
 	)
 }

@@ -2,9 +2,11 @@ package memory
 
 import (
 	"errors"
+	"fmt"
+	"strings"
 	"sync"
 
-	storeerr "github.com/portainer/k2d/internal/adapter/store/errors"
+	adaptererr "github.com/portainer/k2d/internal/adapter/errors"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -23,7 +25,17 @@ type InMemoryStore struct {
 	secretMap map[string]secretData
 }
 
+func buildSecretKey(secretName, namespace string) string {
+	return fmt.Sprintf("%s-%s", namespace, secretName)
+}
+
+func getSecretNameFromKey(key, namespace string) string {
+	return strings.TrimPrefix(key, fmt.Sprintf("%s-", namespace))
+}
+
 // NewInMemoryStore creates a new in-memory store
+// Secrets are stored in a map with the key using a specific format:
+// <namespace>-<secretName>
 func NewInMemoryStore() *InMemoryStore {
 	return &InMemoryStore{
 		m:         sync.RWMutex{},
@@ -32,10 +44,10 @@ func NewInMemoryStore() *InMemoryStore {
 }
 
 // DeleteSecret deletes a secret from the in-memory store
-func (s *InMemoryStore) DeleteSecret(secretName string) error {
+func (s *InMemoryStore) DeleteSecret(secretName, namespace string) error {
 	s.m.Lock()
 	defer s.m.Unlock()
-	delete(s.secretMap, secretName)
+	delete(s.secretMap, buildSecretKey(secretName, namespace))
 	return nil
 }
 
@@ -45,12 +57,12 @@ func (s *InMemoryStore) GetSecretBinds(secret *core.Secret) (map[string]string, 
 }
 
 // GetSecret gets a secret from the in-memory store
-func (s *InMemoryStore) GetSecret(secretName string) (*core.Secret, error) {
+func (s *InMemoryStore) GetSecret(secretName, namespace string) (*core.Secret, error) {
 	s.m.RLock()
 	defer s.m.RUnlock()
-	data, found := s.secretMap[secretName]
+	data, found := s.secretMap[buildSecretKey(secretName, namespace)]
 	if !found {
-		return nil, storeerr.ErrResourceNotFound
+		return nil, adaptererr.ErrResourceNotFound
 	}
 
 	return &core.Secret{
@@ -61,7 +73,7 @@ func (s *InMemoryStore) GetSecret(secretName string) (*core.Secret, error) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        secretName,
 			Annotations: map[string]string{},
-			Namespace:   "default",
+			Namespace:   namespace,
 		},
 		Data: data.Data,
 		Type: core.SecretType(data.Type),
@@ -69,12 +81,16 @@ func (s *InMemoryStore) GetSecret(secretName string) (*core.Secret, error) {
 }
 
 // GetSecrets gets all secrets from the in-memory store
-func (s *InMemoryStore) GetSecrets(selector labels.Selector) (core.SecretList, error) {
+func (s *InMemoryStore) GetSecrets(namespace string, selector labels.Selector) (core.SecretList, error) {
 	s.m.RLock()
 	defer s.m.RUnlock()
 	var secrets []core.Secret
 
-	for name, data := range s.secretMap {
+	for key, data := range s.secretMap {
+
+		if !strings.HasPrefix(key, namespace) {
+			continue
+		}
 
 		secret := core.Secret{
 			TypeMeta: metav1.TypeMeta{
@@ -82,9 +98,9 @@ func (s *InMemoryStore) GetSecrets(selector labels.Selector) (core.SecretList, e
 				APIVersion: "v1",
 			},
 			ObjectMeta: metav1.ObjectMeta{
-				Name:        name,
+				Name:        getSecretNameFromKey(key, namespace),
 				Annotations: map[string]string{},
-				Namespace:   "default",
+				Namespace:   namespace,
 			},
 			Data: data.Data,
 			Type: core.SecretType(data.Type),
@@ -103,7 +119,7 @@ func (s *InMemoryStore) StoreSecret(secret *corev1.Secret) error {
 	s.m.Lock()
 	defer s.m.Unlock()
 
-	s.secretMap[secret.Name] = secretData{
+	s.secretMap[buildSecretKey(secret.Name, secret.Namespace)] = secretData{
 		Data: secret.Data,
 		Type: string(secret.Type),
 	}

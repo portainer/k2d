@@ -15,6 +15,7 @@ import (
 )
 
 func (svc ServiceService) PatchService(r *restful.Request, w *restful.Response) {
+	namespace := utils.NamespaceParameter(r)
 	serviceName := r.PathParameter("name")
 
 	patch, err := io.ReadAll(r.Request.Body)
@@ -23,7 +24,7 @@ func (svc ServiceService) PatchService(r *restful.Request, w *restful.Response) 
 		return
 	}
 
-	service, err := svc.adapter.GetService(r.Request.Context(), serviceName)
+	service, err := svc.adapter.GetService(r.Request.Context(), serviceName, namespace)
 	if err != nil {
 		utils.HttpError(r, w, http.StatusInternalServerError, fmt.Errorf("unable to get service: %w", err))
 		return
