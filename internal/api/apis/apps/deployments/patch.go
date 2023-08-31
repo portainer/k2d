@@ -15,7 +15,7 @@ import (
 )
 
 func (svc DeploymentService) PatchDeployment(r *restful.Request, w *restful.Response) {
-	namespace := utils.NamespaceParameter(r)
+	namespace := r.PathParameter("namespace")
 	deploymentName := r.PathParameter("name")
 
 	patch, err := io.ReadAll(r.Request.Body)

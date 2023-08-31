@@ -13,7 +13,7 @@ import (
 )
 
 func (svc ConfigMapService) CreateConfigMap(r *restful.Request, w *restful.Response) {
-	namespace := utils.NamespaceParameter(r)
+	namespace := r.PathParameter("namespace")
 
 	configMap := &corev1.ConfigMap{}
 

@@ -9,6 +9,7 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/portainer/k2d/internal/adapter/errors"
+	adapterfilters "github.com/portainer/k2d/internal/adapter/filters"
 	k2dtypes "github.com/portainer/k2d/internal/adapter/types"
 	"github.com/portainer/k2d/internal/k8s"
 	corev1 "k8s.io/api/core/v1"
@@ -48,9 +49,9 @@ func (adapter *KubeDockerAdapter) CreateContainerFromPod(ctx context.Context, po
 // The logic used to build a pod from a container is based on the type returned by the list operation (types.Container)
 // and not the inspect operation (types.ContainerJSON).
 // This is because using the inspect operation everywhere would be more expensive overall.
-func (adapter *KubeDockerAdapter) GetPod(ctx context.Context, podName string, namespaceName string) (*corev1.Pod, error) {
+func (adapter *KubeDockerAdapter) GetPod(ctx context.Context, podName string, namespace string) (*corev1.Pod, error) {
 	labelFilter := filters.NewArgs()
-	labelFilter.Add("label", fmt.Sprintf("%s=%s", k2dtypes.NamespaceLabelKey, namespaceName))
+	labelFilter.Add("label", fmt.Sprintf("%s=%s", k2dtypes.NamespaceLabelKey, namespace))
 	labelFilter.Add("label", fmt.Sprintf("%s=%s", k2dtypes.WorkloadNameLabelKey, podName))
 
 	containers, err := adapter.cli.ContainerList(ctx, types.ContainerListOptions{All: true, Filters: labelFilter})
@@ -60,7 +61,7 @@ func (adapter *KubeDockerAdapter) GetPod(ctx context.Context, podName string, na
 
 	var container *types.Container
 
-	containerName := buildContainerName(podName, namespaceName)
+	containerName := buildContainerName(podName, namespace)
 	for _, cntr := range containers {
 		if cntr.Names[0] == "/"+containerName {
 			container = &cntr
@@ -69,7 +70,7 @@ func (adapter *KubeDockerAdapter) GetPod(ctx context.Context, podName string, na
 	}
 
 	if container == nil {
-		adapter.logger.Errorf("unable to find container for pod %s in namespace %s", podName, namespaceName)
+		adapter.logger.Errorf("unable to find container for pod %s in namespace %s", podName, namespace)
 		return nil, errors.ErrResourceNotFound
 	}
 
@@ -93,8 +94,8 @@ func (adapter *KubeDockerAdapter) GetPod(ctx context.Context, podName string, na
 	return &versionedPod, nil
 }
 
-func (adapter *KubeDockerAdapter) GetPodLogs(ctx context.Context, namespaceName string, podName string, opts PodLogOptions) (io.ReadCloser, error) {
-	containerName := buildContainerName(podName, namespaceName)
+func (adapter *KubeDockerAdapter) GetPodLogs(ctx context.Context, namespace string, podName string, opts PodLogOptions) (io.ReadCloser, error) {
+	containerName := buildContainerName(podName, namespace)
 	container, err := adapter.cli.ContainerInspect(ctx, containerName)
 	if err != nil {
 		return nil, fmt.Errorf("unable to inspect container: %w", err)
@@ -109,8 +110,8 @@ func (adapter *KubeDockerAdapter) GetPodLogs(ctx context.Context, namespaceName 
 	})
 }
 
-func (adapter *KubeDockerAdapter) GetPodTable(ctx context.Context, namespaceName string) (*metav1.Table, error) {
-	podList, err := adapter.listPods(ctx, namespaceName)
+func (adapter *KubeDockerAdapter) GetPodTable(ctx context.Context, namespace string) (*metav1.Table, error) {
+	podList, err := adapter.listPods(ctx, namespace)
 	if err != nil {
 		return &metav1.Table{}, fmt.Errorf("unable to list pods: %w", err)
 	}
@@ -118,8 +119,8 @@ func (adapter *KubeDockerAdapter) GetPodTable(ctx context.Context, namespaceName
 	return k8s.GenerateTable(&podList)
 }
 
-func (adapter *KubeDockerAdapter) ListPods(ctx context.Context, namespaceName string) (corev1.PodList, error) {
-	podList, err := adapter.listPods(ctx, namespaceName)
+func (adapter *KubeDockerAdapter) ListPods(ctx context.Context, namespace string) (corev1.PodList, error) {
+	podList, err := adapter.listPods(ctx, namespace)
 	if err != nil {
 		return corev1.PodList{}, fmt.Errorf("unable to list pods: %w", err)
 	}
@@ -157,9 +158,8 @@ func (adapter *KubeDockerAdapter) buildPodFromContainer(container types.Containe
 	return &pod, nil
 }
 
-func (adapter *KubeDockerAdapter) listPods(ctx context.Context, namespaceName string) (core.PodList, error) {
-	labelFilter := filters.NewArgs()
-	labelFilter.Add("label", fmt.Sprintf("%s=%s", k2dtypes.NamespaceLabelKey, namespaceName))
+func (adapter *KubeDockerAdapter) listPods(ctx context.Context, namespace string) (core.PodList, error) {
+	labelFilter := adapterfilters.NamespaceFilter(namespace)
 
 	containers, err := adapter.cli.ContainerList(ctx, types.ContainerListOptions{All: true, Filters: labelFilter})
 	if err != nil {

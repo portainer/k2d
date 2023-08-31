@@ -76,7 +76,12 @@ func (s *VolumeStore) GetConfigMap(configMapName, namespace string) (*core.Confi
 func (store *VolumeStore) GetConfigMaps(namespace string) (core.ConfigMapList, error) {
 	filter := filters.NewArgs()
 	filter.Add("label", fmt.Sprintf("%s=%s", ResourceTypeLabelKey, ConfigMapResourceType))
-	filter.Add("label", fmt.Sprintf("%s=%s", NamespaceNameLabelKey, namespace))
+
+	label := NamespaceNameLabelKey
+	if namespace != "" {
+		label = fmt.Sprintf("%s=%s", NamespaceNameLabelKey, namespace)
+	}
+	filter.Add("label", label)
 
 	volumes, err := store.cli.VolumeList(context.TODO(), volume.ListOptions{
 		Filters: filter,

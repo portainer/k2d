@@ -11,7 +11,7 @@ import (
 )
 
 func (svc ServiceService) GetService(r *restful.Request, w *restful.Response) {
-	namespace := utils.NamespaceParameter(r)
+	namespace := r.PathParameter("namespace")
 	serviceName := r.PathParameter("name")
 
 	service, err := svc.adapter.GetService(r.Request.Context(), serviceName, namespace)

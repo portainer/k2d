@@ -11,6 +11,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/apps"
 
 	adaptererr "github.com/portainer/k2d/internal/adapter/errors"
+	adapterfilters "github.com/portainer/k2d/internal/adapter/filters"
 	k2dtypes "github.com/portainer/k2d/internal/adapter/types"
 	"github.com/portainer/k2d/internal/k8s"
 	appsv1 "k8s.io/api/apps/v1"
@@ -103,8 +104,8 @@ func (adapter *KubeDockerAdapter) GetDeployment(ctx context.Context, deploymentN
 	return &versionedDeployment, nil
 }
 
-func (adapter *KubeDockerAdapter) GetDeploymentTable(ctx context.Context, namespaceName string) (*metav1.Table, error) {
-	deploymentList, err := adapter.listDeployments(ctx, namespaceName)
+func (adapter *KubeDockerAdapter) GetDeploymentTable(ctx context.Context, namespace string) (*metav1.Table, error) {
+	deploymentList, err := adapter.listDeployments(ctx, namespace)
 	if err != nil {
 		return &metav1.Table{}, fmt.Errorf("unable to list deployments: %w", err)
 	}
@@ -112,8 +113,8 @@ func (adapter *KubeDockerAdapter) GetDeploymentTable(ctx context.Context, namesp
 	return k8s.GenerateTable(&deploymentList)
 }
 
-func (adapter *KubeDockerAdapter) ListDeployments(ctx context.Context, namespaceName string) (appsv1.DeploymentList, error) {
-	deploymentList, err := adapter.listDeployments(ctx, namespaceName)
+func (adapter *KubeDockerAdapter) ListDeployments(ctx context.Context, namespace string) (appsv1.DeploymentList, error) {
+	deploymentList, err := adapter.listDeployments(ctx, namespace)
 	if err != nil {
 		return appsv1.DeploymentList{}, fmt.Errorf("unable to list deployments: %w", err)
 	}
@@ -158,10 +159,9 @@ func (adapter *KubeDockerAdapter) buildDeploymentFromContainer(container types.C
 	return &deployment, nil
 }
 
-func (adapter *KubeDockerAdapter) listDeployments(ctx context.Context, namespaceName string) (apps.DeploymentList, error) {
-	labelFilter := filters.NewArgs()
+func (adapter *KubeDockerAdapter) listDeployments(ctx context.Context, namespace string) (apps.DeploymentList, error) {
+	labelFilter := adapterfilters.NamespaceFilter(namespace)
 	labelFilter.Add("label", fmt.Sprintf("%s=%s", k2dtypes.WorkloadLabelKey, DeploymentWorkloadType))
-	labelFilter.Add("label", fmt.Sprintf("%s=%s", k2dtypes.NamespaceLabelKey, namespaceName))
 
 	containers, err := adapter.cli.ContainerList(ctx, types.ContainerListOptions{All: true, Filters: labelFilter})
 	if err != nil {
