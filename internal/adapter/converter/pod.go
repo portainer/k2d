@@ -15,10 +15,22 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core"
 )
 
-// TODO: update comments with namespace
-
-// ConvertContainerToPod tries to convert a Docker container into a Kubernetes Pod.
-// It only implements partial conversion at the moment.
+// ConvertContainerToPod converts a given Docker container into a Kubernetes Pod object.
+// The conversion populates specific fields like TypeMeta, ObjectMeta, PodSpec, and PodStatus.
+// The function currently only supports partial conversion.
+//
+// Parameters:
+// - container: A Docker container object that will be converted into a Kubernetes Pod.
+//
+// Behavior:
+//   - Populates the 'TypeMeta' and 'ObjectMeta' fields of the Pod object from the Docker container's metadata.
+//   - Creates a single-container PodSpec based on the Docker container's image and name.
+//   - Sets the Pod's status based on the Docker container's state. If the Docker container is running,
+//     the Pod's phase is set to 'Running', and the container status is marked as 'Ready'. Otherwise,
+//     the Pod's phase is set to 'Unknown'.
+//
+// Returns:
+// - A Kubernetes Pod object derived from the Docker container.
 func (converter *DockerAPIConverter) ConvertContainerToPod(container types.Container) core.Pod {
 	containerName := container.Labels[k2dtypes.WorkloadNameLabelKey]
 	containerState := container.State
