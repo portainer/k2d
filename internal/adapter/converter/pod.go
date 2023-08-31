@@ -73,9 +73,28 @@ func (converter *DockerAPIConverter) ConvertContainerToPod(container types.Conta
 	return pod
 }
 
-// ConvertPodSpecToContainerConfiguration converts a Kubernetes PodSpec into a Docker container configuration.
-// It receives a Kubernetes PodSpec and a map of labels.
-// It returns a ContainerConfiguration struct, or an error if the conversion fails.
+// ConvertPodSpecToContainerConfiguration converts a Kubernetes PodSpec into a Docker ContainerConfiguration.
+//
+// This function takes a PodSpec (`spec`), the namespace where the pod is to be created (`namespace`),
+// and a set of labels (`labels`) as arguments. It returns a struct `ContainerConfiguration` which contains
+// configurations to be used for creating a Docker container, and an error if any occurs.
+//
+// The function assumes the PodSpec contains at least one container specification. It only uses the first
+// container in the list (`spec.Containers[0]`) for conversion.
+//  1. It initializes the Docker container configuration with the image, labels, and environment variables
+//     related to the Kubernetes server.
+//  2. It sets additional host mappings to resolve the kubernetes service within the Docker container.
+//  3. It associates the Service Account token and CA certificate with the Docker container.
+//  4. It configures port mappings based on the Kubernetes container ports.
+//  5. It sets environment variables based on the Kubernetes container environment settings.
+//  6. It sets the container's command and arguments if they are specified in the PodSpec.
+//  7. It sets the container's restart policy based on the Kubernetes Pod's restart policy.
+//  8. It sets the container and host-level security context based on the PodSpec.
+//  9. It sets resource requirements (CPU, memory limits, etc.) based on the Kubernetes container resources.
+//  10. It configures volume mounts for the container based on the Kubernetes volume specifications.
+//  11. Finally, it sets the network settings for the container, using a network name retrieved from the labels.
+//
+// If any of these steps fails, an error is returned.
 func (converter *DockerAPIConverter) ConvertPodSpecToContainerConfiguration(spec core.PodSpec, namespace string, labels map[string]string) (ContainerConfiguration, error) {
 	containerSpec := spec.Containers[0]
 
@@ -129,7 +148,6 @@ func (converter *DockerAPIConverter) ConvertPodSpecToContainerConfiguration(spec
 
 // setResourceRequirements configures the Docker container's resource constraints based on the provided core.ResourceRequirements.
 // It receives a Docker HostConfig and a Kubernetes ResourceRequirements.
-// It returns nothing.
 func (converter *DockerAPIConverter) setResourceRequirements(hostConfig *container.HostConfig, resources core.ResourceRequirements) {
 	resourceRequirements := container.Resources{}
 	if resources.Requests != nil {
@@ -223,6 +241,21 @@ func (converter *DockerAPIConverter) setHostPorts(containerConfig *container.Con
 // setEnvVars handles setting the environment variables for the Docker container configuration.
 // It receives a pointer to the container configuration and an array of Kubernetes environment variables.
 // It returns an error if the setting of environment variables fails.
+
+// setEnvVars configures the environment variables for the Docker container based on Kubernetes EnvVar and EnvFromSource objects.
+//
+// The function receives the Kubernetes namespace (`namespace`), a pointer to the Docker container configuration (`containerConfig`),
+// an array of Kubernetes EnvVar (`envs`), and an array of Kubernetes EnvFromSource (`envFrom`).
+//
+// It performs the following tasks:
+// 1. Iterates over each EnvVar in `envs`:
+//   - If EnvVar has a `ValueFrom` field, it calls `handleValueFromEnvVars` to handle the logic for populating the environment variable.
+//   - Otherwise, it directly sets the environment variable in the Docker container configuration.
+//
+// 2. Iterates over each EnvFromSource in `envFrom`:
+//   - Calls `handleValueFromEnvFromSource` to populate the environment variables based on the EnvFromSource settings.
+//
+// The function returns an error if any of the steps to set the environment variables fail.
 func (converter *DockerAPIConverter) setEnvVars(namespace string, containerConfig *container.Config, envs []core.EnvVar, envFrom []core.EnvFromSource) error {
 	for _, env := range envs {
 
@@ -244,16 +277,24 @@ func (converter *DockerAPIConverter) setEnvVars(namespace string, containerConfi
 	return nil
 }
 
-// handleValueFromEnvFromSource populates the environment variables of a Docker container configuration from
-// a Kubernetes EnvFromSource object. The function supports environment variables defined in ConfigMaps and Secrets.
+// handleValueFromEnvFromSource populates the environment variables of a Docker container configuration based on a Kubernetes EnvFromSource object.
+// The function will do a lookup for ConfigMaps and Secrets within a specified Kubernetes namespace.
 //
-// The function takes two parameters:
-// - containerConfig: a pointer to a Docker container configuration object where the environment variables will be added.
-// - env: a Kubernetes EnvFromSource object that contains the source of the environment variables.
+// The function takes three parameters:
+// - namespace: the Kubernetes namespace where the ConfigMap or Secret is located.
+// - containerConfig: a pointer to a Docker container configuration object where the environment variables will be populated.
+// - env: a Kubernetes EnvFromSource object that specifies the source of the environment variables.
 //
-// If the EnvFromSource object points to a ConfigMap, the function retrieves the ConfigMap and adds its data as
-// environment variables to the Docker container configuration. Similarly, if the EnvFromSource points to a Secret,
-// the function retrieves the Secret and adds its data as environment variables.
+// The function performs the following actions:
+// 1. If the EnvFromSource object has a ConfigMapRef, the function retrieves the ConfigMap from the given namespace using `configMapStore.GetConfigMap()`.
+//   - If successful, it adds each key-value pair in the ConfigMap data as an environment variable in the Docker container configuration.
+//   - Returns an error if the ConfigMap retrieval fails.
+//
+// 2. If the EnvFromSource object has a SecretRef, the function retrieves the Secret from the given namespace using `secretStore.GetSecret()`.
+//   - If successful, it adds each key-value pair in the Secret data as an environment variable in the Docker container configuration.
+//   - Returns an error if the Secret retrieval fails.
+//
+// The function returns nil if it successfully populates the environment variables, or an error if any step fails.
 func (converter *DockerAPIConverter) handleValueFromEnvFromSource(namespace string, containerConfig *container.Config, env core.EnvFromSource) error {
 	if env.ConfigMapRef != nil {
 		configMap, err := converter.configMapStore.GetConfigMap(env.ConfigMapRef.Name, namespace)
@@ -278,9 +319,23 @@ func (converter *DockerAPIConverter) handleValueFromEnvFromSource(namespace stri
 	return nil
 }
 
-// handleValueFromEnvVars manages environment variables that are defined through ConfigMap or Secret references.
-// It receives a pointer to the container configuration and a Kubernetes environment variable.
-// It returns an error if the sourcing of the environment variables fails.
+// handleValueFromEnvVars populates specific environment variables in a Docker container configuration based on ConfigMap or Secret references in a Kubernetes EnvVar object.
+//
+// Parameters:
+// - namespace: The Kubernetes namespace where the ConfigMap or Secret resides.
+// - containerConfig: A pointer to a Docker container configuration where the environment variable will be set.
+// - env: A Kubernetes EnvVar object that may contain ValueFrom references to ConfigMaps or Secrets.
+//
+// The function performs the following actions:
+// 1. If the EnvVar object has a ConfigMapKeyRef, it uses `configMapStore.GetConfigMap()` to fetch the ConfigMap by name from the specified namespace.
+//   - If successful, the function fetches the value using the Key provided in ConfigMapKeyRef and sets it as an environment variable in the Docker container configuration.
+//   - Returns an error if it fails to retrieve the ConfigMap.
+//
+// 2. If the EnvVar object has a SecretKeyRef, it uses `secretStore.GetSecret()` to fetch the Secret by name from the specified namespace.
+//   - If successful, the function fetches the value using the Key provided in SecretKeyRef and sets it as an environment variable in the Docker container configuration.
+//   - Returns an error if it fails to retrieve the Secret.
+//
+// The function returns nil upon successful population of the environment variables or an error if any step fails.
 func (converter *DockerAPIConverter) handleValueFromEnvVars(namespace string, containerConfig *container.Config, env core.EnvVar) error {
 	if env.ValueFrom.ConfigMapKeyRef != nil {
 		configMap, err := converter.configMapStore.GetConfigMap(env.ValueFrom.ConfigMapKeyRef.Name, namespace)
@@ -364,24 +419,26 @@ func (converter *DockerAPIConverter) setVolumeMounts(namespace string, hostConfi
 	return nil
 }
 
-// handleVolumeSource processes a Kubernetes VolumeSource, which can either be a ConfigMap, a Secret, or a HostPath.
-// This function sets up the volume bindings in the Docker host configuration according to the provided VolumeSource.
-//
-// For ConfigMap and Secret:
-// 1. It fetches the resource (ConfigMap or Secret) from the store.
-// 2. It generates the list of filesystem binds via the store specific implementation.
-// 3. These binds are then appended to the Docker host configuration.
-//
-// For HostPath:
-// The function directly uses the HostPath and volume mount to set up the bind in the Docker host configuration.
+// handleVolumeSource configures the Docker host configuration's volume bindings based on a Kubernetes VolumeSource.
+// The VolumeSource can be of type ConfigMap, Secret, or HostPath.
 //
 // Parameters:
-// - hostConfig:   The Docker host configuration where the volume binds will be set.
-// - volume:       The Kubernetes volume object to be processed.
-// - volumeMount:  The Kubernetes volume mount object that provides additional information on how the volume should be mounted.
+// - namespace:    The Kubernetes namespace where the volume resources (ConfigMap or Secret) are located.
+// - hostConfig:   A pointer to the Docker host configuration to which the volume bindings will be appended.
+// - volume:       A Kubernetes Volume object describing the source of the volume.
+// - volumeMount:  A Kubernetes VolumeMount object containing additional specifications for mounting the volume.
+//
+// Behavior:
+// - For ConfigMap and Secret:
+//  1. Retrieves the resource (ConfigMap or Secret) from the store based on the volume source.
+//  2. Utilizes the store's specific implementation to generate a list of filesystem binds.
+//  3. Appends these binds to the 'Binds' field of the Docker host configuration.
+//     - For HostPath:
+//     Directly appends a bind between the HostPath and the volume mount path to the Docker host configuration.
 //
 // Returns:
-// An error if fetching the ConfigMap or Secret from the store fails; otherwise, it returns nil.
+// - An error if retrieval of the ConfigMap or Secret fails or if bind generation encounters issues.
+// - Nil if the volume bindings are successfully appended to the Docker host configuration.
 func (converter *DockerAPIConverter) handleVolumeSource(namespace string, hostConfig *container.HostConfig, volume core.Volume, volumeMount core.VolumeMount) error {
 	if volume.VolumeSource.ConfigMap != nil {
 		configMap, err := converter.configMapStore.GetConfigMap(volume.VolumeSource.ConfigMap.Name, namespace)
