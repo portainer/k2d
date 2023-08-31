@@ -7,6 +7,8 @@ import (
 	"github.com/portainer/k2d/internal/api/core/v1/events"
 	"github.com/portainer/k2d/internal/api/core/v1/namespaces"
 	"github.com/portainer/k2d/internal/api/core/v1/nodes"
+	"github.com/portainer/k2d/internal/api/core/v1/persistentvolumeclaims"
+	"github.com/portainer/k2d/internal/api/core/v1/persistentvolumes"
 	"github.com/portainer/k2d/internal/api/core/v1/pods"
 	"github.com/portainer/k2d/internal/api/core/v1/secrets"
 	"github.com/portainer/k2d/internal/api/core/v1/services"
@@ -15,24 +17,28 @@ import (
 )
 
 type V1Service struct {
-	configMaps configmaps.ConfigMapService
-	events     events.EventService
-	namespaces namespaces.NamespaceService
-	nodes      nodes.NodeService
-	pods       pods.PodService
-	secrets    secrets.SecretService
-	services   services.ServiceService
+	configMaps             configmaps.ConfigMapService
+	events                 events.EventService
+	namespaces             namespaces.NamespaceService
+	nodes                  nodes.NodeService
+	pods                   pods.PodService
+	secrets                secrets.SecretService
+	services               services.ServiceService
+	persistentvolumes      persistentvolumes.PersistentVolumeService
+	persistentvolumeclaims persistentvolumeclaims.PersistentVolumeClaimService
 }
 
 func NewV1Service(adapter *adapter.KubeDockerAdapter, operations chan controller.Operation) V1Service {
 	return V1Service{
-		configMaps: configmaps.NewConfigMapService(adapter, operations),
-		events:     events.NewEventService(adapter),
-		namespaces: namespaces.NewNamespaceService(adapter, operations),
-		nodes:      nodes.NewNodeService(adapter),
-		pods:       pods.NewPodService(adapter, operations),
-		secrets:    secrets.NewSecretService(adapter, operations),
-		services:   services.NewServiceService(adapter, operations),
+		configMaps:             configmaps.NewConfigMapService(adapter, operations),
+		events:                 events.NewEventService(adapter),
+		namespaces:             namespaces.NewNamespaceService(adapter, operations),
+		nodes:                  nodes.NewNodeService(adapter),
+		pods:                   pods.NewPodService(adapter, operations),
+		secrets:                secrets.NewSecretService(adapter, operations),
+		services:               services.NewServiceService(adapter, operations),
+		persistentvolumes:      persistentvolumes.NewPersistentVolumeService(adapter),
+		persistentvolumeclaims: persistentvolumeclaims.NewPersistentVolumeClaimService(adapter, operations),
 	}
 }
 
@@ -107,6 +113,22 @@ func (svc V1Service) ListAPIResources(r *restful.Request, w *restful.Response) {
 				Verbs:        []string{"list"},
 				Namespaced:   false,
 			},
+			{
+				Kind:         "PersistentVolume",
+				SingularName: "",
+				Name:         "persistentvolumes",
+				Verbs:        []string{"list", "get"},
+				Namespaced:   false,
+				ShortNames:   []string{"pv"},
+			},
+			{
+				Kind:         "PersistentVolumeClaim",
+				SingularName: "",
+				Name:         "persistentvolumeclaims",
+				Verbs:        []string{"create", "list", "delete", "get", "patch"},
+				Namespaced:   true,
+				ShortNames:   []string{"pvc"},
+			},
 		},
 	}
 
@@ -136,4 +158,10 @@ func (svc V1Service) RegisterV1API(routes *restful.WebService) {
 
 	// services
 	svc.services.RegisterServiceAPI(routes)
+
+	// persistentvolumes
+	svc.persistentvolumes.RegisterPersistentVolumeAPI(routes)
+
+	// persistentvolumeclaims
+	svc.persistentvolumeclaims.RegisterPersistentVolumeClaimAPI(routes)
 }

@@ -75,6 +75,8 @@ func (adapter *KubeDockerAdapter) DeleteNamespace(ctx context.Context, namespace
 		adapter.DeleteContainer(ctx, container.Names[0], namespaceName)
 	}
 
+	// Add deletion of persistent volumes
+
 	// This is just to make sure that the containers have been properly deleted
 	// before we try to delete the network
 	time.Sleep(3 * time.Second)

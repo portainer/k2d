@@ -214,6 +214,14 @@ func (controller *OperationController) processOperation(op Operation) {
 				"request_id", op.RequestID,
 			)
 		}
+	case *corev1.PersistentVolumeClaim:
+		err := controller.createPersistentVolumeClaim(op)
+		if err != nil {
+			controller.logger.Errorw("unable to update persistent volume claim",
+				"error", err,
+				"request_id", op.RequestID,
+			)
+		}
 	}
 }
 
@@ -245,4 +253,9 @@ func (controller *OperationController) createConfigMap(op Operation) error {
 func (controller *OperationController) createSecret(op Operation) error {
 	secret := op.Operation.(*corev1.Secret)
 	return controller.adapter.CreateSecret(secret)
+}
+
+func (controller *OperationController) createPersistentVolumeClaim(op Operation) error {
+	persistentVolumeClaim := op.Operation.(*corev1.PersistentVolumeClaim)
+	return controller.adapter.CreatePersistentVolumeClaim(context.TODO(), persistentVolumeClaim)
 }
