@@ -16,6 +16,9 @@ const (
 	// ServiceLastAppliedConfigLabelKey is the key used to store the service specific last applied configuration in the container labels
 	ServiceLastAppliedConfigLabelKey = "service.k2d.io/last-applied-configuration"
 
+	// PersistentVolumeClaimLastAppliedConfigLabelKey is the key used to store the service specific last applied configuration in the container labels
+	PersistentVolumeClaimLastAppliedConfigLabelKey = "persistentvolumeclaim.k2d.io/last-applied-configuration"
+
 	// ServiceNameLabelKey is the key used to store the service name in the container labels
 	ServiceNameLabelKey = "workload.k2d.io/service-name"
 
@@ -27,4 +30,10 @@ const (
 
 	// WorkloadNameLabelKey is the key used to store the workload name in the container labels
 	WorkloadNameLabelKey = "workload.k2d.io/name"
+
+	// PersistentVolumeLabelKey is the key used to store the persistent volume name in the container labels
+	PersistentVolumeLabelKey = "persistentvolume.k2d.io/name"
+
+	// PersistentVolumeClaimLabelKey is the key used to store the persistent volume name in the container labels
+	PersistentVolumeClaimLabelKey = "persistentvolumeclaim.k2d.io/name"
 )
