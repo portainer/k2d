@@ -13,7 +13,7 @@ import (
 )
 
 func (svc ServiceService) CreateService(r *restful.Request, w *restful.Response) {
-	namespace := utils.NamespaceParameter(r)
+	namespace := r.PathParameter("namespace")
 
 	service := &corev1.Service{}
 

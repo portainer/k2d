@@ -9,7 +9,7 @@ import (
 )
 
 func (svc DeploymentService) ListDeployments(r *restful.Request, w *restful.Response) {
-	namespace := utils.NamespaceParameter(r)
+	namespace := r.PathParameter("namespace")
 
 	utils.ListResources(
 		r,

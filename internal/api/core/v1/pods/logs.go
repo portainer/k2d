@@ -19,7 +19,7 @@ import (
 // (flushWriter) that invokes the http.Flusher interface on every Write call to ensure
 // the data is immediately sent to the client.
 func (svc PodService) GetPodLogs(r *restful.Request, w *restful.Response) {
-	namespace := utils.NamespaceParameter(r)
+	namespace := r.PathParameter("namespace")
 	podName := r.PathParameter("name")
 
 	podLogOptions := adapter.PodLogOptions{

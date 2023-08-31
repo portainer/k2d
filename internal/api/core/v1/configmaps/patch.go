@@ -17,7 +17,7 @@ import (
 )
 
 func (svc ConfigMapService) PatchConfigMap(r *restful.Request, w *restful.Response) {
-	namespace := utils.NamespaceParameter(r)
+	namespace := r.PathParameter("namespace")
 	configMapName := r.PathParameter("name")
 
 	patch, err := io.ReadAll(r.Request.Body)

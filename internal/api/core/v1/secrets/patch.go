@@ -18,7 +18,7 @@ import (
 )
 
 func (svc SecretService) PatchSecret(r *restful.Request, w *restful.Response) {
-	namespace := utils.NamespaceParameter(r)
+	namespace := r.PathParameter("namespace")
 	secretName := r.PathParameter("name")
 
 	patch, err := io.ReadAll(r.Request.Body)

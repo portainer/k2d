@@ -9,7 +9,7 @@ import (
 )
 
 func (svc PodService) ListPods(r *restful.Request, w *restful.Response) {
-	namespace := utils.NamespaceParameter(r)
+	namespace := r.PathParameter("namespace")
 
 	utils.ListResources(
 		r,

@@ -77,7 +77,12 @@ func (s *VolumeStore) GetSecret(secretName, namespace string) (*core.Secret, err
 func (s *VolumeStore) GetSecrets(namespace string, selector labels.Selector) (core.SecretList, error) {
 	filter := filters.NewArgs()
 	filter.Add("label", fmt.Sprintf("%s=%s", ResourceTypeLabelKey, SecretResourceType))
-	filter.Add("label", fmt.Sprintf("%s=%s", NamespaceNameLabelKey, namespace))
+
+	label := NamespaceNameLabelKey
+	if namespace != "" {
+		label = fmt.Sprintf("%s=%s", NamespaceNameLabelKey, namespace)
+	}
+	filter.Add("label", label)
 
 	volumes, err := s.cli.VolumeList(context.TODO(), volume.ListOptions{
 		Filters: filter,

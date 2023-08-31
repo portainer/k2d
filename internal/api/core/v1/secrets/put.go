@@ -14,7 +14,7 @@ import (
 )
 
 func (svc SecretService) PutSecret(r *restful.Request, w *restful.Response) {
-	namespace := utils.NamespaceParameter(r)
+	namespace := r.PathParameter("namespace")
 	secretName := r.PathParameter("name")
 
 	secret := &corev1.Secret{}

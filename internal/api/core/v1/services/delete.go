@@ -10,7 +10,7 @@ import (
 )
 
 func (svc ServiceService) DeleteService(r *restful.Request, w *restful.Response) {
-	namespace := utils.NamespaceParameter(r)
+	namespace := r.PathParameter("namespace")
 	serviceName := r.PathParameter("name")
 
 	err := svc.adapter.DeleteService(r.Request.Context(), serviceName, namespace)

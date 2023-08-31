@@ -13,7 +13,7 @@ import (
 )
 
 func (svc PodService) CreatePod(r *restful.Request, w *restful.Response) {
-	namespace := utils.NamespaceParameter(r)
+	namespace := r.PathParameter("namespace")
 
 	pod := &corev1.Pod{}
 

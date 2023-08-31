@@ -10,7 +10,7 @@ import (
 )
 
 func (svc ConfigMapService) DeleteConfigMap(r *restful.Request, w *restful.Response) {
-	namespace := utils.NamespaceParameter(r)
+	namespace := r.PathParameter("namespace")
 	configMapName := r.PathParameter("name")
 
 	err := svc.adapter.DeleteConfigMap(configMapName, namespace)

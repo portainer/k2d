@@ -9,6 +9,7 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
 	adaptererr "github.com/portainer/k2d/internal/adapter/errors"
+	adapterfilters "github.com/portainer/k2d/internal/adapter/filters"
 	k2dtypes "github.com/portainer/k2d/internal/adapter/types"
 	"github.com/portainer/k2d/internal/k8s"
 	"github.com/portainer/k2d/internal/logging"
@@ -156,8 +157,8 @@ func (adapter *KubeDockerAdapter) GetService(ctx context.Context, serviceName, n
 	return &versionedService, nil
 }
 
-func (adapter *KubeDockerAdapter) GetServiceTable(ctx context.Context, namespaceName string) (*metav1.Table, error) {
-	serviceList, err := adapter.listServices(ctx, namespaceName)
+func (adapter *KubeDockerAdapter) GetServiceTable(ctx context.Context, namespace string) (*metav1.Table, error) {
+	serviceList, err := adapter.listServices(ctx, namespace)
 	if err != nil {
 		return &metav1.Table{}, fmt.Errorf("unable to list services: %w", err)
 	}
@@ -165,8 +166,8 @@ func (adapter *KubeDockerAdapter) GetServiceTable(ctx context.Context, namespace
 	return k8s.GenerateTable(&serviceList)
 }
 
-func (adapter *KubeDockerAdapter) ListServices(ctx context.Context, namespaceName string) (corev1.ServiceList, error) {
-	serviceList, err := adapter.listServices(ctx, namespaceName)
+func (adapter *KubeDockerAdapter) ListServices(ctx context.Context, namespace string) (corev1.ServiceList, error) {
+	serviceList, err := adapter.listServices(ctx, namespace)
 	if err != nil {
 		return corev1.ServiceList{}, fmt.Errorf("unable to list services: %w", err)
 	}
@@ -232,10 +233,9 @@ func (adapter *KubeDockerAdapter) buildServiceFromContainer(container types.Cont
 	return &service, nil
 }
 
-func (adapter *KubeDockerAdapter) listServices(ctx context.Context, namespaceName string) (core.ServiceList, error) {
-	labelFilter := filters.NewArgs()
+func (adapter *KubeDockerAdapter) listServices(ctx context.Context, namespace string) (core.ServiceList, error) {
+	labelFilter := adapterfilters.NamespaceFilter(namespace)
 	labelFilter.Add("label", k2dtypes.ServiceNameLabelKey)
-	labelFilter.Add("label", fmt.Sprintf("%s=%s", k2dtypes.NamespaceLabelKey, namespaceName))
 
 	containers, err := adapter.cli.ContainerList(ctx, types.ContainerListOptions{All: true, Filters: labelFilter})
 	if err != nil {
