@@ -41,19 +41,24 @@ func findContainerMatchingSelector(containers []types.Container, selector map[st
 	return nil
 }
 
-// reCreateContainerWithNewConfiguration replaces an existing Docker container with a new one having updated configuration.
+// reCreateContainerWithNewConfiguration replaces an existing Docker container with a new one that has an updated configuration.
 // The function performs the following steps:
-// 1. Stops the existing container.
-// 2. Creates a new container with the updated configuration using a temporary name.
-// 3. Attempts to start the new container.
-// 4. If the new container starts successfully, it removes the old container and renames the new container to the original name.
-// In case of failure during the creation or start of the new container, it attempts to restart the old container and remove the new one.
-// This way, the function ensures that a working container is always available.
-// The function takes three arguments:
-// - ctx is the context, used to control cancellation or timeouts for the operations.
-// - containerID is the ID of the existing container that needs to be replaced.
-// - newContainerCfg is the configuration for the new container.
-// The function returns an error if any step in the process fails.
+// 1. Stops the existing container by its containerID.
+// 2. Creates a new container using the newContainerCfg with a temporary name.
+// 3. Starts the newly created container.
+// 4. If the new container starts successfully, removes the old container.
+// 5. Renames the new container to have the original name as specified in newContainerCfg.
+// If any of the steps fail:
+// - When failing to create a new container, the function attempts to restart the old container.
+// - When failing to start the new container, the old container is removed, and the new container is left in a created state and renamed to the original name for inspection.
+//
+// Parameters:
+// - ctx: Context used for cancellation or timeouts.
+// - containerID: The ID of the existing Docker container to be replaced.
+// - newContainerCfg: The new container configuration.
+//
+// Returns:
+// - An error if any of the steps fail.
 func (adapter *KubeDockerAdapter) reCreateContainerWithNewConfiguration(ctx context.Context, containerID string, newContainerCfg converter.ContainerConfiguration) error {
 	// Define temporary container name
 	tempContainerName := newContainerCfg.ContainerName + "_temp"
