@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"runtime"
+	"strings"
 
 	"github.com/docker/docker/api/types"
 	"github.com/emicklei/go-restful/v3"
@@ -11,9 +12,6 @@ import (
 	"github.com/portainer/k2d/internal/api/utils"
 	k2dtypes "github.com/portainer/k2d/internal/types"
 )
-
-// TODO: use Authorization auth
-const HEADER_SECRET = "x-k2d-secret"
 
 type SystemService struct {
 	serverConfiguration *k2dtypes.K2DServerConfiguration
@@ -37,7 +35,9 @@ func NewSystemService(cfg *k2dtypes.K2DServerConfiguration, adapter *adapter.Kub
 }
 
 func (svc SystemService) Diagnostics(r *restful.Request, w *restful.Response) {
-	secret := r.HeaderParameter(HEADER_SECRET)
+	authorizationHeader := r.HeaderParameter("Authorization")
+	secret := strings.TrimPrefix(authorizationHeader, "Bearer ")
+
 	if secret != svc.serverConfiguration.Secret {
 		w.WriteHeader(http.StatusUnauthorized)
 		w.Write([]byte("invalid secret\n"))
