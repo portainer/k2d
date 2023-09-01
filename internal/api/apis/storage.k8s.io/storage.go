@@ -52,5 +52,5 @@ func (svc StorageService) ListAPIResources(r *restful.Request, w *restful.Respon
 
 func (svc StorageService) RegisterStorageAPI(routes *restful.WebService) {
 	// storage
-	svc.storageclasses.RegisterDeploymentAPI(routes)
+	svc.storageclasses.RegisterStorageClassAPI(routes)
 }

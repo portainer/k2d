@@ -6,30 +6,29 @@ import (
 
 	"github.com/docker/docker/api/types/volume"
 	k2dtypes "github.com/portainer/k2d/internal/adapter/types"
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/pkg/apis/core"
 )
 
-func (converter *DockerAPIConverter) ConvertVolumeToPersistentVolume(volume volume.Volume) (*corev1.PersistentVolume, error) {
+func (converter *DockerAPIConverter) ConvertVolumeToPersistentVolume(volume volume.Volume) (*core.PersistentVolume, error) {
 	creationDate, err := time.Parse(time.RFC3339, volume.CreatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse volume creation date: %w", err)
 	}
 
-	resourceList := corev1.ResourceList{}
-	if volume.UsageData != nil {
-		resourceList[corev1.ResourceStorage] = resource.MustParse(fmt.Sprint(volume.UsageData.Size))
-	}
+	// TODO: Document it as a limitation
+	// resourceList := core.ResourceList{}
+	// if volume.UsageData != nil {
+	// 	resourceList[core.ResourceStorage] = resource.MustParse(fmt.Sprint(volume.UsageData.Size))
+	// }
 
-	// claim reference
-	persistentVolumeClaimReference := &corev1.ObjectReference{
+	persistentVolumeClaimReference := &core.ObjectReference{
 		Kind:      "PersistentVolumeClaim",
 		Namespace: volume.Labels[k2dtypes.NamespaceLabelKey],
 		Name:      volume.Labels[k2dtypes.PersistentVolumeClaimLabelKey],
 	}
 
-	return &corev1.PersistentVolume{
+	return &core.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: volume.Name,
 			CreationTimestamp: metav1.Time{
@@ -40,21 +39,63 @@ func (converter *DockerAPIConverter) ConvertVolumeToPersistentVolume(volume volu
 			Kind:       "PersistentVolume",
 			APIVersion: "v1",
 		},
-		Spec: corev1.PersistentVolumeSpec{
-			Capacity: resourceList,
-			AccessModes: []corev1.PersistentVolumeAccessMode{
-				corev1.ReadWriteOnce,
+		Spec: core.PersistentVolumeSpec{
+			// Capacity: resourceList,
+			AccessModes: []core.PersistentVolumeAccessMode{
+				core.ReadWriteOnce,
 			},
-			PersistentVolumeReclaimPolicy: corev1.PersistentVolumeReclaimDelete,
-			PersistentVolumeSource: corev1.PersistentVolumeSource{
-				HostPath: &corev1.HostPathVolumeSource{
+			PersistentVolumeReclaimPolicy: core.PersistentVolumeReclaimDelete,
+			PersistentVolumeSource: core.PersistentVolumeSource{
+				HostPath: &core.HostPathVolumeSource{
 					Path: volume.Mountpoint,
 				},
 			},
-			ClaimRef: persistentVolumeClaimReference,
+			ClaimRef:         persistentVolumeClaimReference,
+			StorageClassName: "local",
 		},
-		Status: corev1.PersistentVolumeStatus{
-			Phase: corev1.VolumeBound,
+		Status: core.PersistentVolumeStatus{
+			Phase: core.VolumeBound,
+		},
+	}, nil
+}
+
+func (converter *DockerAPIConverter) ConvertVolumeToPersistentVolumeClaim(volume volume.Volume) (*core.PersistentVolumeClaim, error) {
+	creationDate, err := time.Parse(time.RFC3339, volume.CreatedAt)
+	if err != nil {
+		return &core.PersistentVolumeClaim{}, fmt.Errorf("unable to parse volume creation date: %w", err)
+	}
+
+	storageClassName := "local"
+
+	return &core.PersistentVolumeClaim{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "PersistentVolumeClaim",
+			APIVersion: "v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      volume.Labels[k2dtypes.PersistentVolumeClaimLabelKey],
+			Namespace: volume.Labels[k2dtypes.NamespaceLabelKey],
+			CreationTimestamp: metav1.Time{
+				Time: creationDate,
+			},
+			Annotations: map[string]string{
+				"kubectl.kubernetes.io/last-applied-configuration": volume.Labels[k2dtypes.PersistentVolumeClaimLastAppliedConfigLabelKey],
+			},
+		},
+		Spec: core.PersistentVolumeClaimSpec{
+			StorageClassName: &storageClassName,
+			// TODO: Replace the fmt.Sprintf("k2d-pv-%s-%s", namespace, volume.VolumeSource.PersistentVolumeClaim.ClaimName)
+			// part with the buildPersistentVolumeName function.
+			VolumeName: fmt.Sprintf("k2d-pv-%s-%s", volume.Labels[k2dtypes.NamespaceLabelKey], volume.Labels[k2dtypes.PersistentVolumeClaimLabelKey]),
+			AccessModes: []core.PersistentVolumeAccessMode{
+				core.ReadWriteOnce,
+			},
+		},
+		Status: core.PersistentVolumeClaimStatus{
+			Phase: core.ClaimBound,
+			AccessModes: []core.PersistentVolumeAccessMode{
+				core.ReadWriteOnce,
+			},
 		},
 	}, nil
 }

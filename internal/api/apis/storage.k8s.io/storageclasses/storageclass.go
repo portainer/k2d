@@ -15,7 +15,7 @@ func NewStorageClassService(adapter *adapter.KubeDockerAdapter) StorageClassServ
 	}
 }
 
-func (svc StorageClassService) RegisterDeploymentAPI(ws *restful.WebService) {
+func (svc StorageClassService) RegisterStorageClassAPI(ws *restful.WebService) {
 	ws.Route(ws.GET("/v1/storageclasses").
 		To(svc.ListStorageClass))
 

@@ -1,10 +1,13 @@
 package storageclasses
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 
 	"github.com/emicklei/go-restful/v3"
+
+	adaptererr "github.com/portainer/k2d/internal/adapter/errors"
 	"github.com/portainer/k2d/internal/api/utils"
 )
 
@@ -13,12 +16,12 @@ func (svc StorageClassService) GetStorageClass(r *restful.Request, w *restful.Re
 
 	sc, err := svc.adapter.GetStorageClass(r.Request.Context(), storageClassName)
 	if err != nil {
-		utils.HttpError(r, w, http.StatusInternalServerError, fmt.Errorf("unable to get the storage class: %w", err))
-		return
-	}
+		if errors.Is(err, adaptererr.ErrResourceNotFound) {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
 
-	if sc == nil {
-		w.WriteHeader(http.StatusNotFound)
+		utils.HttpError(r, w, http.StatusInternalServerError, fmt.Errorf("unable to get storage class: %w", err))
 		return
 	}
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	adaptererr "github.com/portainer/k2d/internal/adapter/errors"
 	"github.com/portainer/k2d/internal/k8s"
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -11,27 +12,20 @@ import (
 )
 
 func (adapter *KubeDockerAdapter) GetStorageClass(ctx context.Context, storageClassName string) (*storagev1.StorageClass, error) {
-	info, _, err := adapter.InfoAndVersion(ctx)
-	if err != nil {
-		return &storagev1.StorageClass{}, err
+	if storageClassName != "local" {
+		return nil, adaptererr.ErrResourceNotFound
 	}
 
-	for _, plugin := range info.Plugins.Volume {
-		if plugin == storageClassName {
-			return &storagev1.StorageClass{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: plugin,
-				},
-				TypeMeta: metav1.TypeMeta{
-					Kind:       "StorageClass",
-					APIVersion: "storage.k8s.io/v1",
-				},
-				Provisioner: plugin,
-			}, nil
-		}
-	}
-
-	return nil, nil
+	return &storagev1.StorageClass{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "local",
+		},
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "StorageClass",
+			APIVersion: "storage.k8s.io/v1",
+		},
+		Provisioner: "local",
+	}, nil
 }
 
 func (adapter *KubeDockerAdapter) ListStorageClasses(ctx context.Context) (storage.StorageClassList, error) {
@@ -53,25 +47,17 @@ func (adapter *KubeDockerAdapter) GetStorageClassTable(ctx context.Context) (*me
 }
 
 func (adapter *KubeDockerAdapter) listStorageClasses(ctx context.Context) (storage.StorageClassList, error) {
-	info, _, err := adapter.InfoAndVersion(ctx)
-	if err != nil {
-		return storage.StorageClassList{}, err
-	}
-
 	storageClasses := []storage.StorageClass{}
-
-	for _, plugin := range info.Plugins.Volume {
-		storageClasses = append(storageClasses, storage.StorageClass{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: plugin,
-			},
-			TypeMeta: metav1.TypeMeta{
-				Kind:       "StorageClass",
-				APIVersion: "storage.k8s.io/v1",
-			},
-			Provisioner: plugin,
-		})
-	}
+	storageClasses = append(storageClasses, storage.StorageClass{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "local",
+		},
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "StorageClass",
+			APIVersion: "storage.k8s.io/v1",
+		},
+		Provisioner: "local",
+	})
 
 	return storage.StorageClassList{
 		TypeMeta: metav1.TypeMeta{
