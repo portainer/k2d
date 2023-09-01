@@ -19,18 +19,6 @@ import (
 
 // TODO: add function comments
 
-// Each secret has its own metadata file using the following naming convention:
-// [namespace]-[secret-name]-k2dsec.metadata
-func buildSecretMetadataFileName(secretName, namespace string) string {
-	return fmt.Sprintf("%s-%s-k2dsec.metadata", namespace, secretName)
-}
-
-// Each key of a secret is stored in a separate file using the following naming convention:
-// [namespace]-[secret-name]-k2dsec-[key]
-func buildSecretFilePrefix(secretName, namespace string) string {
-	return fmt.Sprintf("%s-%s%s", namespace, secretName, SecretSeparator)
-}
-
 func (s *FileSystemStore) DeleteSecret(secretName, namespace string) error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
@@ -41,17 +29,8 @@ func (s *FileSystemStore) DeleteSecret(secretName, namespace string) error {
 	}
 
 	filePrefix := buildSecretFilePrefix(secretName, namespace)
-
-	// TODO: centralize this logic into a function hasMatchingSecretFile(files []os.FileInfo, filePrefix string) bool
-	hasMatchingSecretFile := false
-	for _, file := range files {
-		if strings.HasPrefix(file.Name(), filePrefix) {
-			hasMatchingSecretFile = true
-			break
-		}
-	}
-
-	if !hasMatchingSecretFile {
+	secretFileFound := containsFileWithPrefix(files, filePrefix)
+	if !secretFileFound {
 		return errors.ErrResourceNotFound
 	}
 
@@ -99,17 +78,8 @@ func (s *FileSystemStore) GetSecret(secretName, namespace string) (*core.Secret,
 	}
 
 	filePrefix := buildSecretFilePrefix(secretName, namespace)
-
-	// TODO: centralize this logic into a function hasMatchingSecretFile(files []os.FileInfo, filePrefix string) bool
-	hasMatchingSecretFile := false
-	for _, file := range files {
-		if strings.HasPrefix(file.Name(), filePrefix) {
-			hasMatchingSecretFile = true
-			break
-		}
-	}
-
-	if !hasMatchingSecretFile {
+	secretFileFound := containsFileWithPrefix(files, filePrefix)
+	if !secretFileFound {
 		return nil, errors.ErrResourceNotFound
 	}
 

@@ -16,21 +16,6 @@ import (
 )
 
 // TODO: add function comments
-
-// TODO: introduce a naming package in each store implementation to centralize the naming logic
-
-// Each configmap has its own metadata file using the following naming convention:
-// [namespace]-[configmap-name]-k2dcm.metadata
-func buildConfigMapMetadataFileName(configMapName, namespace string) string {
-	return fmt.Sprintf("%s-%s-k2dcm.metadata", namespace, configMapName)
-}
-
-// Each key of a configmap is stored in a separate file using the following naming convention:
-// [namespace]-[configmap-name]-k2dcm-[key]
-func buildConfigMapFilePrefix(configMapName, namespace string) string {
-	return fmt.Sprintf("%s-%s%s", namespace, configMapName, ConfigMapSeparator)
-}
-
 func (s *FileSystemStore) DeleteConfigMap(configMapName, namespace string) error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
@@ -41,17 +26,8 @@ func (s *FileSystemStore) DeleteConfigMap(configMapName, namespace string) error
 	}
 
 	filePrefix := buildConfigMapFilePrefix(configMapName, namespace)
-
-	// TODO: centralize this logic into a function hasMatchingConfigMapFile(files []os.FileInfo, filePrefix string) bool
-	hasMatchingConfigMapFile := false
-	for _, file := range files {
-		if strings.HasPrefix(file.Name(), filePrefix) {
-			hasMatchingConfigMapFile = true
-			break
-		}
-	}
-
-	if !hasMatchingConfigMapFile {
+	configMapFileFound := containsFileWithPrefix(files, filePrefix)
+	if !configMapFileFound {
 		return errors.ErrResourceNotFound
 	}
 
@@ -105,16 +81,8 @@ func (s *FileSystemStore) GetConfigMap(configMapName, namespace string) (*core.C
 	}
 
 	filePrefix := buildConfigMapFilePrefix(configMapName, namespace)
-
-	hasMatchingConfigMapFile := false
-	for _, file := range files {
-		if strings.HasPrefix(file.Name(), filePrefix) {
-			hasMatchingConfigMapFile = true
-			break
-		}
-	}
-
-	if !hasMatchingConfigMapFile {
+	configMapFileFound := containsFileWithPrefix(files, filePrefix)
+	if !configMapFileFound {
 		return nil, errors.ErrResourceNotFound
 	}
 
