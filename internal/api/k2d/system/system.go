@@ -12,6 +12,7 @@ import (
 	k2dtypes "github.com/portainer/k2d/internal/types"
 )
 
+// TODO: use Authorization auth
 const HEADER_SECRET = "x-k2d-secret"
 
 type SystemService struct {
