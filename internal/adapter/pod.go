@@ -7,9 +7,8 @@ import (
 	"io"
 
 	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/api/types/filters"
 	"github.com/portainer/k2d/internal/adapter/errors"
-	adapterfilters "github.com/portainer/k2d/internal/adapter/filters"
+	"github.com/portainer/k2d/internal/adapter/filters"
 	k2dtypes "github.com/portainer/k2d/internal/adapter/types"
 	"github.com/portainer/k2d/internal/k8s"
 	corev1 "k8s.io/api/core/v1"
@@ -44,17 +43,14 @@ func (adapter *KubeDockerAdapter) CreateContainerFromPod(ctx context.Context, po
 	return adapter.createContainerFromPodSpec(ctx, opts)
 }
 
-// The GetPod implementation has to use a filtered list approach as the Docker API provide different response types
+// The GetPod implementation is using a filtered list approach as the Docker API provide different response types
 // when inspecting a container and listing containers.
 // The logic used to build a pod from a container is based on the type returned by the list operation (types.Container)
 // and not the inspect operation (types.ContainerJSON).
 // This is because using the inspect operation everywhere would be more expensive overall.
 func (adapter *KubeDockerAdapter) GetPod(ctx context.Context, podName string, namespace string) (*corev1.Pod, error) {
-	labelFilter := filters.NewArgs()
-	labelFilter.Add("label", fmt.Sprintf("%s=%s", k2dtypes.NamespaceLabelKey, namespace))
-	labelFilter.Add("label", fmt.Sprintf("%s=%s", k2dtypes.WorkloadNameLabelKey, podName))
-
-	containers, err := adapter.cli.ContainerList(ctx, types.ContainerListOptions{All: true, Filters: labelFilter})
+	filter := filters.ByPod(namespace, podName)
+	containers, err := adapter.cli.ContainerList(ctx, types.ContainerListOptions{All: true, Filters: filter})
 	if err != nil {
 		return nil, fmt.Errorf("unable to list containers: %w", err)
 	}
@@ -159,9 +155,8 @@ func (adapter *KubeDockerAdapter) buildPodFromContainer(container types.Containe
 }
 
 func (adapter *KubeDockerAdapter) listPods(ctx context.Context, namespace string) (core.PodList, error) {
-	labelFilter := adapterfilters.NamespaceFilter(namespace)
-
-	containers, err := adapter.cli.ContainerList(ctx, types.ContainerListOptions{All: true, Filters: labelFilter})
+	filter := filters.ByNamespace(namespace)
+	containers, err := adapter.cli.ContainerList(ctx, types.ContainerListOptions{All: true, Filters: filter})
 	if err != nil {
 		return core.PodList{}, fmt.Errorf("unable to list containers: %w", err)
 	}

@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/errdefs"
 	adaptererr "github.com/portainer/k2d/internal/adapter/errors"
+	"github.com/portainer/k2d/internal/adapter/filters"
 	k2dtypes "github.com/portainer/k2d/internal/adapter/types"
 	"github.com/portainer/k2d/internal/k8s"
 	corev1 "k8s.io/api/core/v1"
@@ -63,10 +63,8 @@ func (adapter *KubeDockerAdapter) CreateNetworkFromNamespace(ctx context.Context
 }
 
 func (adapter *KubeDockerAdapter) DeleteNamespace(ctx context.Context, namespaceName string) error {
-	labelFilter := filters.NewArgs()
-	labelFilter.Add("label", fmt.Sprintf("%s=%s", k2dtypes.NamespaceLabelKey, namespaceName))
-
-	containers, err := adapter.cli.ContainerList(ctx, types.ContainerListOptions{All: true, Filters: labelFilter})
+	filter := filters.ByNamespace(namespaceName)
+	containers, err := adapter.cli.ContainerList(ctx, types.ContainerListOptions{All: true, Filters: filter})
 	if err != nil {
 		return fmt.Errorf("unable to list containers: %w", err)
 	}
@@ -155,10 +153,8 @@ func (adapter *KubeDockerAdapter) getNetwork(ctx context.Context, networkName st
 }
 
 func (adapter *KubeDockerAdapter) listNamespaces(ctx context.Context) (core.NamespaceList, error) {
-	labelFilter := filters.NewArgs()
-	labelFilter.Add("label", k2dtypes.NamespaceLabelKey)
-
-	networks, err := adapter.cli.NetworkList(ctx, types.NetworkListOptions{Filters: labelFilter})
+	filter := filters.AllNamespaces()
+	networks, err := adapter.cli.NetworkList(ctx, types.NetworkListOptions{Filters: filter})
 	if err != nil {
 		return core.NamespaceList{}, fmt.Errorf("unable to list networks: %w", err)
 	}
