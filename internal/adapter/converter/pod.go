@@ -375,12 +375,14 @@ func (converter *DockerAPIConverter) setVolumeMounts(namespace string, hostConfi
 // For HostPath:
 // The function directly uses the HostPath and volume mount to set up the bind in the Docker host configuration.
 //
+// For PersistentVolumeClaim:
+// The function uses the volume name and namespace to generate a unique name for the volume.
+//
 // Parameters:
 // - hostConfig:   The Docker host configuration where the volume binds will be set.
 // - volume:       The Kubernetes volume object to be processed.
 // - volumeMount:  The Kubernetes volume mount object that provides additional information on how the volume should be mounted.
 //
-// UPDATE WITH PVC
 // Returns:
 // An error if fetching the ConfigMap or Secret from the store fails; otherwise, it returns nil.
 func (converter *DockerAPIConverter) handleVolumeSource(namespace string, hostConfig *container.HostConfig, volume core.Volume, volumeMount core.VolumeMount) error {

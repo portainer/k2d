@@ -16,12 +16,6 @@ func (converter *DockerAPIConverter) ConvertVolumeToPersistentVolume(volume volu
 		return nil, fmt.Errorf("unable to parse volume creation date: %w", err)
 	}
 
-	// TODO: Document it as a limitation
-	// resourceList := core.ResourceList{}
-	// if volume.UsageData != nil {
-	// 	resourceList[core.ResourceStorage] = resource.MustParse(fmt.Sprint(volume.UsageData.Size))
-	// }
-
 	persistentVolumeClaimReference := &core.ObjectReference{
 		Kind:      "PersistentVolumeClaim",
 		Namespace: volume.Labels[k2dtypes.NamespaceLabelKey],
