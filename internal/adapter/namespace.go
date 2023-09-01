@@ -89,6 +89,7 @@ func (adapter *KubeDockerAdapter) DeleteNamespace(ctx context.Context, namespace
 }
 
 func (adapter *KubeDockerAdapter) GetNamespace(ctx context.Context, namespaceName string) (*corev1.Namespace, error) {
+
 	networkName := buildNetworkName(namespaceName)
 
 	network, err := adapter.getNetwork(ctx, networkName)

@@ -219,6 +219,8 @@ func (adapter *KubeDockerAdapter) getContainer(ctx context.Context, containerNam
 //   - namespace: Used to determine the network in which the container should be created.
 //   - podSpec: The Kubernetes PodSpec that serves as the template for the Docker container.
 //
+// mention about the volume mounts
+//
 // Returns:
 //   - If any step in the container creation process fails (such as PodSpec conversion, image pull, or container creation),
 //     the function returns an error wrapped with a description of the failed step.

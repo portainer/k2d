@@ -375,6 +375,8 @@ func (converter *DockerAPIConverter) setVolumeMounts(namespace string, hostConfi
 // For HostPath:
 // The function directly uses the HostPath and volume mount to set up the bind in the Docker host configuration.
 //
+// TBU:
+//
 // Parameters:
 // - hostConfig:   The Docker host configuration where the volume binds will be set.
 // - volume:       The Kubernetes volume object to be processed.
@@ -415,6 +417,9 @@ func (converter *DockerAPIConverter) handleVolumeSource(namespace string, hostCo
 		}
 	} else if volume.HostPath != nil {
 		bind := fmt.Sprintf("%s:%s", volume.HostPath.Path, volumeMount.MountPath)
+		hostConfig.Binds = append(hostConfig.Binds, bind)
+	} else if volume.VolumeSource.PersistentVolumeClaim != nil {
+		bind := fmt.Sprintf("%s:%s", fmt.Sprintf("k2d-pv-%s-%s", namespace, volume.VolumeSource.PersistentVolumeClaim.ClaimName), volumeMount.MountPath)
 		hostConfig.Binds = append(hostConfig.Binds, bind)
 	}
 	return nil

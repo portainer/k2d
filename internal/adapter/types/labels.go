@@ -32,8 +32,8 @@ const (
 	WorkloadNameLabelKey = "workload.k2d.io/name"
 
 	// PersistentVolumeLabelKey is the key used to store the persistent volume name in the container labels
-	PersistentVolumeLabelKey = "persistentvolume.k2d.io/name"
+	PersistentVolumeLabelKey = "storage.k2d.io/pv"
 
 	// PersistentVolumeClaimLabelKey is the key used to store the persistent volume name in the container labels
-	PersistentVolumeClaimLabelKey = "persistentvolumeclaim.k2d.io/name"
+	PersistentVolumeClaimLabelKey = "storage.k2d.io/pvc"
 )

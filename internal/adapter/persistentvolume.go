@@ -16,57 +16,12 @@ import (
 )
 
 func (adapter *KubeDockerAdapter) GetPersistentVolume(ctx context.Context, persistentVolumeName string) (*corev1.PersistentVolume, error) {
-	labelFilter := filters.NewArgs()
-	labelFilter.Add("name", persistentVolumeName)
-	labelFilter.Add("label", fmt.Sprintf("%s=%s", k2dtypes.PersistentVolumeLabelKey, persistentVolumeName))
-
-	volumeList, err := adapter.cli.VolumeList(ctx, volume.ListOptions{Filters: labelFilter})
+	volume, err := adapter.cli.VolumeInspect(ctx, persistentVolumeName)
 	if err != nil {
 		return nil, fmt.Errorf("unable to list volumes to return the output values from a Docker volume: %w", err)
 	}
 
-	if len(volumeList.Volumes) > 0 {
-		creationDate, err := time.Parse(time.RFC3339, volumeList.Volumes[0].CreatedAt)
-		if err != nil {
-			return nil, fmt.Errorf("unable to parse volume creation date: %w", err)
-		}
-
-		resourceList := corev1.ResourceList{}
-		if volumeList.Volumes[0].UsageData != nil {
-			resourceList[corev1.ResourceStorage] = resource.MustParse(fmt.Sprint(volumeList.Volumes[0].UsageData.Size))
-		}
-
-		return &corev1.PersistentVolume{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: volumeList.Volumes[0].Name,
-				CreationTimestamp: metav1.Time{
-					Time: creationDate,
-				},
-			},
-			TypeMeta: metav1.TypeMeta{
-				Kind:       "PersistentVolume",
-				APIVersion: "v1",
-			},
-			Spec: corev1.PersistentVolumeSpec{
-				Capacity: resourceList,
-				AccessModes: []corev1.PersistentVolumeAccessMode{
-					corev1.ReadWriteOnce,
-				},
-				PersistentVolumeReclaimPolicy: corev1.PersistentVolumeReclaimDelete,
-				PersistentVolumeSource: corev1.PersistentVolumeSource{
-					HostPath: &corev1.HostPathVolumeSource{
-						Path: volumeList.Volumes[0].Mountpoint,
-					},
-				},
-				ClaimRef: nil,
-			},
-			Status: corev1.PersistentVolumeStatus{
-				Phase: corev1.VolumeBound,
-			},
-		}, nil
-	}
-
-	return nil, nil
+	return adapter.converter.ConvertVolumeToPersistentVolume(volume)
 }
 
 func (adapter *KubeDockerAdapter) ListPersistentVolumes(ctx context.Context) (core.PersistentVolumeList, error) {

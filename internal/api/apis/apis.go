@@ -46,7 +46,6 @@ func (api ApisAPI) APIs() *restful.WebService {
 func (api ApisAPI) Storages() *restful.WebService {
 	routes := new(restful.WebService).
 		Path("/apis/storage.k8s.io").
-		Consumes(restful.MIME_JSON).
 		Produces(restful.MIME_JSON)
 
 	// which versions are served by this api
