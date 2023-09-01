@@ -6,7 +6,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/volume"
 	"github.com/docker/docker/errdefs"
 	"github.com/portainer/k2d/internal/adapter/errors"
@@ -75,15 +74,7 @@ func (s *VolumeStore) GetSecret(secretName, namespace string) (*core.Secret, err
 // Filters are applied to list only the volumes that are meant to be Secrets.
 // Returns a SecretList object containing all matched Secrets, and an error if any occurs.
 func (s *VolumeStore) GetSecrets(namespace string, selector labels.Selector) (core.SecretList, error) {
-	filter := filters.NewArgs()
-	filter.Add("label", fmt.Sprintf("%s=%s", ResourceTypeLabelKey, SecretResourceType))
-
-	label := NamespaceNameLabelKey
-	if namespace != "" {
-		label = fmt.Sprintf("%s=%s", NamespaceNameLabelKey, namespace)
-	}
-	filter.Add("label", label)
-
+	filter := secretListFilter(namespace)
 	volumes, err := s.cli.VolumeList(context.TODO(), volume.ListOptions{
 		Filters: filter,
 	})

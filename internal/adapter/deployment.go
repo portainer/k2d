@@ -6,21 +6,14 @@ import (
 	"fmt"
 
 	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/api/types/filters"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/apis/apps"
 
 	adaptererr "github.com/portainer/k2d/internal/adapter/errors"
-	adapterfilters "github.com/portainer/k2d/internal/adapter/filters"
+	"github.com/portainer/k2d/internal/adapter/filters"
 	k2dtypes "github.com/portainer/k2d/internal/adapter/types"
 	"github.com/portainer/k2d/internal/k8s"
 	appsv1 "k8s.io/api/apps/v1"
-)
-
-const (
-	// DeploymentWorkloadType is the label value used to identify a Deployment workload
-	// It is stored on a container as a label and used to filter containers when listing deployments
-	DeploymentWorkloadType = "deployment"
 )
 
 func (adapter *KubeDockerAdapter) CreateContainerFromDeployment(ctx context.Context, deployment *appsv1.Deployment) error {
@@ -31,7 +24,7 @@ func (adapter *KubeDockerAdapter) CreateContainerFromDeployment(ctx context.Cont
 		labels:        deployment.Spec.Template.Labels,
 	}
 
-	opts.labels[k2dtypes.WorkloadLabelKey] = DeploymentWorkloadType
+	opts.labels[k2dtypes.WorkloadLabelKey] = k2dtypes.DeploymentWorkloadType
 
 	if deployment.Labels["app.kubernetes.io/managed-by"] == "Helm" {
 		deploymentData, err := json.Marshal(deployment)
@@ -57,12 +50,8 @@ func (adapter *KubeDockerAdapter) CreateContainerFromDeployment(ctx context.Cont
 }
 
 func (adapter *KubeDockerAdapter) getContainerFromDeploymentName(ctx context.Context, deploymentName, namespace string) (types.Container, error) {
-	labelFilter := filters.NewArgs()
-	labelFilter.Add("label", fmt.Sprintf("%s=%s", k2dtypes.WorkloadLabelKey, DeploymentWorkloadType))
-	labelFilter.Add("label", fmt.Sprintf("%s=%s", k2dtypes.NamespaceLabelKey, namespace))
-	labelFilter.Add("label", fmt.Sprintf("%s=%s", k2dtypes.WorkloadNameLabelKey, deploymentName))
-
-	containers, err := adapter.cli.ContainerList(ctx, types.ContainerListOptions{All: true, Filters: labelFilter})
+	filter := filters.ByDeployment(namespace, deploymentName)
+	containers, err := adapter.cli.ContainerList(ctx, types.ContainerListOptions{All: true, Filters: filter})
 	if err != nil {
 		return types.Container{}, fmt.Errorf("unable to list containers: %w", err)
 	}
@@ -160,10 +149,8 @@ func (adapter *KubeDockerAdapter) buildDeploymentFromContainer(container types.C
 }
 
 func (adapter *KubeDockerAdapter) listDeployments(ctx context.Context, namespace string) (apps.DeploymentList, error) {
-	labelFilter := adapterfilters.NamespaceFilter(namespace)
-	labelFilter.Add("label", fmt.Sprintf("%s=%s", k2dtypes.WorkloadLabelKey, DeploymentWorkloadType))
-
-	containers, err := adapter.cli.ContainerList(ctx, types.ContainerListOptions{All: true, Filters: labelFilter})
+	filter := filters.AllDeployments(namespace)
+	containers, err := adapter.cli.ContainerList(ctx, types.ContainerListOptions{All: true, Filters: filter})
 	if err != nil {
 		return apps.DeploymentList{}, fmt.Errorf("unable to list containers: %w", err)
 	}

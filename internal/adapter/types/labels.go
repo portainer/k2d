@@ -28,3 +28,9 @@ const (
 	// WorkloadNameLabelKey is the key used to store the workload name in the container labels
 	WorkloadNameLabelKey = "workload.k2d.io/name"
 )
+
+const (
+	// DeploymentWorkloadType is the label value used to identify a Deployment workload
+	// It is stored on a container as a label and used to filter containers when listing deployments
+	DeploymentWorkloadType = "deployment"
+)

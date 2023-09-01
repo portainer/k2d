@@ -6,7 +6,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/volume"
 	"github.com/docker/docker/errdefs"
 	"github.com/portainer/k2d/internal/adapter/errors"
@@ -74,15 +73,7 @@ func (s *VolumeStore) GetConfigMap(configMapName, namespace string) (*core.Confi
 // Filters are applied to list only the volumes that are meant to be ConfigMaps.
 // Returns a ConfigMapList object containing all matched ConfigMaps, and an error if any occurs.
 func (store *VolumeStore) GetConfigMaps(namespace string) (core.ConfigMapList, error) {
-	filter := filters.NewArgs()
-	filter.Add("label", fmt.Sprintf("%s=%s", ResourceTypeLabelKey, ConfigMapResourceType))
-
-	label := NamespaceNameLabelKey
-	if namespace != "" {
-		label = fmt.Sprintf("%s=%s", NamespaceNameLabelKey, namespace)
-	}
-	filter.Add("label", label)
-
+	filter := configMapListFilter(namespace)
 	volumes, err := store.cli.VolumeList(context.TODO(), volume.ListOptions{
 		Filters: filter,
 	})

@@ -7,9 +7,8 @@ import (
 	"fmt"
 
 	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/api/types/filters"
 	adaptererr "github.com/portainer/k2d/internal/adapter/errors"
-	adapterfilters "github.com/portainer/k2d/internal/adapter/filters"
+	"github.com/portainer/k2d/internal/adapter/filters"
 	k2dtypes "github.com/portainer/k2d/internal/adapter/types"
 	"github.com/portainer/k2d/internal/k8s"
 	"github.com/portainer/k2d/internal/logging"
@@ -188,11 +187,8 @@ func (adapter *KubeDockerAdapter) ListServices(ctx context.Context, namespace st
 }
 
 func (adapter *KubeDockerAdapter) getContainerFromServiceName(ctx context.Context, serviceName, namespace string) (types.Container, error) {
-	labelFilter := filters.NewArgs()
-	labelFilter.Add("label", fmt.Sprintf("%s=%s", k2dtypes.ServiceNameLabelKey, serviceName))
-	labelFilter.Add("label", fmt.Sprintf("%s=%s", k2dtypes.NamespaceLabelKey, namespace))
-
-	containers, err := adapter.cli.ContainerList(ctx, types.ContainerListOptions{All: true, Filters: labelFilter})
+	filter := filters.ByService(namespace, serviceName)
+	containers, err := adapter.cli.ContainerList(ctx, types.ContainerListOptions{All: true, Filters: filter})
 	if err != nil {
 		return types.Container{}, fmt.Errorf("unable to list containers: %w", err)
 	}
@@ -234,10 +230,8 @@ func (adapter *KubeDockerAdapter) buildServiceFromContainer(container types.Cont
 }
 
 func (adapter *KubeDockerAdapter) listServices(ctx context.Context, namespace string) (core.ServiceList, error) {
-	labelFilter := adapterfilters.NamespaceFilter(namespace)
-	labelFilter.Add("label", k2dtypes.ServiceNameLabelKey)
-
-	containers, err := adapter.cli.ContainerList(ctx, types.ContainerListOptions{All: true, Filters: labelFilter})
+	filter := filters.AllServices(namespace)
+	containers, err := adapter.cli.ContainerList(ctx, types.ContainerListOptions{All: true, Filters: filter})
 	if err != nil {
 		return core.ServiceList{}, fmt.Errorf("unable to list containers: %w", err)
 	}
