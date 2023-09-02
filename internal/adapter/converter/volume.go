@@ -53,43 +53,47 @@ func (converter *DockerAPIConverter) ConvertVolumeToPersistentVolume(volume volu
 	}, nil
 }
 
-func (converter *DockerAPIConverter) ConvertVolumeToPersistentVolumeClaim(volume volume.Volume) (*core.PersistentVolumeClaim, error) {
+func (converter *DockerAPIConverter) UpdateVolumeToPersistentVolumeClaim(persistentVolumeClaim *core.PersistentVolumeClaim, volume volume.Volume) error {
 	creationDate, err := time.Parse(time.RFC3339, volume.CreatedAt)
 	if err != nil {
-		return &core.PersistentVolumeClaim{}, fmt.Errorf("unable to parse volume creation date: %w", err)
+		return fmt.Errorf("unable to parse volume creation date: %w", err)
 	}
 
 	storageClassName := "local"
 
-	return &core.PersistentVolumeClaim{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "PersistentVolumeClaim",
-			APIVersion: "v1",
+	persistentVolumeClaim.TypeMeta = metav1.TypeMeta{
+		Kind:       "PersistentVolumeClaim",
+		APIVersion: "v1",
+	}
+
+	persistentVolumeClaim.ObjectMeta = metav1.ObjectMeta{
+		Name:      volume.Labels[k2dtypes.PersistentVolumeClaimLabelKey],
+		Namespace: volume.Labels[k2dtypes.NamespaceLabelKey],
+		CreationTimestamp: metav1.Time{
+			Time: creationDate,
 		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      volume.Labels[k2dtypes.PersistentVolumeClaimLabelKey],
-			Namespace: volume.Labels[k2dtypes.NamespaceLabelKey],
-			CreationTimestamp: metav1.Time{
-				Time: creationDate,
-			},
-			Annotations: map[string]string{
-				"kubectl.kubernetes.io/last-applied-configuration": volume.Labels[k2dtypes.PersistentVolumeClaimLastAppliedConfigLabelKey],
-			},
+		Annotations: map[string]string{
+			"kubectl.kubernetes.io/last-applied-configuration": volume.Labels[k2dtypes.PersistentVolumeClaimLastAppliedConfigLabelKey],
 		},
-		Spec: core.PersistentVolumeClaimSpec{
-			StorageClassName: &storageClassName,
-			// TODO: Replace the fmt.Sprintf("k2d-pv-%s-%s", namespace, volume.VolumeSource.PersistentVolumeClaim.ClaimName)
-			// part with the buildPersistentVolumeName function.
-			VolumeName: fmt.Sprintf("k2d-pv-%s-%s", volume.Labels[k2dtypes.NamespaceLabelKey], volume.Labels[k2dtypes.PersistentVolumeClaimLabelKey]),
-			AccessModes: []core.PersistentVolumeAccessMode{
-				core.ReadWriteOnce,
-			},
+	}
+
+	persistentVolumeClaim.Spec = core.PersistentVolumeClaimSpec{
+		StorageClassName: &storageClassName,
+		// TODO: Replace the fmt.Sprintf("k2d-pv-%s-%s", namespace, volume.VolumeSource.PersistentVolumeClaim.ClaimName)
+		// part with the buildPersistentVolumeName function.
+		VolumeName: fmt.Sprintf("k2d-pv-%s-%s", volume.Labels[k2dtypes.NamespaceLabelKey], volume.Labels[k2dtypes.PersistentVolumeClaimLabelKey]),
+		AccessModes: []core.PersistentVolumeAccessMode{
+			core.ReadWriteOnce,
 		},
-		Status: core.PersistentVolumeClaimStatus{
-			Phase: core.ClaimBound,
-			AccessModes: []core.PersistentVolumeAccessMode{
-				core.ReadWriteOnce,
-			},
+		Resources: persistentVolumeClaim.Spec.Resources,
+	}
+
+	persistentVolumeClaim.Status = core.PersistentVolumeClaimStatus{
+		Phase: core.ClaimBound,
+		AccessModes: []core.PersistentVolumeAccessMode{
+			core.ReadWriteOnce,
 		},
-	}, nil
+	}
+
+	return nil
 }

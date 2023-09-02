@@ -64,45 +64,48 @@ func (adapter *KubeDockerAdapter) GetPersistentVolumeClaim(ctx context.Context, 
 		return nil, fmt.Errorf("unable to inspect docker volume %s: %w", volumeName, err)
 	}
 
-	persistentVolumeClaim, err := adapter.buildPersistentVolumeClaimFromVolume(volume)
+	persistentVolumeClaim, err := adapter.updatePersistentVolumeClaimFromVolume(volume)
 	if err != nil {
-		return nil, fmt.Errorf("unable to build persistent volume claim from volume: %w", err)
+		return nil, fmt.Errorf("unable to update persistent volume claim from volume: %w", err)
 	}
 
-	versionedPersistentVolumeClaim := corev1.PersistentVolumeClaim{
+	versionedpersistentVolumeClaim := corev1.PersistentVolumeClaim{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "PersistentVolumeClaim",
 			APIVersion: "v1",
 		},
 	}
 
-	err = adapter.ConvertK8SResource(persistentVolumeClaim, &versionedPersistentVolumeClaim)
+	err = adapter.ConvertK8SResource(persistentVolumeClaim, &versionedpersistentVolumeClaim)
 	if err != nil {
 		return nil, fmt.Errorf("unable to convert internal object to versioned object: %w", err)
 	}
 
-	return &versionedPersistentVolumeClaim, nil
+	return &versionedpersistentVolumeClaim, nil
 }
 
-func (adapter *KubeDockerAdapter) buildPersistentVolumeClaimFromVolume(volume volume.Volume) (*core.PersistentVolumeClaim, error) {
-	persistentVolumeClaim, err := adapter.converter.ConvertVolumeToPersistentVolumeClaim(volume)
+func (adapter *KubeDockerAdapter) updatePersistentVolumeClaimFromVolume(volume volume.Volume) (*core.PersistentVolumeClaim, error) {
+	persistentVolumeClaimData := volume.Labels[k2dtypes.PersistentVolumeClaimLastAppliedConfigLabelKey]
+
+	versionedPersistentVolumeClaim := &corev1.PersistentVolumeClaim{}
+
+	err := json.Unmarshal([]byte(persistentVolumeClaimData), &versionedPersistentVolumeClaim)
+	if err != nil {
+		return nil, fmt.Errorf("unable to unmarshal versioned service: %w", err)
+	}
+
+	persistentVolumeClaim := core.PersistentVolumeClaim{}
+	err = adapter.ConvertK8SResource(versionedPersistentVolumeClaim, &persistentVolumeClaim)
+	if err != nil {
+		return nil, fmt.Errorf("unable to convert internal object to versioned object: %w", err)
+	}
+
+	err = adapter.converter.UpdateVolumeToPersistentVolumeClaim(&persistentVolumeClaim, volume)
 	if err != nil {
 		return nil, fmt.Errorf("unable to convert Docker volume to PersistentVolumeClaim: %w", err)
 	}
 
-	if volume.Labels[k2dtypes.PersistentVolumeClaimLastAppliedConfigLabelKey] != "" {
-		internalPersistentVolumeClaimData := volume.Labels[k2dtypes.PersistentVolumeClaimLastAppliedConfigLabelKey]
-		persistentVolumeClaimSpec := core.PersistentVolumeClaimSpec{}
-
-		err := json.Unmarshal([]byte(internalPersistentVolumeClaimData), &persistentVolumeClaimSpec)
-		if err != nil {
-			return nil, fmt.Errorf("unable to unmarshal pod spec: %w", err)
-		}
-
-		persistentVolumeClaim.Spec = persistentVolumeClaimSpec
-	}
-
-	return persistentVolumeClaim, nil
+	return &persistentVolumeClaim, nil
 }
 
 func (adapter *KubeDockerAdapter) ListPersistentVolumeClaims(ctx context.Context, namespaceName string) (core.PersistentVolumeClaimList, error) {
@@ -128,7 +131,7 @@ func (adapter *KubeDockerAdapter) listPersistentVolumeClaims(ctx context.Context
 	labelFilter.Add("label", k2dtypes.PersistentVolumeClaimLabelKey)
 	labelFilter.Add("label", fmt.Sprintf("%s=%s", k2dtypes.NamespaceLabelKey, namespaceName))
 
-	volumeList, err := adapter.cli.VolumeList(ctx, volume.ListOptions{Filters: labelFilter})
+	volumes, err := adapter.cli.VolumeList(ctx, volume.ListOptions{Filters: labelFilter})
 	if err != nil {
 		return &core.PersistentVolumeClaimList{}, fmt.Errorf("unable to list volumes to return the output values from a Docker volume: %w", err)
 	}
@@ -140,10 +143,10 @@ func (adapter *KubeDockerAdapter) listPersistentVolumeClaims(ctx context.Context
 		},
 	}
 
-	for _, volume := range volumeList.Volumes {
-		persistentVolumeClaim, err := adapter.converter.ConvertVolumeToPersistentVolumeClaim(*volume)
+	for _, volume := range volumes.Volumes {
+		persistentVolumeClaim, err := adapter.updatePersistentVolumeClaimFromVolume(*volume)
 		if err != nil {
-			return nil, fmt.Errorf("unable to convert Docker volume to PersistentVolumeClaim: %w", err)
+			return nil, fmt.Errorf("unable to update persistent volume claim from volume: %w", err)
 		}
 
 		persistentVolumeClaims.Items = append(persistentVolumeClaims.Items, *persistentVolumeClaim)
