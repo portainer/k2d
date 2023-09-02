@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	adaptererr "github.com/portainer/k2d/internal/adapter/errors"
 	"github.com/portainer/k2d/internal/k8s"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -31,8 +32,8 @@ func (adapter *KubeDockerAdapter) ListNodes(ctx context.Context) (corev1.NodeLis
 	return versionedNodeList, nil
 }
 
-func (adapter *KubeDockerAdapter) GetNode(ctx context.Context) (*corev1.Node, error) {
-	node, err := adapter.getNode(ctx)
+func (adapter *KubeDockerAdapter) GetNode(ctx context.Context, nodeName string) (*corev1.Node, error) {
+	node, err := adapter.getNode(ctx, nodeName)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get node: %w", err)
 	}
@@ -61,10 +62,14 @@ func (adapter *KubeDockerAdapter) GetNodeTable(ctx context.Context) (*metav1.Tab
 	return k8s.GenerateTable(&nodeList)
 }
 
-func (adapter *KubeDockerAdapter) getNode(ctx context.Context) (*core.Node, error) {
+func (adapter *KubeDockerAdapter) getNode(ctx context.Context, nodeName string) (*core.Node, error) {
 	info, err := adapter.cli.Info(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to retrieve docker server info: %w", err)
+	}
+
+	if nodeName != info.Name {
+		return nil, adaptererr.ErrResourceNotFound
 	}
 
 	version, err := adapter.cli.ServerVersion(ctx)
