@@ -91,7 +91,7 @@ type StoreOptions struct {
 func ConfigureStore(opts StoreOptions) (ConfigMapStore, SecretStore, error) {
 	switch opts.Backend {
 	case "disk":
-		filesystemStore, err := filesystem.NewFileSystemStore(opts.Filesystem)
+		filesystemStore, err := filesystem.NewFileSystemStore(opts.Logger, opts.Filesystem)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to create filesystem store: %w", err)
 		}
