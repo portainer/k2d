@@ -12,6 +12,7 @@ import (
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
+	"github.com/portainer/k2d/pkg/crypto"
 )
 
 // copyDataMapToVolume is responsible for copying a given data map into a specified Docker volume.
@@ -33,7 +34,8 @@ func (s *VolumeStore) copyDataMapToVolume(volumeName string, dataMap map[string]
 		},
 	}
 
-	resp, err := s.cli.ContainerCreate(context.TODO(), containerConfig, hostConfig, nil, nil, fmt.Sprintf("k2d-volume-copy-%s", volumeName))
+	copyContainerName := fmt.Sprintf("k2d-volume-copy-%s-%d", volumeName, time.Now().UnixNano())
+	resp, err := s.cli.ContainerCreate(context.TODO(), containerConfig, hostConfig, nil, nil, copyContainerName)
 	if err != nil {
 		return fmt.Errorf("unable to create temporary volume copy container: %w", err)
 	}
@@ -47,16 +49,26 @@ func (s *VolumeStore) copyDataMapToVolume(volumeName string, dataMap map[string]
 	tw := tar.NewWriter(&buf)
 
 	for key, value := range dataMap {
+		data := []byte(value)
+		// TODO: maybe refactor this to if s.secretKind == RegistrySecretResourceType
+		if len(s.encryptionKey) > 0 {
+			data, err = crypto.Encrypt(data, s.encryptionKey)
+			if err != nil {
+				return fmt.Errorf("unable to encrypt data: %w", err)
+			}
+		}
+
 		hdr := &tar.Header{
 			Name: key,
 			Mode: 0400,
-			Size: int64(len(value)),
+			Size: int64(len(data)),
 		}
 
 		if err := tw.WriteHeader(hdr); err != nil {
 			return fmt.Errorf("unable to write tar header: %w", err)
 		}
-		if _, err := tw.Write([]byte(value)); err != nil {
+
+		if _, err := tw.Write(data); err != nil {
 			return fmt.Errorf("unable to write tar body: %w", err)
 		}
 	}
@@ -118,7 +130,8 @@ func (s *VolumeStore) createAndStartCopyContainer(volumeBindings []string, conta
 // Returns:
 // - A map where the keys are filenames and the values are file contents, or an error if the operation fails.
 func (store *VolumeStore) getDataMapFromVolume(volumeName string) (map[string]string, error) {
-	containerID, err := store.createAndStartCopyContainer([]string{fmt.Sprintf("%s:%s", volumeName, WorkingDirName)}, fmt.Sprintf("k2d-volume-read-%s", volumeName))
+	copyContainerName := fmt.Sprintf("k2d-volume-read-%s-%d", volumeName, time.Now().UnixNano())
+	containerID, err := store.createAndStartCopyContainer([]string{fmt.Sprintf("%s:%s", volumeName, WorkingDirName)}, copyContainerName)
 	if err != nil {
 		return nil, err
 	}
@@ -133,7 +146,7 @@ func (store *VolumeStore) getDataMapFromVolume(volumeName string) (map[string]st
 		return nil, err
 	}
 
-	return parseTarToMap(content)
+	return parseTarToMap(content, store.encryptionKey)
 }
 
 // getDataMapsFromVolumes extracts the data stored in multiple Docker volumes and returns it as a map of maps.
@@ -164,7 +177,7 @@ func (store *VolumeStore) getDataMapsFromVolumes(volumeNames []string) (map[stri
 			return nil, err
 		}
 
-		dataMap, err := parseTarToMap(content)
+		dataMap, err := parseTarToMap(content, store.encryptionKey)
 		if err != nil {
 			return nil, err
 		}
@@ -189,7 +202,7 @@ func (store *VolumeStore) getDataMapsFromVolumes(volumeNames []string) (map[stri
 //
 // Returns:
 // - A map representing the extracted files and their contents, or an error if the operation fails.
-func parseTarToMap(content io.Reader) (map[string]string, error) {
+func parseTarToMap(content io.Reader, encryptionKey []byte) (map[string]string, error) {
 	dataMap := make(map[string]string)
 	tr := tar.NewReader(content)
 
@@ -210,7 +223,15 @@ func parseTarToMap(content io.Reader) (map[string]string, error) {
 
 			key := filepath.Base(hdr.Name)
 			if key != "" {
-				dataMap[key] = buf.String()
+				if len(encryptionKey) > 0 {
+					decryptedData, err := crypto.Decrypt(buf.Bytes(), encryptionKey)
+					if err != nil {
+						return nil, fmt.Errorf("unable to decrypt data: %w", err)
+					}
+					dataMap[key] = string(decryptedData)
+				} else {
+					dataMap[key] = buf.String()
+				}
 			}
 		}
 	}

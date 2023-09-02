@@ -2,11 +2,14 @@ package volume
 
 import (
 	"context"
+	"crypto/rand"
 	"fmt"
 	"io"
+	"path/filepath"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
+	"github.com/portainer/k2d/pkg/filesystem"
 	"go.uber.org/zap"
 )
 
@@ -15,13 +18,13 @@ const (
 	// It is used to identify the type of resource that the volume is associated with such as a ConfigMap or a Secret
 	ResourceTypeLabelKey = "store.k2d.io/volume/resource-type"
 
+	// SecretTypeLabelKey is the key used to store the type of Secret in the volume labels
+	// It is used to identify the type of Secret that the volume is associated with such as Opaque, kubernetes.io/dockerconfigjson, etc...
+	SecretTypeLabelKey = "store.k2d.io/volume/secret-type"
+
 	// VolumeNameLabelKey is the key used to store the name of a volume in the resource labels
 	// It is used to identify the name of the volume associated with a ConfigMap or a Secret
 	VolumeNameLabelKey = "store.k2d.io/volume/volume-name"
-
-	// NamespaceNameLabelKey is the key used to store the namespace of a volume in the resource labels
-	// It is used to identify the namespace of the volume associated with a ConfigMap or a Secret
-	NamespaceNameLabelKey = "store.k2d.io/volume/namespace-name"
 )
 
 const (
@@ -32,6 +35,11 @@ const (
 	// ConfigMapResourceType is the label value used to identify a volume that is associated to a ConfigMap resource
 	// It is stored on a volume as a label and used to filter volumes when listing volumes associated to ConfigMaps
 	ConfigMapResourceType = "configmap"
+
+	// RegistrySecretResourceType is the label value used to identify a volume that is associated to a Secret resource
+	// used to store a Docker registry credentials.
+	// It is stored on a volume as a label and used to filter volumes when listing volumes associated to Secrets
+	RegistrySecretResourceType = "registrysecret"
 
 	// SecretVolumePrefix is the prefix used to name volumes associated to Secret resources
 	// A prefix is used to avoid clash with ConfigMap volumes
@@ -46,6 +54,9 @@ const (
 	WorkingDirName = "/work"
 )
 
+// EncryptionKeyFileName is the name of the file used to store the encryption key on disk
+const EncryptionKeyFileName = "volume-encryption.key"
+
 // VolumeStore provides an implementation of the SecretStore and ConfigMapStore interfaces,
 // leveraging Docker volumes to store the contents of Kubernetes Secrets and ConfigMaps.
 //
@@ -57,12 +68,16 @@ type VolumeStore struct {
 	cli           *client.Client
 	logger        *zap.SugaredLogger
 	copyImageName string
+	secretKind    string
+	encryptionKey []byte
 }
 
 // VolumeStoreOptions represents options used to create a new VolumeStore.
 type VolumeStoreOptions struct {
 	DockerCli     *client.Client
 	CopyImageName string
+	EncryptionKey []byte
+	SecretKind    string
 }
 
 // NewVolumeStore creates a new instance of VolumeStore.
@@ -90,5 +105,43 @@ func NewVolumeStore(logger *zap.SugaredLogger, opts VolumeStoreOptions) (*Volume
 		cli:           opts.DockerCli,
 		logger:        logger,
 		copyImageName: opts.CopyImageName,
+		encryptionKey: opts.EncryptionKey,
+		secretKind:    opts.SecretKind,
 	}, nil
+}
+
+func GenerateOrRetrieveEncryptionKey(logger *zap.SugaredLogger, encryptionKeyFolder string) ([]byte, error) {
+	encryptionKeyPath := filepath.Join(encryptionKeyFolder, EncryptionKeyFileName)
+
+	keyFileExists, err := filesystem.FileExists(encryptionKeyPath)
+	if err != nil {
+		return nil, fmt.Errorf("unable to check if encryption key file exists: %w", err)
+	}
+
+	if keyFileExists {
+		logger.Infof("Encryption key file already exists. Retrieving encryption key from file: %s", encryptionKeyPath)
+
+		key, err := filesystem.ReadFileAsString(encryptionKeyPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read encryption key: %w", err)
+		}
+
+		return []byte(key), nil
+	}
+
+	logger.Infof("Encryption key file does not exist. Generating a new encryption key and storing it in file: %s", encryptionKeyPath)
+
+	// Generate a new encryption key
+	key := make([]byte, 32)
+	if _, err := rand.Read(key); err != nil {
+		return nil, fmt.Errorf("failed to generate encryption key: %w", err)
+	}
+
+	// Write the new key to disk
+	err = filesystem.CreateFileWithDirectories(encryptionKeyPath, key)
+	if err != nil {
+		return nil, fmt.Errorf("failed to write encryption key to disk: %w", err)
+	}
+
+	return key, nil
 }

@@ -13,8 +13,8 @@ func configMapListFilter(namespace string) filters.Args {
 	return filter
 }
 
-func secretListFilter(namespace string) filters.Args {
+func secretListFilter(namespace, secretKind string) filters.Args {
 	filter := adapterfilters.ByNamespace(namespace)
-	filter.Add("label", fmt.Sprintf("%s=%s", ResourceTypeLabelKey, SecretResourceType))
+	filter.Add("label", fmt.Sprintf("%s=%s", ResourceTypeLabelKey, secretKind))
 	return filter
 }
