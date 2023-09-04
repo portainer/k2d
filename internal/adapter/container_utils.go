@@ -21,6 +21,7 @@ import (
 	k2dtypes "github.com/portainer/k2d/internal/adapter/types"
 	"github.com/portainer/k2d/internal/k8s"
 	"github.com/portainer/k2d/pkg/maputils"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/apis/core"
@@ -165,12 +166,15 @@ func (adapter *KubeDockerAdapter) buildContainerConfigurationFromExistingContain
 //     This is used to ensure that the container is created in the correct network.
 //   - podSpec: Holds the corev1.PodSpec object representing the desired state of the associated Pod.
 //     This includes configurations like the container image, environment variables, and volume mounts.
+//   - jobSpec: Holds the batchv1.PodSpec object representing the desired state of the associated Job.
+//     This includes configurations like the container image, environment variables, and volume mounts.
 type ContainerCreationOptions struct {
 	containerName            string
 	labels                   map[string]string
 	lastAppliedConfiguration string
 	namespace                string
 	podSpec                  corev1.PodSpec
+	jobSpec                  batchv1.JobSpec
 }
 
 // getContainer inspects the specified container and returns its details in the form of a pointer to a types.ContainerJSON object.
@@ -301,6 +305,12 @@ func (adapter *KubeDockerAdapter) createContainerFromPodSpec(ctx context.Context
 	}
 
 	return adapter.cli.ContainerStart(ctx, containerCreateResponse.ID, types.ContainerStartOptions{})
+}
+
+// createContainerFromJobSpec orchestrates the creation of a Docker container based on a given Kubernetes PodSpec.
+// TODO: needs full description
+func (adapter *KubeDockerAdapter) createContainerFromJobSpec(ctx context.Context, options ContainerCreationOptions) error {
+	panic("unimplemented")
 }
 
 // DeleteContainer attempts to remove a Docker container based on its name and associated namespace.

@@ -176,6 +176,8 @@ func main() {
 	container.Add(apis.APIs())
 	// /apis/apps
 	container.Add(apis.Apps())
+	// /apis/batch
+	container.Add(apis.Batch())
 	// /apis/events.k8s.io
 	container.Add(apis.Events())
 	// /apis/authorization.k8s.io
