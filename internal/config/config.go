@@ -67,6 +67,11 @@ type Config struct {
 	// the default value is set to disk.
 	StoreBackend string `env:"K2D_STORE_BACKEND,default=disk"`
 
+	// StoreRegistryBackend represents the backend used to store registries secrets.
+	// If not provided through an environment variable named K2D_STORE_REGISTRY_BACKEND,
+	// the default value is set to memory.
+	StoreRegistryBackend string `env:"K2D_STORE_REGISTRY_BACKEND,default=memory"`
+
 	// StoreVolumeCopyImageName represents the name of the container image used to copy and read from volumes
 	// when using the volume store for secrets and configmaps.
 	// If not provided through an environment variable named K2D_STORE_VOLUME_COPY_IMAGE_NAME,

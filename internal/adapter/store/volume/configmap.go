@@ -8,6 +8,7 @@ import (
 	"github.com/docker/docker/api/types/volume"
 	"github.com/docker/docker/errdefs"
 	"github.com/portainer/k2d/internal/adapter/errors"
+	"github.com/portainer/k2d/internal/adapter/types"
 	"github.com/portainer/k2d/pkg/maputils"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -162,8 +163,8 @@ func (store *VolumeStore) StoreConfigMap(configMap *corev1.ConfigMap) error {
 	volumeName := buildConfigMapVolumeName(configMap.Name, configMap.Namespace)
 
 	labels := map[string]string{
-		ResourceTypeLabelKey:  ConfigMapResourceType,
-		NamespaceNameLabelKey: configMap.Namespace,
+		ResourceTypeLabelKey:    ConfigMapResourceType,
+		types.NamespaceLabelKey: configMap.Namespace,
 	}
 	maputils.MergeMapsInPlace(labels, configMap.Labels)
 
@@ -186,7 +187,7 @@ func (store *VolumeStore) StoreConfigMap(configMap *corev1.ConfigMap) error {
 // createConfigMapFromVolume constructs a Kubernetes ConfigMap object from a Docker volume.
 // Returns a ConfigMap object, and an error if any occurs (e.g., if the volume's creation timestamp is not parseable).
 func createConfigMapFromVolume(volume *volume.Volume) (core.ConfigMap, error) {
-	namespace := volume.Labels[NamespaceNameLabelKey]
+	namespace := volume.Labels[types.NamespaceLabelKey]
 
 	configMap := core.ConfigMap{
 		TypeMeta: metav1.TypeMeta{

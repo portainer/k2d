@@ -38,6 +38,7 @@ import (
 	"fmt"
 
 	"github.com/portainer/k2d/internal/adapter/store/filesystem"
+	"github.com/portainer/k2d/internal/adapter/store/memory"
 	"github.com/portainer/k2d/internal/adapter/store/volume"
 	"go.uber.org/zap"
 	corev1 "k8s.io/api/core/v1"
@@ -64,12 +65,13 @@ type ConfigMapStore interface {
 }
 
 // StoreOptions represents options that can be used to configure how to store ConfigMap and Secret resources.
-// It is used by the ConfigureStore() function to initialize and configure the storage backend.
+// It is used by the ConfigureStore() and ConfigureRegistrySecretStore() functions to initialize and configure the storage backends.
 type StoreOptions struct {
-	Backend    string
-	Logger     *zap.SugaredLogger
-	Filesystem filesystem.FileSystemStoreOptions
-	Volume     volume.VolumeStoreOptions
+	Backend         string
+	RegistryBackend string
+	Logger          *zap.SugaredLogger
+	Filesystem      filesystem.FileSystemStoreOptions
+	Volume          volume.VolumeStoreOptions
 }
 
 // ConfigureStore initializes and configures a storage backend for ConfigMap and Secret resources based on the provided StoreOptions.
@@ -96,15 +98,61 @@ func ConfigureStore(opts StoreOptions) (ConfigMapStore, SecretStore, error) {
 			return nil, nil, fmt.Errorf("failed to create filesystem store: %w", err)
 		}
 
+		opts.Logger.Info("Using disk store for ConfigMaps and Secrets")
 		return filesystemStore, filesystemStore, nil
 	case "volume":
+		opts.Volume.SecretKind = volume.SecretResourceType
 		volumeStore, err := volume.NewVolumeStore(opts.Logger, opts.Volume)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to create volume store: %w", err)
 		}
 
+		opts.Logger.Info("Using volume store for ConfigMaps and Secrets")
 		return volumeStore, volumeStore, nil
 	default:
 		return nil, nil, fmt.Errorf("invalid store backend: %s", opts.Backend)
+	}
+}
+
+// ConfigureRegistrySecretStore initializes and configures a storage backend for Registry Secrets based on the provided StoreOptions.
+// It supports multiple backends: "memory" and "volume". For the "memory" backend, it uses an in-memory store.
+// The "volume" backend utilizes a volume-based store, which relies on Docker volumes and an encryption key to store encrypted data.
+//
+// Parameters:
+// - opts: StoreOptions object containing configurations for initializing the storage backend.
+// - encryptionKeyFolder: A string representing the folder where the encryption key is stored or will be generated.
+//
+// Returns:
+// - SecretStore: An interface for interacting with Kubernetes Registry Secrets.
+// - error: An error object if any errors occur during the initialization or configuration process.
+//
+// Errors:
+// - Returns an error if it fails to generate the encryption key for the "volume" backend.
+// - Returns an error if it fails to create the volume store for the "volume" backend.
+// - Returns an error if an invalid registry secret store backend is provided.
+func ConfigureRegistrySecretStore(opts StoreOptions, encryptionKeyFolder string) (SecretStore, error) {
+	switch opts.RegistryBackend {
+	case "memory":
+
+		opts.Logger.Info("Using memory store for registry Secrets")
+		return memory.NewInMemoryStore(), nil
+	case "volume":
+		encryptionKey, err := volume.GenerateOrRetrieveEncryptionKey(opts.Logger, encryptionKeyFolder)
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate encryption key: %w", err)
+		}
+
+		opts.Volume.EncryptionKey = encryptionKey
+		opts.Volume.SecretKind = volume.RegistrySecretResourceType
+
+		volumeStore, err := volume.NewVolumeStore(opts.Logger, opts.Volume)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create volume store: %w", err)
+		}
+
+		opts.Logger.Info("Using encrypted volume store for registry Secrets")
+		return volumeStore, nil
+	default:
+		return nil, fmt.Errorf("invalid registry secret store backend: %s", opts.RegistryBackend)
 	}
 }

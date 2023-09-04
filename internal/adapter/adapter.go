@@ -9,7 +9,6 @@ import (
 	"github.com/portainer/k2d/internal/adapter/converter"
 	"github.com/portainer/k2d/internal/adapter/store"
 	"github.com/portainer/k2d/internal/adapter/store/filesystem"
-	"github.com/portainer/k2d/internal/adapter/store/memory"
 	"github.com/portainer/k2d/internal/adapter/store/volume"
 	k2dtypes "github.com/portainer/k2d/internal/adapter/types"
 	"github.com/portainer/k2d/internal/config"
@@ -79,8 +78,9 @@ func NewKubeDockerAdapter(options *KubeDockerAdapterOptions) (*KubeDockerAdapter
 	}
 
 	storeOptions := store.StoreOptions{
-		Backend: options.K2DConfig.StoreBackend,
-		Logger:  options.Logger,
+		Backend:         options.K2DConfig.StoreBackend,
+		RegistryBackend: options.K2DConfig.StoreRegistryBackend,
+		Logger:          options.Logger,
 		Filesystem: filesystem.FileSystemStoreOptions{
 			DataPath: options.K2DConfig.DataPath,
 		},
@@ -93,6 +93,11 @@ func NewKubeDockerAdapter(options *KubeDockerAdapterOptions) (*KubeDockerAdapter
 	configMapStore, secretStore, err := store.ConfigureStore(storeOptions)
 	if err != nil {
 		return nil, fmt.Errorf("unable to initialize store backends: %w", err)
+	}
+
+	registrySecretStore, err := store.ConfigureRegistrySecretStore(storeOptions, options.K2DConfig.DataPath)
+	if err != nil {
+		return nil, fmt.Errorf("unable to initialize registry secret store: %w", err)
 	}
 
 	scheme := runtime.NewScheme()
@@ -109,7 +114,7 @@ func NewKubeDockerAdapter(options *KubeDockerAdapterOptions) (*KubeDockerAdapter
 		configMapStore:         configMapStore,
 		k2dServerConfiguration: options.ServerConfiguration,
 		logger:                 options.Logger,
-		registrySecretStore:    memory.NewInMemoryStore(),
+		registrySecretStore:    registrySecretStore,
 		secretStore:            secretStore,
 		startTime:              time.Now(),
 	}, nil

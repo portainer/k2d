@@ -8,6 +8,7 @@ import (
 	"github.com/docker/docker/api/types/volume"
 	"github.com/docker/docker/errdefs"
 	"github.com/portainer/k2d/internal/adapter/errors"
+	"github.com/portainer/k2d/internal/adapter/types"
 	"github.com/portainer/k2d/pkg/maputils"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -108,7 +109,7 @@ func (s *VolumeStore) GetSecret(secretName, namespace string) (*core.Secret, err
 // - A SecretList object containing all the filtered secrets for the given namespace.
 // - An error object if the function fails to retrieve the secrets.
 func (s *VolumeStore) GetSecrets(namespace string, selector labels.Selector) (core.SecretList, error) {
-	filter := secretListFilter(namespace)
+	filter := secretListFilter(namespace, s.secretKind)
 	volumes, err := s.cli.VolumeList(context.TODO(), volume.ListOptions{
 		Filters: filter,
 	})
@@ -172,8 +173,9 @@ func (s *VolumeStore) StoreSecret(secret *corev1.Secret) error {
 	volumeName := buildSecretVolumeName(secret.Name, secret.Namespace)
 
 	labels := map[string]string{
-		ResourceTypeLabelKey:  SecretResourceType,
-		NamespaceNameLabelKey: secret.Namespace,
+		ResourceTypeLabelKey:    s.secretKind,
+		SecretTypeLabelKey:      string(secret.Type),
+		types.NamespaceLabelKey: secret.Namespace,
 	}
 	maputils.MergeMapsInPlace(labels, secret.Labels)
 
@@ -206,7 +208,7 @@ func (s *VolumeStore) StoreSecret(secret *corev1.Secret) error {
 // createSecretFromVolume constructs a Kubernetes Secret object from a Docker volume.
 // Returns a Secret object, and an error if any occurs (e.g., if the volume's creation timestamp is not parseable).
 func createSecretFromVolume(volume *volume.Volume) (core.Secret, error) {
-	namespace := volume.Labels[NamespaceNameLabelKey]
+	namespace := volume.Labels[types.NamespaceLabelKey]
 
 	secret := core.Secret{
 		TypeMeta: metav1.TypeMeta{
@@ -220,7 +222,7 @@ func createSecretFromVolume(volume *volume.Volume) (core.Secret, error) {
 			Labels:      volume.Labels,
 		},
 		Data: map[string][]byte{},
-		Type: core.SecretTypeOpaque,
+		Type: core.SecretType(volume.Labels[SecretTypeLabelKey]),
 	}
 
 	secret.Labels[VolumeNameLabelKey] = volume.Name
