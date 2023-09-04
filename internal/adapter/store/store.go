@@ -98,7 +98,7 @@ func ConfigureStore(opts StoreOptions) (ConfigMapStore, SecretStore, error) {
 			return nil, nil, fmt.Errorf("failed to create filesystem store: %w", err)
 		}
 
-		opts.Logger.Info("Using disk store for ConfigMaps and Secrets")
+		opts.Logger.Info("using disk store for ConfigMaps and Secrets")
 		return filesystemStore, filesystemStore, nil
 	case "volume":
 		opts.Volume.SecretKind = volume.SecretResourceType
@@ -107,7 +107,7 @@ func ConfigureStore(opts StoreOptions) (ConfigMapStore, SecretStore, error) {
 			return nil, nil, fmt.Errorf("failed to create volume store: %w", err)
 		}
 
-		opts.Logger.Info("Using volume store for ConfigMaps and Secrets")
+		opts.Logger.Info("using volume store for ConfigMaps and Secrets")
 		return volumeStore, volumeStore, nil
 	default:
 		return nil, nil, fmt.Errorf("invalid store backend: %s", opts.Backend)
@@ -134,7 +134,7 @@ func ConfigureRegistrySecretStore(opts StoreOptions, encryptionKeyFolder string)
 	switch opts.RegistryBackend {
 	case "memory":
 
-		opts.Logger.Info("Using memory store for registry Secrets")
+		opts.Logger.Info("using memory store for registry Secrets")
 		return memory.NewInMemoryStore(), nil
 	case "volume":
 		encryptionKey, err := volume.GenerateOrRetrieveEncryptionKey(opts.Logger, encryptionKeyFolder)
@@ -150,7 +150,7 @@ func ConfigureRegistrySecretStore(opts StoreOptions, encryptionKeyFolder string)
 			return nil, fmt.Errorf("failed to create volume store: %w", err)
 		}
 
-		opts.Logger.Info("Using encrypted volume store for registry Secrets")
+		opts.Logger.Info("using encrypted volume store for registry Secrets")
 		return volumeStore, nil
 	default:
 		return nil, fmt.Errorf("invalid registry secret store backend: %s", opts.RegistryBackend)

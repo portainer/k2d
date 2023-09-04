@@ -130,7 +130,7 @@ func GenerateOrRetrieveEncryptionKey(logger *zap.SugaredLogger, encryptionKeyFol
 	}
 
 	if keyFileExists {
-		logger.Infof("Encryption key file already exists. Retrieving encryption key from file: %s", encryptionKeyPath)
+		logger.Infof("encryption key file already exists. Retrieving encryption key from file: %s", encryptionKeyPath)
 
 		key, err := filesystem.ReadFileAsString(encryptionKeyPath)
 		if err != nil {
@@ -140,7 +140,7 @@ func GenerateOrRetrieveEncryptionKey(logger *zap.SugaredLogger, encryptionKeyFol
 		return []byte(key), nil
 	}
 
-	logger.Infof("Encryption key file does not exist. Generating a new encryption key and storing it in file: %s", encryptionKeyPath)
+	logger.Infof("encryption key file does not exist. Generating a new encryption key and storing it in file: %s", encryptionKeyPath)
 
 	key := make([]byte, 32)
 	if _, err := rand.Read(key); err != nil {
