@@ -110,6 +110,17 @@ func NewVolumeStore(logger *zap.SugaredLogger, opts VolumeStoreOptions) (*Volume
 	}, nil
 }
 
+// GenerateOrRetrieveEncryptionKey generates a new encryption key or retrieves an existing one from a specified folder.
+// It first checks if an encryption key file already exists in the given folder. If so, it reads the key from the file.
+// Otherwise, it generates a new 32-byte encryption key, saves it to a file in the specified folder, and then returns it.
+//
+// Parameters:
+// - logger: A pointer to a zap.SugaredLogger for logging informational messages.
+// - encryptionKeyFolder: The folder where the encryption key file should be stored or retrieved from.
+//
+// Returns:
+// - A byte slice containing the encryption key.
+// - An error if any operation (key generation, file read/write, etc.) fails.
 func GenerateOrRetrieveEncryptionKey(logger *zap.SugaredLogger, encryptionKeyFolder string) ([]byte, error) {
 	encryptionKeyPath := filepath.Join(encryptionKeyFolder, EncryptionKeyFileName)
 
@@ -131,13 +142,11 @@ func GenerateOrRetrieveEncryptionKey(logger *zap.SugaredLogger, encryptionKeyFol
 
 	logger.Infof("Encryption key file does not exist. Generating a new encryption key and storing it in file: %s", encryptionKeyPath)
 
-	// Generate a new encryption key
 	key := make([]byte, 32)
 	if _, err := rand.Read(key); err != nil {
 		return nil, fmt.Errorf("failed to generate encryption key: %w", err)
 	}
 
-	// Write the new key to disk
 	err = filesystem.CreateFileWithDirectories(encryptionKeyPath, key)
 	if err != nil {
 		return nil, fmt.Errorf("failed to write encryption key to disk: %w", err)
