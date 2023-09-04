@@ -22,6 +22,15 @@ func ListAPIGroups(r *restful.Request, w *restful.Response) {
 				},
 			},
 			{
+				Name: "batch",
+				Versions: []metav1.GroupVersionForDiscovery{
+					{
+						GroupVersion: "batch/v1",
+						Version:      "v1",
+					},
+				},
+			},
+			{
 				Name: "events.k8s.io",
 				Versions: []metav1.GroupVersionForDiscovery{
 					{
