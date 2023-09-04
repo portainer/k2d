@@ -13,6 +13,7 @@ import (
 	"github.com/portainer/k2d/internal/k8s"
 	batchv1 "k8s.io/api/batch/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/pkg/apis/batch"
 )
 
 type JobLogOptions struct {
@@ -114,13 +115,13 @@ func (adapter *KubeDockerAdapter) GetJobTable(ctx context.Context, namespace str
 	return k8s.GenerateTable(&jobList)
 }
 
-func (adapter *KubeDockerAdapter) ListJobs(ctx context.Context, namespace string) (batchv1.JobList, error) {
+func (adapter *KubeDockerAdapter) ListJobs(ctx context.Context, namespace string) (batch.JobList, error) {
 	jobList, err := adapter.listJobs(ctx, namespace)
 	if err != nil {
-		return batchv1.JobList{}, fmt.Errorf("unable to list jobs: %w", err)
+		return batch.JobList{}, fmt.Errorf("unable to list jobs: %w", err)
 	}
 
-	versionedJobList := batchv1.JobList{
+	versionedJobList := batch.JobList{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "JobList",
 			APIVersion: "v1",
@@ -129,18 +130,18 @@ func (adapter *KubeDockerAdapter) ListJobs(ctx context.Context, namespace string
 
 	err = adapter.ConvertK8SResource(&jobList, &versionedJobList)
 	if err != nil {
-		return batchv1.JobList{}, fmt.Errorf("unable to convert internal JobList to versioned JobList: %w", err)
+		return batch.JobList{}, fmt.Errorf("unable to convert internal JobList to versioned JobList: %w", err)
 	}
 
 	return versionedJobList, nil
 }
 
-func (adapter *KubeDockerAdapter) buildJobFromContainer(container types.Container) (*batchv1.Job, error) {
+func (adapter *KubeDockerAdapter) buildJobFromContainer(container types.Container) (*batch.Job, error) {
 	job := adapter.converter.ConvertContainerToJob(container)
 
 	if container.Labels[k2dtypes.JobLastAppliedConfigLabelKey] != "" {
 		internalJobSpecData := container.Labels[k2dtypes.JobLastAppliedConfigLabelKey]
-		jobSpec := batchv1.JobSpec{}
+		jobSpec := batch.JobSpec{}
 
 		err := json.Unmarshal([]byte(internalJobSpecData), &jobSpec)
 		if err != nil {
@@ -153,25 +154,25 @@ func (adapter *KubeDockerAdapter) buildJobFromContainer(container types.Containe
 	return &job, nil
 }
 
-func (adapter *KubeDockerAdapter) listJobs(ctx context.Context, namespace string) (batchv1.JobList, error) {
+func (adapter *KubeDockerAdapter) listJobs(ctx context.Context, namespace string) (batch.JobList, error) {
 	filter := filters.ByNamespace(namespace)
 	containers, err := adapter.cli.ContainerList(ctx, types.ContainerListOptions{All: true, Filters: filter})
 	if err != nil {
-		return batchv1.JobList{}, fmt.Errorf("unable to list containers: %w", err)
+		return batch.JobList{}, fmt.Errorf("unable to list containers: %w", err)
 	}
 
-	jobs := []batchv1.Job{}
+	jobs := []batch.Job{}
 
 	for _, container := range containers {
 		job, err := adapter.buildJobFromContainer(container)
 		if err != nil {
-			return batchv1.JobList{}, fmt.Errorf("unable to get jobs: %w", err)
+			return batch.JobList{}, fmt.Errorf("unable to get jobs: %w", err)
 		}
 
 		jobs = append(jobs, *job)
 	}
 
-	return batchv1.JobList{
+	return batch.JobList{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "JobList",
 			APIVersion: "v1",
