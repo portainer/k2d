@@ -434,6 +434,9 @@ func (converter *DockerAPIConverter) setVolumeMounts(namespace string, hostConfi
 // handleVolumeSource configures the Docker host configuration's volume bindings based on a Kubernetes VolumeSource.
 // The VolumeSource can be of type ConfigMap, Secret, or HostPath.
 //
+// For PersistentVolumeClaim:
+// The function uses the volume name and namespace to generate a unique name for the volume.
+//
 // Parameters:
 // - namespace:    The Kubernetes namespace where the volume resources (ConfigMap or Secret) are located.
 // - hostConfig:   A pointer to the Docker host configuration to which the volume bindings will be appended.
@@ -484,6 +487,11 @@ func (converter *DockerAPIConverter) handleVolumeSource(namespace string, hostCo
 		}
 	} else if volume.HostPath != nil {
 		bind := fmt.Sprintf("%s:%s", volume.HostPath.Path, volumeMount.MountPath)
+		hostConfig.Binds = append(hostConfig.Binds, bind)
+	} else if volume.VolumeSource.PersistentVolumeClaim != nil {
+		// TODO: Replace the fmt.Sprintf("k2d-pv-%s-%s", namespace, volume.VolumeSource.PersistentVolumeClaim.ClaimName)
+		// part with the buildPersistentVolumeName function.
+		bind := fmt.Sprintf("%s:%s", fmt.Sprintf("k2d-pv-%s-%s", namespace, volume.VolumeSource.PersistentVolumeClaim.ClaimName), volumeMount.MountPath)
 		hostConfig.Binds = append(hostConfig.Binds, bind)
 	}
 	return nil
