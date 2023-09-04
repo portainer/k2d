@@ -117,8 +117,6 @@ func ConfigureRegistrySecretStore(opts StoreOptions, encryptionKeyFolder string)
 	case "memory":
 		return memory.NewInMemoryStore(), nil
 	case "volume":
-
-		// TODO: generate or retrieve the encryption key from here
 		encryptionKey, err := volume.GenerateOrRetrieveEncryptionKey(opts.Logger, encryptionKeyFolder)
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate encryption key: %w", err)

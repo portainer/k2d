@@ -49,13 +49,9 @@ func (s *VolumeStore) copyDataMapToVolume(volumeName string, dataMap map[string]
 	tw := tar.NewWriter(&buf)
 
 	for key, value := range dataMap {
-		data := []byte(value)
-		// TODO: maybe refactor this to if s.secretKind == RegistrySecretResourceType
-		if len(s.encryptionKey) > 0 {
-			data, err = crypto.Encrypt(data, s.encryptionKey)
-			if err != nil {
-				return fmt.Errorf("unable to encrypt data: %w", err)
-			}
+		data, err := encryptIfKeyProvided([]byte(value), s.encryptionKey)
+		if err != nil {
+			return fmt.Errorf("unable to write data: %w", err)
 		}
 
 		hdr := &tar.Header{
@@ -223,18 +219,42 @@ func parseTarToMap(content io.Reader, encryptionKey []byte) (map[string]string, 
 
 			key := filepath.Base(hdr.Name)
 			if key != "" {
-				if len(encryptionKey) > 0 {
-					decryptedData, err := crypto.Decrypt(buf.Bytes(), encryptionKey)
-					if err != nil {
-						return nil, fmt.Errorf("unable to decrypt data: %w", err)
-					}
-					dataMap[key] = string(decryptedData)
-				} else {
-					dataMap[key] = buf.String()
+				data, err := decryptIfKeyProvided(buf.Bytes(), encryptionKey)
+				if err != nil {
+					return nil, fmt.Errorf("unable to read data: %w", err)
 				}
+
+				dataMap[key] = string(data)
 			}
 		}
 	}
 
 	return dataMap, nil
+}
+
+// encryptIfKeyProvided encrypts the given data using the encryptionKey if provided.
+func encryptIfKeyProvided(data, encryptionKey []byte) ([]byte, error) {
+	if len(encryptionKey) == 0 {
+		return data, nil
+	}
+
+	encryptedData, err := crypto.Encrypt(data, encryptionKey)
+	if err != nil {
+		return nil, fmt.Errorf("unable to encrypt data: %w", err)
+	}
+
+	return encryptedData, nil
+}
+
+// decryptIfKeyProvided decrypts the given data using the encryptionKey if provided.
+func decryptIfKeyProvided(data, encryptionKey []byte) ([]byte, error) {
+	if len(encryptionKey) == 0 {
+		return data, nil
+	}
+
+	decryptedData, err := crypto.Decrypt(data, encryptionKey)
+	if err != nil {
+		return nil, fmt.Errorf("unable to decrypt data: %w", err)
+	}
+	return decryptedData, nil
 }
