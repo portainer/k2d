@@ -9,6 +9,7 @@ import (
 	"github.com/docker/docker/api/types"
 	adaptererr "github.com/portainer/k2d/internal/adapter/errors"
 	"github.com/portainer/k2d/internal/adapter/filters"
+	"github.com/portainer/k2d/internal/adapter/naming"
 	k2dtypes "github.com/portainer/k2d/internal/adapter/types"
 	"github.com/portainer/k2d/internal/k8s"
 	"github.com/portainer/k2d/internal/logging"
@@ -37,7 +38,7 @@ func (adapter *KubeDockerAdapter) DeleteService(ctx context.Context, serviceName
 	delete(cfg.ContainerConfig.Labels, k2dtypes.ServiceNameLabelKey)
 	delete(cfg.ContainerConfig.Labels, k2dtypes.ServiceLastAppliedConfigLabelKey)
 
-	networkName := buildNetworkName(namespace)
+	networkName := naming.BuildNetworkName(namespace)
 	cfg.NetworkConfig.EndpointsConfig[networkName].Aliases = []string{}
 
 	return adapter.reCreateContainerWithNewConfiguration(ctx, container.ID, cfg)
@@ -119,7 +120,7 @@ func (adapter *KubeDockerAdapter) CreateContainerFromService(ctx context.Context
 		return fmt.Errorf("unable to convert service spec into container configuration: %w", err)
 	}
 
-	networkName := buildNetworkName(service.Namespace)
+	networkName := naming.BuildNetworkName(service.Namespace)
 	cfg.NetworkConfig.EndpointsConfig[networkName].Aliases = []string{
 		service.Name,
 		fmt.Sprintf("%s.%s", service.Name, service.Namespace),
