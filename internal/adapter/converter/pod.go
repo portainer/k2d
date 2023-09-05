@@ -127,7 +127,7 @@ func (converter *DockerAPIConverter) ConvertPodSpecToContainerConfiguration(spec
 		},
 	}
 
-	if err := converter.setServiceAccountTokenAndCACert(hostConfig); err != nil {
+	if err := converter.SetServiceAccountTokenAndCACert(hostConfig); err != nil {
 		return ContainerConfiguration{}, err
 	}
 
@@ -189,7 +189,7 @@ func (converter *DockerAPIConverter) setResourceRequirements(hostConfig *contain
 	hostConfig.Resources = resourceRequirements
 }
 
-// setServiceAccountTokenAndCACert configures the Docker container to have access to the service account token
+// SetServiceAccountTokenAndCACert configures the Docker container to have access to the service account token
 // and CA certificate stored in a Kubernetes Secret. The function performs the following steps:
 //  1. Fetches the service account Secret from Kubernetes using the provided secretStore.
 //  2. Obtains the filesystem bind mappings for the Secret using the secretStore's GetSecretBinds method.
@@ -201,7 +201,7 @@ func (converter *DockerAPIConverter) setResourceRequirements(hostConfig *contain
 //     account token and CA certificate binds.
 //
 // It returns an error if any occurred fetching the Secret or obtaining the bind mappings fails.
-func (converter *DockerAPIConverter) setServiceAccountTokenAndCACert(hostConfig *container.HostConfig) error {
+func (converter *DockerAPIConverter) SetServiceAccountTokenAndCACert(hostConfig *container.HostConfig) error {
 	secret, err := converter.secretStore.GetSecret(k2dtypes.K2dServiceAccountSecretName, k2dtypes.K2DNamespaceName)
 	if err != nil {
 		return fmt.Errorf("unable to get secret %s: %w", k2dtypes.K2dServiceAccountSecretName, err)
