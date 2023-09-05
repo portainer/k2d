@@ -14,7 +14,6 @@ import (
 	"github.com/portainer/k2d/internal/adapter/naming"
 	k2dtypes "github.com/portainer/k2d/internal/adapter/types"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/core"
 )
 
@@ -185,59 +184,6 @@ func (converter *DockerAPIConverter) ConvertPodSpecToContainerConfiguration(spec
 	converter.setResourceRequirements(hostConfig, containerSpec.Resources)
 
 	if err := converter.setVolumeMounts(namespace, hostConfig, spec.Volumes, containerSpec.VolumeMounts); err != nil {
-		return ContainerConfiguration{}, err
-	}
-
-	networkName := labels[k2dtypes.NetworkNameLabelKey]
-	return ContainerConfiguration{
-		ContainerConfig: containerConfig,
-		HostConfig:      hostConfig,
-		NetworkConfig: &network.NetworkingConfig{
-			EndpointsConfig: map[string]*network.EndpointSettings{
-				networkName: {},
-			},
-		},
-	}, nil
-}
-
-// ConvertJobSpecToContainerConfiguration converts a Kubernetes JobSpec into a Docker ContainerConfiguration.
-func (converter *DockerAPIConverter) ConvertJobSpecToContainerConfiguration(spec batch.JobSpec, namespace string, labels map[string]string) (ContainerConfiguration, error) {
-	podSpec := spec.Template.Spec
-	containerSpec := podSpec.Containers[0]
-
-	containerConfig := &container.Config{
-		Image:  containerSpec.Image,
-		Labels: labels,
-		Env: []string{
-			fmt.Sprintf("KUBERNETES_SERVICE_HOST=%s", converter.k2dServerConfiguration.ServerIpAddr),
-			fmt.Sprintf("KUBERNETES_SERVICE_PORT=%d", converter.k2dServerConfiguration.ServerPort),
-		},
-	}
-
-	hostConfig := &container.HostConfig{
-		ExtraHosts: []string{
-			fmt.Sprintf("kubernetes.default.svc:%s", converter.k2dServerConfiguration.ServerIpAddr),
-		},
-	}
-
-	if err := converter.setServiceAccountTokenAndCACert(hostConfig); err != nil {
-		return ContainerConfiguration{}, err
-	}
-
-	if err := converter.setHostPorts(containerConfig, hostConfig, containerSpec.Ports); err != nil {
-		return ContainerConfiguration{}, err
-	}
-
-	if err := converter.setEnvVars(namespace, containerConfig, containerSpec.Env, containerSpec.EnvFrom); err != nil {
-		return ContainerConfiguration{}, err
-	}
-
-	setCommandAndArgs(containerConfig, containerSpec.Command, containerSpec.Args)
-	setRestartPolicy(hostConfig, podSpec.RestartPolicy)
-	setSecurityContext(containerConfig, hostConfig, podSpec.SecurityContext, containerSpec.SecurityContext)
-	converter.setResourceRequirements(hostConfig, containerSpec.Resources)
-
-	if err := converter.setVolumeMounts(namespace, hostConfig, podSpec.Volumes, containerSpec.VolumeMounts); err != nil {
 		return ContainerConfiguration{}, err
 	}
 

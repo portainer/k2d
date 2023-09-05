@@ -2,14 +2,12 @@ package adapter
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 
 	"github.com/docker/docker/api/types"
 	"github.com/portainer/k2d/internal/adapter/errors"
 	"github.com/portainer/k2d/internal/adapter/filters"
-	k2dtypes "github.com/portainer/k2d/internal/adapter/types"
 	"github.com/portainer/k2d/internal/k8s"
 	batchv1 "k8s.io/api/batch/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -20,27 +18,6 @@ type JobLogOptions struct {
 	Timestamps bool
 	Follow     bool
 	Tail       string
-}
-
-func (adapter *KubeDockerAdapter) CreateContainerFromJob(ctx context.Context, job *batchv1.Job) error {
-	opts := ContainerCreationOptions{
-		containerName: job.Name,
-		namespace:     job.Namespace,
-		jobSpec:       job.Spec,
-		labels:        job.Labels,
-	}
-
-	if job.Labels["app.kubernetes.io/managed-by"] == "Helm" {
-		jobData, err := json.Marshal(job)
-		if err != nil {
-			return fmt.Errorf("unable to marshal job: %w", err)
-		}
-		job.ObjectMeta.Annotations["kubectl.kubernetes.io/last-applied-configuration"] = string(jobData)
-	}
-
-	opts.lastAppliedConfiguration = job.ObjectMeta.Annotations["kubectl.kubernetes.io/last-applied-configuration"]
-
-	return adapter.createContainerFromJobSpec(ctx, opts)
 }
 
 // The GetJob implementation is using a filtered list approach as the Docker API provide different response types
@@ -134,24 +111,6 @@ func (adapter *KubeDockerAdapter) ListJobs(ctx context.Context, namespace string
 	}
 
 	return versionedJobList, nil
-}
-
-func (adapter *KubeDockerAdapter) buildJobFromContainer(container types.Container) (*batch.Job, error) {
-	job := adapter.converter.ConvertContainerToJob(container)
-
-	if container.Labels[k2dtypes.JobLastAppliedConfigLabelKey] != "" {
-		internalJobSpecData := container.Labels[k2dtypes.JobLastAppliedConfigLabelKey]
-		jobSpec := batch.JobSpec{}
-
-		err := json.Unmarshal([]byte(internalJobSpecData), &jobSpec)
-		if err != nil {
-			return nil, fmt.Errorf("unable to unmarshal job spec: %w", err)
-		}
-
-		job.Spec = jobSpec
-	}
-
-	return &job, nil
 }
 
 func (adapter *KubeDockerAdapter) listJobs(ctx context.Context, namespace string) (batch.JobList, error) {
