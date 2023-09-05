@@ -3,6 +3,7 @@ package converter
 import (
 	"fmt"
 	"path"
+	"path/filepath"
 	"strconv"
 	"time"
 
@@ -466,10 +467,7 @@ func (converter *DockerAPIConverter) handleVolumeSource(namespace string, hostCo
 			return fmt.Errorf("unable to get binds for configmap %s: %w", volume.VolumeSource.ConfigMap.Name, err)
 		}
 
-		for containerBind, hostBind := range binds {
-			bind := fmt.Sprintf("%s:%s", hostBind, path.Join(volumeMount.MountPath, containerBind))
-			hostConfig.Binds = append(hostConfig.Binds, bind)
-		}
+		handleStoreBinds(hostConfig, binds, volumeMount.MountPath)
 	} else if volume.VolumeSource.Secret != nil {
 		secret, err := converter.secretStore.GetSecret(volume.VolumeSource.Secret.SecretName, namespace)
 		if err != nil {
@@ -481,10 +479,7 @@ func (converter *DockerAPIConverter) handleVolumeSource(namespace string, hostCo
 			return fmt.Errorf("unable to get binds for secrets %s: %w", volume.VolumeSource.ConfigMap.Name, err)
 		}
 
-		for containerBind, hostBind := range binds {
-			bind := fmt.Sprintf("%s:%s", hostBind, path.Join(volumeMount.MountPath, containerBind))
-			hostConfig.Binds = append(hostConfig.Binds, bind)
-		}
+		handleStoreBinds(hostConfig, binds, volumeMount.MountPath)
 	} else if volume.HostPath != nil {
 		bind := fmt.Sprintf("%s:%s", volume.HostPath.Path, volumeMount.MountPath)
 		hostConfig.Binds = append(hostConfig.Binds, bind)
@@ -495,4 +490,41 @@ func (converter *DockerAPIConverter) handleVolumeSource(namespace string, hostCo
 		hostConfig.Binds = append(hostConfig.Binds, bind)
 	}
 	return nil
+}
+
+// handleStoreBinds constructs bind mounts for Docker containers based on given host paths and container paths.
+// It appends these binds to the Binds field in the given HostConfig.
+//
+// The function considers two scenarios:
+// 1. Single-file ConfigMap:
+//   - If there is only one file in the configmap, the function will attempt to mount it directly to the file in the container if
+//     mountPath has a file extension. Otherwise, it will mount to a folder.
+//
+// 2. Multiple-file ConfigMap:
+//   - If there are multiple files in the configmap, the function will mount each host file to its corresponding container path.
+//
+// Special handling is performed when the mount path in the container is already a file (has an extension), and there is only one bind.
+// In this case, the parent directory of the existing file is used as the mount path. This is to support mounting a file to a file when using the disk
+// backend, and mounting a volume to the parent directory of the file when using the volume backend.
+// For example, when mountPath is set to /etc/influxdb/influxdb.conf, this function needs to be able to mount the /path/to/host/influxdb.conf file
+// directly to the /etc/influxdb/influxdb.conf file in the container when using the disk backend. However, when using the volume backend, the
+// volume that contains the influxdb.conf file needs to be mounted to the /etc/influxdb directory in the container.
+//
+// Parameters:
+// - hostConfig: The Docker container's host configuration where the bind mounts are appended.
+// - binds: A map where the key is the container path (containerBind) and the value is the host path (hostBind).
+// - mountPath: The target file in the container where the host files will be mounted.
+//
+// Note:
+// - For disk backend, binds map entries would be like {"filename": "/path/on/host"}
+// - For volume backend, binds map entries would be like {"": "volumename"}
+func handleStoreBinds(hostConfig *container.HostConfig, binds map[string]string, mountPath string) {
+	for containerBind, hostBind := range binds {
+		bind := fmt.Sprintf("%s:%s", hostBind, path.Join(mountPath, containerBind))
+		if len(binds) == 1 && filepath.Ext(mountPath) != "" {
+			bind = fmt.Sprintf("%s:%s", hostBind, path.Join(filepath.Dir(mountPath), containerBind))
+		}
+
+		hostConfig.Binds = append(hostConfig.Binds, bind)
+	}
 }
