@@ -11,6 +11,7 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/go-connections/nat"
+	"github.com/portainer/k2d/internal/adapter/naming"
 	k2dtypes "github.com/portainer/k2d/internal/adapter/types"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/apis/core"
@@ -484,9 +485,8 @@ func (converter *DockerAPIConverter) handleVolumeSource(namespace string, hostCo
 		bind := fmt.Sprintf("%s:%s", volume.HostPath.Path, volumeMount.MountPath)
 		hostConfig.Binds = append(hostConfig.Binds, bind)
 	} else if volume.VolumeSource.PersistentVolumeClaim != nil {
-		// TODO: Replace the fmt.Sprintf("k2d-pv-%s-%s", namespace, volume.VolumeSource.PersistentVolumeClaim.ClaimName)
-		// part with the buildPersistentVolumeName function.
-		bind := fmt.Sprintf("%s:%s", fmt.Sprintf("k2d-pv-%s-%s", namespace, volume.VolumeSource.PersistentVolumeClaim.ClaimName), volumeMount.MountPath)
+		volumeName := naming.BuildPersistentVolumeName(volume.VolumeSource.PersistentVolumeClaim.ClaimName, namespace)
+		bind := fmt.Sprintf("%s:%s", volumeName, volumeMount.MountPath)
 		hostConfig.Binds = append(hostConfig.Binds, bind)
 	}
 	return nil

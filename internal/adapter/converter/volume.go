@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/docker/docker/api/types/volume"
+	"github.com/portainer/k2d/internal/adapter/naming"
 	k2dtypes "github.com/portainer/k2d/internal/adapter/types"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/apis/core"
@@ -79,9 +80,7 @@ func (converter *DockerAPIConverter) UpdateVolumeToPersistentVolumeClaim(persist
 
 	persistentVolumeClaim.Spec = core.PersistentVolumeClaimSpec{
 		StorageClassName: &storageClassName,
-		// TODO: Replace the fmt.Sprintf("k2d-pv-%s-%s", namespace, volume.VolumeSource.PersistentVolumeClaim.ClaimName)
-		// part with the buildPersistentVolumeName function.
-		VolumeName: fmt.Sprintf("k2d-pv-%s-%s", volume.Labels[k2dtypes.NamespaceLabelKey], volume.Labels[k2dtypes.PersistentVolumeClaimLabelKey]),
+		VolumeName:       naming.BuildPersistentVolumeName(volume.Labels[k2dtypes.PersistentVolumeClaimLabelKey], volume.Labels[k2dtypes.NamespaceLabelKey]),
 		AccessModes: []core.PersistentVolumeAccessMode{
 			core.ReadWriteOnce,
 		},

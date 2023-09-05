@@ -11,6 +11,7 @@ import (
 	"github.com/docker/docker/errdefs"
 	adaptererr "github.com/portainer/k2d/internal/adapter/errors"
 	"github.com/portainer/k2d/internal/adapter/filters"
+	"github.com/portainer/k2d/internal/adapter/naming"
 	k2dtypes "github.com/portainer/k2d/internal/adapter/types"
 	"github.com/portainer/k2d/internal/k8s"
 	corev1 "k8s.io/api/core/v1"
@@ -19,7 +20,7 @@ import (
 )
 
 func (adapter *KubeDockerAdapter) CreateNetworkFromNamespace(ctx context.Context, namespace *corev1.Namespace) error {
-	networkName := buildNetworkName(namespace.Name)
+	networkName := naming.BuildNetworkName(namespace.Name)
 
 	network, err := adapter.getNetwork(ctx, networkName)
 	if err != nil && !errors.Is(err, adaptererr.ErrResourceNotFound) {
@@ -77,7 +78,7 @@ func (adapter *KubeDockerAdapter) DeleteNamespace(ctx context.Context, namespace
 	// before we try to delete the network
 	time.Sleep(3 * time.Second)
 
-	networkName := buildNetworkName(namespaceName)
+	networkName := naming.BuildNetworkName(namespaceName)
 	err = adapter.cli.NetworkRemove(ctx, networkName)
 	if err != nil {
 		return fmt.Errorf("unable to delete network %s: %w", networkName, err)
@@ -88,7 +89,7 @@ func (adapter *KubeDockerAdapter) DeleteNamespace(ctx context.Context, namespace
 
 func (adapter *KubeDockerAdapter) GetNamespace(ctx context.Context, namespaceName string) (*corev1.Namespace, error) {
 
-	networkName := buildNetworkName(namespaceName)
+	networkName := naming.BuildNetworkName(namespaceName)
 
 	network, err := adapter.getNetwork(ctx, networkName)
 	if err != nil {

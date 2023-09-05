@@ -9,6 +9,7 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/portainer/k2d/internal/adapter/errors"
 	"github.com/portainer/k2d/internal/adapter/filters"
+	"github.com/portainer/k2d/internal/adapter/naming"
 	k2dtypes "github.com/portainer/k2d/internal/adapter/types"
 	"github.com/portainer/k2d/internal/k8s"
 	corev1 "k8s.io/api/core/v1"
@@ -57,7 +58,7 @@ func (adapter *KubeDockerAdapter) GetPod(ctx context.Context, podName string, na
 
 	var container *types.Container
 
-	containerName := buildContainerName(podName, namespace)
+	containerName := naming.BuildContainerName(podName, namespace)
 	for _, cntr := range containers {
 		if cntr.Names[0] == "/"+containerName {
 			container = &cntr
@@ -91,7 +92,7 @@ func (adapter *KubeDockerAdapter) GetPod(ctx context.Context, podName string, na
 }
 
 func (adapter *KubeDockerAdapter) GetPodLogs(ctx context.Context, namespace string, podName string, opts PodLogOptions) (io.ReadCloser, error) {
-	containerName := buildContainerName(podName, namespace)
+	containerName := naming.BuildContainerName(podName, namespace)
 	container, err := adapter.cli.ContainerInspect(ctx, containerName)
 	if err != nil {
 		return nil, fmt.Errorf("unable to inspect container: %w", err)

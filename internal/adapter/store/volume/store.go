@@ -28,10 +28,6 @@ const (
 )
 
 const (
-	// ConfigMapVolumePrefix is the prefix used to name volumes associated to ConfigMap resources
-	// A prefix is used to avoid clash with Secret volumes
-	ConfigMapVolumePrefix = "configmap-"
-
 	// ConfigMapResourceType is the label value used to identify a volume that is associated to a ConfigMap resource
 	// It is stored on a volume as a label and used to filter volumes when listing volumes associated to ConfigMaps
 	ConfigMapResourceType = "configmap"
@@ -40,10 +36,6 @@ const (
 	// used to store a Docker registry credentials.
 	// It is stored on a volume as a label and used to filter volumes when listing volumes associated to Secrets
 	RegistrySecretResourceType = "registrysecret"
-
-	// SecretVolumePrefix is the prefix used to name volumes associated to Secret resources
-	// A prefix is used to avoid clash with ConfigMap volumes
-	SecretVolumePrefix = "secret-"
 
 	// SecretResourceType is the label value used to identify a volume that is associated to a Secret resource
 	// It is stored on a volume as a label and used to filter volumes when listing volumes associated to Secrets

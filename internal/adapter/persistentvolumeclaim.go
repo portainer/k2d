@@ -9,6 +9,7 @@ import (
 	"github.com/docker/docker/api/types/volume"
 	"github.com/docker/docker/errdefs"
 	adaptererr "github.com/portainer/k2d/internal/adapter/errors"
+	"github.com/portainer/k2d/internal/adapter/naming"
 	k2dtypes "github.com/portainer/k2d/internal/adapter/types"
 	"github.com/portainer/k2d/internal/k8s"
 	corev1 "k8s.io/api/core/v1"
@@ -25,12 +26,13 @@ func (adapter *KubeDockerAdapter) CreatePersistentVolumeClaim(ctx context.Contex
 		persistentVolumeClaim.ObjectMeta.Annotations["kubectl.kubernetes.io/last-applied-configuration"] = string(persistentVolumeClaimData)
 	}
 
+	volumeName := naming.BuildPersistentVolumeName(persistentVolumeClaim.Name, persistentVolumeClaim.Namespace)
 	_, err := adapter.cli.VolumeCreate(ctx, volume.CreateOptions{
-		Name:   buildPersistentVolumeName(persistentVolumeClaim.Name, persistentVolumeClaim.Namespace),
+		Name:   volumeName,
 		Driver: "local",
 		Labels: map[string]string{
 			k2dtypes.NamespaceLabelKey:                              persistentVolumeClaim.Namespace,
-			k2dtypes.PersistentVolumeLabelKey:                       buildPersistentVolumeName(persistentVolumeClaim.Name, persistentVolumeClaim.Namespace),
+			k2dtypes.PersistentVolumeLabelKey:                       volumeName,
 			k2dtypes.PersistentVolumeClaimLabelKey:                  persistentVolumeClaim.Name,
 			k2dtypes.PersistentVolumeClaimLastAppliedConfigLabelKey: persistentVolumeClaim.ObjectMeta.Annotations["kubectl.kubernetes.io/last-applied-configuration"],
 		},
@@ -44,9 +46,9 @@ func (adapter *KubeDockerAdapter) CreatePersistentVolumeClaim(ctx context.Contex
 }
 
 func (adapter *KubeDockerAdapter) DeletePersistentVolumeClaim(ctx context.Context, persistentVolumeClaimName string, namespaceName string) error {
-	persistentVolumeName := buildPersistentVolumeName(persistentVolumeClaimName, namespaceName)
+	volumeName := naming.BuildPersistentVolumeName(persistentVolumeClaimName, namespaceName)
 
-	err := adapter.cli.VolumeRemove(ctx, persistentVolumeName, true)
+	err := adapter.cli.VolumeRemove(ctx, volumeName, true)
 	if err != nil {
 		return fmt.Errorf("unable to remove Docker volume: %w", err)
 	}
@@ -55,7 +57,7 @@ func (adapter *KubeDockerAdapter) DeletePersistentVolumeClaim(ctx context.Contex
 }
 
 func (adapter *KubeDockerAdapter) GetPersistentVolumeClaim(ctx context.Context, persistentVolumeClaimName string, namespaceName string) (*corev1.PersistentVolumeClaim, error) {
-	volumeName := buildPersistentVolumeName(persistentVolumeClaimName, namespaceName)
+	volumeName := naming.BuildPersistentVolumeName(persistentVolumeClaimName, namespaceName)
 	volume, err := adapter.cli.VolumeInspect(ctx, volumeName)
 	if err != nil {
 		if errdefs.IsNotFound(err) {

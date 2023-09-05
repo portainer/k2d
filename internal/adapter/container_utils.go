@@ -17,6 +17,7 @@ import (
 	"github.com/docker/docker/errdefs"
 	"github.com/docker/go-connections/nat"
 	"github.com/portainer/k2d/internal/adapter/converter"
+	"github.com/portainer/k2d/internal/adapter/naming"
 	k2dtypes "github.com/portainer/k2d/internal/adapter/types"
 	"github.com/portainer/k2d/internal/k8s"
 	"github.com/portainer/k2d/pkg/maputils"
@@ -240,13 +241,13 @@ func (adapter *KubeDockerAdapter) createContainerFromPodSpec(ctx context.Context
 	options.labels[k2dtypes.PodLastAppliedConfigLabelKey] = string(internalPodSpecData)
 	options.labels[k2dtypes.NamespaceLabelKey] = options.namespace
 	options.labels[k2dtypes.WorkloadNameLabelKey] = options.containerName
-	options.labels[k2dtypes.NetworkNameLabelKey] = buildNetworkName(options.namespace)
+	options.labels[k2dtypes.NetworkNameLabelKey] = naming.BuildNetworkName(options.namespace)
 
 	containerCfg, err := adapter.converter.ConvertPodSpecToContainerConfiguration(internalPodSpec, options.namespace, options.labels)
 	if err != nil {
 		return fmt.Errorf("unable to build container configuration from pod spec: %w", err)
 	}
-	containerCfg.ContainerName = buildContainerName(options.containerName, options.namespace)
+	containerCfg.ContainerName = naming.BuildContainerName(options.containerName, options.namespace)
 
 	existingContainer, err := adapter.getContainer(ctx, containerCfg.ContainerName)
 	if err != nil {
@@ -319,7 +320,7 @@ func (adapter *KubeDockerAdapter) createContainerFromPodSpec(ctx context.Context
 //   - This function does not return any value or error. Failures in container removal are only logged as warnings.
 //     This is because the container may not exist anymore, and the function should not fail in that case.
 func (adapter *KubeDockerAdapter) DeleteContainer(ctx context.Context, containerName, namespace string) {
-	containerName = buildContainerName(containerName, namespace)
+	containerName = naming.BuildContainerName(containerName, namespace)
 
 	err := adapter.cli.ContainerRemove(ctx, containerName, types.ContainerRemoveOptions{Force: true})
 	if err != nil {
@@ -467,7 +468,7 @@ func (adapter *KubeDockerAdapter) DeployPortainerEdgeAgent(ctx context.Context, 
 		},
 	}
 
-	networkName := buildNetworkName(k2dtypes.K2DNamespaceName)
+	networkName := naming.BuildNetworkName(k2dtypes.K2DNamespaceName)
 	networkConfig := &network.NetworkingConfig{
 		EndpointsConfig: map[string]*network.EndpointSettings{
 			networkName: {},
