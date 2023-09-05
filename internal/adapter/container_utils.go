@@ -21,10 +21,8 @@ import (
 	k2dtypes "github.com/portainer/k2d/internal/adapter/types"
 	"github.com/portainer/k2d/internal/k8s"
 	"github.com/portainer/k2d/pkg/maputils"
-	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/core"
 )
 
@@ -175,7 +173,6 @@ type ContainerCreationOptions struct {
 	lastAppliedConfiguration string
 	namespace                string
 	podSpec                  corev1.PodSpec
-	jobSpec                  batchv1.JobSpec
 }
 
 // getContainer inspects the specified container and returns its details in the form of a pointer to a types.ContainerJSON object.
@@ -263,86 +260,6 @@ func (adapter *KubeDockerAdapter) createContainerFromPodSpec(ctx context.Context
 
 	if existingContainer != nil {
 		if options.lastAppliedConfiguration == existingContainer.Config.Labels[k2dtypes.LastAppliedConfigLabelKey] {
-			adapter.logger.Infof("container with the name %s already exists with the same configuration. The update will be skipped", containerCfg.ContainerName)
-			return nil
-		}
-
-		adapter.logger.Infof("container with the name %s already exists with a different configuration. The container will be recreated", containerCfg.ContainerName)
-
-		if existingContainer.Config.Labels[k2dtypes.ServiceLastAppliedConfigLabelKey] != "" {
-			options.labels[k2dtypes.ServiceLastAppliedConfigLabelKey] = existingContainer.Config.Labels[k2dtypes.ServiceLastAppliedConfigLabelKey]
-		}
-
-		err := adapter.cli.ContainerRemove(ctx, existingContainer.ID, types.ContainerRemoveOptions{Force: true})
-		if err != nil {
-			return fmt.Errorf("unable to remove container: %w", err)
-		}
-	}
-
-	registryAuth, err := adapter.getRegistryCredentials(options.podSpec, options.namespace, containerCfg.ContainerConfig.Image)
-	if err != nil {
-		return fmt.Errorf("unable to get registry credentials: %w", err)
-	}
-
-	out, err := adapter.cli.ImagePull(ctx, containerCfg.ContainerConfig.Image, types.ImagePullOptions{
-		RegistryAuth: registryAuth,
-	})
-	if err != nil {
-		return fmt.Errorf("unable to pull %s image: %w", containerCfg.ContainerConfig.Image, err)
-	}
-	defer out.Close()
-
-	io.Copy(os.Stdout, out)
-
-	containerCreateResponse, err := adapter.cli.ContainerCreate(ctx,
-		containerCfg.ContainerConfig,
-		containerCfg.HostConfig,
-		containerCfg.NetworkConfig,
-		nil,
-		containerCfg.ContainerName,
-	)
-	if err != nil {
-		return fmt.Errorf("unable to create container: %w", err)
-	}
-
-	return adapter.cli.ContainerStart(ctx, containerCreateResponse.ID, types.ContainerStartOptions{})
-}
-
-// createContainerFromJobSpec orchestrates the creation of a Docker container based on a given Kubernetes PodSpec.
-// TODO: needs full description
-func (adapter *KubeDockerAdapter) createContainerFromJobSpec(ctx context.Context, options ContainerCreationOptions) error {
-	if options.lastAppliedConfiguration != "" {
-		options.labels[k2dtypes.WorkloadLastAppliedConfigLabelKey] = options.lastAppliedConfiguration
-	}
-
-	internalJobSpec := batch.JobSpec{}
-	err := adapter.ConvertK8SResource(&options.jobSpec, &internalJobSpec)
-	if err != nil {
-		return fmt.Errorf("unable to convert versioned pod spec to internal pod spec: %w", err)
-	}
-
-	internalJobSpecData, err := json.Marshal(internalJobSpec)
-	if err != nil {
-		return fmt.Errorf("unable to marshal internal pod spec: %w", err)
-	}
-	options.labels[k2dtypes.PodLastAppliedConfigLabelKey] = string(internalJobSpecData)
-	options.labels[k2dtypes.NamespaceLabelKey] = options.namespace
-	options.labels[k2dtypes.WorkloadNameLabelKey] = options.containerName
-	options.labels[k2dtypes.NetworkNameLabelKey] = buildNetworkName(options.namespace)
-
-	containerCfg, err := adapter.converter.ConvertJobSpecToContainerConfiguration(internalJobSpec, options.namespace, options.labels)
-	if err != nil {
-		return fmt.Errorf("unable to build container configuration from pod spec: %w", err)
-	}
-	containerCfg.ContainerName = buildContainerName(options.containerName, options.namespace)
-
-	existingContainer, err := adapter.getContainer(ctx, containerCfg.ContainerName)
-	if err != nil {
-		return fmt.Errorf("unable to inspect container: %w", err)
-	}
-
-	if existingContainer != nil {
-		if options.lastAppliedConfiguration == existingContainer.Config.Labels[k2dtypes.WorkloadLastAppliedConfigLabelKey] {
 			adapter.logger.Infof("container with the name %s already exists with the same configuration. The update will be skipped", containerCfg.ContainerName)
 			return nil
 		}
