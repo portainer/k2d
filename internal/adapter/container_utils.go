@@ -456,10 +456,6 @@ func (adapter *KubeDockerAdapter) DeployPortainerEdgeAgent(ctx context.Context, 
 	}
 
 	hostConfig := &container.HostConfig{
-		// Binds: []string{
-		// 	fmt.Sprintf("%s:%s", adapter.k2dServerConfiguration.CaPath, "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"),
-		// 	fmt.Sprintf("%s:%s", adapter.k2dServerConfiguration.TokenPath, "/var/run/secrets/kubernetes.io/serviceaccount/token"),
-		// },
 		ExtraHosts: []string{
 			fmt.Sprintf("kubernetes.default.svc:%s", adapter.k2dServerConfiguration.ServerIpAddr),
 		},
