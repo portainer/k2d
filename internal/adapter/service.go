@@ -20,7 +20,7 @@ import (
 func (adapter *KubeDockerAdapter) DeleteService(ctx context.Context, serviceName, namespace string) error {
 	container, err := adapter.getContainerFromServiceName(ctx, serviceName, namespace)
 	if err != nil {
-		adapter.logger.Warnf("unable to get container from service name: %s", err)
+		adapter.logger.Warnf("unable to get container from service name %s: %s", serviceName, err)
 		return nil
 	}
 
