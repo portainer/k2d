@@ -61,4 +61,8 @@ const (
 	// DeploymentWorkloadType is the label value used to identify a Deployment workload
 	// It is stored on a container as a label and used to filter containers when listing deployments
 	DeploymentWorkloadType = "deployment"
+
+	// JobWorkloadType is the label value used to identify a Job workload
+	// It is stored on a container as a label and used to filter containers when listing deployments
+	JobWorkloadType = "job"
 )

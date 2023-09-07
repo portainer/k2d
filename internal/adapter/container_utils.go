@@ -165,8 +165,6 @@ func (adapter *KubeDockerAdapter) buildContainerConfigurationFromExistingContain
 //     This is used to ensure that the container is created in the correct network.
 //   - podSpec: Holds the corev1.PodSpec object representing the desired state of the associated Pod.
 //     This includes configurations like the container image, environment variables, and volume mounts.
-//   - jobSpec: Holds the batchv1.PodSpec object representing the desired state of the associated Job.
-//     This includes configurations like the container image, environment variables, and volume mounts.
 type ContainerCreationOptions struct {
 	containerName            string
 	labels                   map[string]string
