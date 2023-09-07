@@ -2,52 +2,77 @@ package adapter
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
-	"io"
 
 	"github.com/docker/docker/api/types"
-	"github.com/portainer/k2d/internal/adapter/errors"
+	adaptererr "github.com/portainer/k2d/internal/adapter/errors"
 	"github.com/portainer/k2d/internal/adapter/filters"
+	k2dtypes "github.com/portainer/k2d/internal/adapter/types"
 	"github.com/portainer/k2d/internal/k8s"
 	batchv1 "k8s.io/api/batch/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/apis/batch"
 )
 
-type JobLogOptions struct {
-	Timestamps bool
-	Follow     bool
-	Tail       string
+func (adapter *KubeDockerAdapter) CreateContainerFromJob(ctx context.Context, job *batchv1.Job) error {
+	opts := ContainerCreationOptions{
+		containerName: job.Name,
+		namespace:     job.Namespace,
+		podSpec:       job.Spec.Template.Spec,
+		labels:        job.Spec.Template.Labels,
+	}
+
+	opts.labels[k2dtypes.WorkloadLabelKey] = k2dtypes.JobWorkloadType
+
+	if job.Labels["app.kubernetes.io/managed-by"] == "Helm" {
+		jobData, err := json.Marshal(job)
+		if err != nil {
+			return fmt.Errorf("unable to marshal job: %w", err)
+		}
+		job.ObjectMeta.Annotations["kubectl.kubernetes.io/last-applied-configuration"] = string(jobData)
+	}
+
+	// kubectl create job does not pass the last-applied-configuration annotation
+	// so we need to add it manually
+	if job.ObjectMeta.Annotations["kubectl.kubernetes.io/last-applied-configuration"] == "" {
+		jobData, err := json.Marshal(job)
+		if err != nil {
+			return fmt.Errorf("unable to marshal job: %w", err)
+		}
+		opts.labels[k2dtypes.WorkloadLastAppliedConfigLabelKey] = string(jobData)
+	}
+
+	opts.lastAppliedConfiguration = job.ObjectMeta.Annotations["kubectl.kubernetes.io/last-applied-configuration"]
+
+	return adapter.createContainerFromPodSpec(ctx, opts)
 }
 
-// The GetJob implementation is using a filtered list approach as the Docker API provide different response types
-// when inspecting a container and listing containers.
-// The logic used to build a job from a container is based on the type returned by the list operation (types.Container)
-// and not the inspect operation (types.ContainerJSON).
-// This is because using the inspect operation everywhere would be more expensive overall.
-func (adapter *KubeDockerAdapter) GetJob(ctx context.Context, jobName string, namespace string) (*batchv1.Job, error) {
-	filter := filters.ByPod(namespace, jobName) // NOTE: I am not sure about this, should work?
+func (adapter *KubeDockerAdapter) getContainerFromJobName(ctx context.Context, jobName, namespace string) (types.Container, error) {
+	filter := filters.ByJob(namespace, jobName)
 	containers, err := adapter.cli.ContainerList(ctx, types.ContainerListOptions{All: true, Filters: filter})
 	if err != nil {
-		return nil, fmt.Errorf("unable to list containers: %w", err)
+		return types.Container{}, fmt.Errorf("unable to list containers: %w", err)
 	}
 
-	var container *types.Container
-
-	containerName := buildContainerName(jobName, namespace)
-	for _, cntr := range containers {
-		if cntr.Names[0] == "/"+containerName {
-			container = &cntr
-			break
-		}
+	if len(containers) == 0 {
+		return types.Container{}, adaptererr.ErrResourceNotFound
 	}
 
-	if container == nil {
-		adapter.logger.Errorf("unable to find container for job %s in namespace %s", jobName, namespace)
-		return nil, errors.ErrResourceNotFound
+	if len(containers) > 1 {
+		return types.Container{}, fmt.Errorf("multiple containers were found with the associated job name %s", jobName)
 	}
 
-	job, err := adapter.buildJobFromContainer(*container)
+	return containers[0], nil
+}
+
+func (adapter *KubeDockerAdapter) GetJob(ctx context.Context, jobName string, namespace string) (*batchv1.Job, error) {
+	container, err := adapter.getContainerFromJobName(ctx, jobName, namespace)
+	if err != nil {
+		return nil, fmt.Errorf("unable to get container from job name: %w", err)
+	}
+
+	job, err := adapter.buildJobFromContainer(container)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get job: %w", err)
 	}
@@ -55,7 +80,7 @@ func (adapter *KubeDockerAdapter) GetJob(ctx context.Context, jobName string, na
 	versionedJob := batchv1.Job{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Job",
-			APIVersion: "v1",
+			APIVersion: "batch/v1",
 		},
 	}
 
@@ -67,22 +92,6 @@ func (adapter *KubeDockerAdapter) GetJob(ctx context.Context, jobName string, na
 	return &versionedJob, nil
 }
 
-func (adapter *KubeDockerAdapter) GetJobLogs(ctx context.Context, namespace string, jobName string, opts JobLogOptions) (io.ReadCloser, error) {
-	containerName := buildContainerName(jobName, namespace)
-	container, err := adapter.cli.ContainerInspect(ctx, containerName)
-	if err != nil {
-		return nil, fmt.Errorf("unable to inspect container: %w", err)
-	}
-
-	return adapter.cli.ContainerLogs(ctx, container.ID, types.ContainerLogsOptions{
-		ShowStdout: true,
-		ShowStderr: true,
-		Timestamps: opts.Timestamps,
-		Follow:     opts.Follow,
-		Tail:       opts.Tail,
-	})
-}
-
 func (adapter *KubeDockerAdapter) GetJobTable(ctx context.Context, namespace string) (*metav1.Table, error) {
 	jobList, err := adapter.listJobs(ctx, namespace)
 	if err != nil {
@@ -92,29 +101,54 @@ func (adapter *KubeDockerAdapter) GetJobTable(ctx context.Context, namespace str
 	return k8s.GenerateTable(&jobList)
 }
 
-func (adapter *KubeDockerAdapter) ListJobs(ctx context.Context, namespace string) (batch.JobList, error) {
+func (adapter *KubeDockerAdapter) ListJobs(ctx context.Context, namespace string) (batchv1.JobList, error) {
 	jobList, err := adapter.listJobs(ctx, namespace)
 	if err != nil {
-		return batch.JobList{}, fmt.Errorf("unable to list jobs: %w", err)
+		return batchv1.JobList{}, fmt.Errorf("unable to list jobs: %w", err)
 	}
 
-	versionedJobList := batch.JobList{
+	versionedJobList := batchv1.JobList{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "JobList",
-			APIVersion: "v1",
+			APIVersion: "batch/v1",
 		},
 	}
 
 	err = adapter.ConvertK8SResource(&jobList, &versionedJobList)
 	if err != nil {
-		return batch.JobList{}, fmt.Errorf("unable to convert internal JobList to versioned JobList: %w", err)
+		return batchv1.JobList{}, fmt.Errorf("unable to convert internal JobList to versioned JobList: %w", err)
 	}
 
 	return versionedJobList, nil
 }
 
+func (adapter *KubeDockerAdapter) buildJobFromContainer(container types.Container) (*batch.Job, error) {
+	if container.Labels[k2dtypes.WorkloadLastAppliedConfigLabelKey] == "" {
+		return nil, fmt.Errorf("unable to build job, missing %s label on container %s", k2dtypes.WorkloadLastAppliedConfigLabelKey, container.Names[0])
+	}
+
+	jobData := container.Labels[k2dtypes.WorkloadLastAppliedConfigLabelKey]
+
+	versionedJob := batchv1.Job{}
+
+	err := json.Unmarshal([]byte(jobData), &versionedJob)
+	if err != nil {
+		return nil, fmt.Errorf("unable to unmarshal versioned job: %w", err)
+	}
+
+	job := batch.Job{}
+	err = adapter.ConvertK8SResource(&versionedJob, &job)
+	if err != nil {
+		return nil, fmt.Errorf("unable to convert versioned job spec to internal job spec: %w", err)
+	}
+
+	adapter.converter.UpdateJobFromContainerInfo(&job, container)
+
+	return &job, nil
+}
+
 func (adapter *KubeDockerAdapter) listJobs(ctx context.Context, namespace string) (batch.JobList, error) {
-	filter := filters.ByNamespace(namespace)
+	filter := filters.AllJobs(namespace)
 	containers, err := adapter.cli.ContainerList(ctx, types.ContainerListOptions{All: true, Filters: filter})
 	if err != nil {
 		return batch.JobList{}, fmt.Errorf("unable to list containers: %w", err)
@@ -125,16 +159,18 @@ func (adapter *KubeDockerAdapter) listJobs(ctx context.Context, namespace string
 	for _, container := range containers {
 		job, err := adapter.buildJobFromContainer(container)
 		if err != nil {
-			return batch.JobList{}, fmt.Errorf("unable to get jobs: %w", err)
+			return batch.JobList{}, fmt.Errorf("unable to get job: %w", err)
 		}
 
-		jobs = append(jobs, *job)
+		if job != nil {
+			jobs = append(jobs, *job)
+		}
 	}
 
 	return batch.JobList{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "JobList",
-			APIVersion: "v1",
+			APIVersion: "batch/v1",
 		},
 		Items: jobs,
 	}, nil
