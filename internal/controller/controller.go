@@ -9,6 +9,7 @@ import (
 	"go.uber.org/zap"
 
 	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -192,6 +193,13 @@ func (controller *OperationController) processOperation(op Operation) {
 				"request_id", op.RequestID,
 			)
 		}
+	case *batchv1.Job:
+		err := controller.createJob(op)
+		if err != nil {
+			controller.logger.Errorw("unable to create job",
+				"error", err,
+			)
+		}
 	case *corev1.ConfigMap:
 		err := controller.createConfigMap(op)
 		if err != nil {
@@ -238,6 +246,11 @@ func (controller *OperationController) createPod(op Operation) error {
 func (controller *OperationController) createDeployment(op Operation) error {
 	deployment := op.Operation.(*appsv1.Deployment)
 	return controller.adapter.CreateContainerFromDeployment(context.TODO(), deployment)
+}
+
+func (controller *OperationController) createJob(op Operation) error {
+	job := op.Operation.(*batchv1.Job)
+	return controller.adapter.CreateContainerFromJob(context.TODO(), job)
 }
 
 func (controller *OperationController) createService(op Operation) error {

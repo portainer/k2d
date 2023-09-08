@@ -23,6 +23,10 @@ func (adapter *KubeDockerAdapter) CreateContainerFromJob(ctx context.Context, jo
 		labels:        job.Spec.Template.Labels,
 	}
 
+	if opts.labels == nil {
+		opts.labels = make(map[string]string)
+	}
+
 	opts.labels[k2dtypes.WorkloadLabelKey] = k2dtypes.JobWorkloadType
 
 	if job.Labels["app.kubernetes.io/managed-by"] == "Helm" {
