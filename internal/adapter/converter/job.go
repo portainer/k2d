@@ -22,20 +22,20 @@ func (converter *DockerAPIConverter) UpdateJobFromContainerInfo(job *batch.Job, 
 
 	job.ObjectMeta.Annotations["kubectl.kubernetes.io/last-applied-configuration"] = container.Labels[k2dtypes.WorkloadLastAppliedConfigLabelKey]
 
-	// containerState := container.State
+	containerState := container.State
 
-	// // if the number of replicas isn't set in the job, set it to 1
-	// if job.Spec.Replicas == 0 {
-	// 	job.Spec.Replicas = 1
-	// }
+	job.Status.Active = 0
 
-	// job.Status.Replicas = 1
+	if containerState == "running" {
+		job.Status.Active = 1
+	} else {
+		// TODO: handle completion status?
+		job.Status.Failed = 1
+	}
 
-	// if containerState == "running" {
-	// 	job.Status.UpdatedReplicas = 1
-	// 	job.Status.ReadyReplicas = 1
-	// 	job.Status.AvailableReplicas = 1
-	// } else {
-	// 	job.Status.UnavailableReplicas = 1
-	// }
+	// TODO: handle duration?
+	// /containers/<container ID>/json ? This will allow getting:
+	// - State.ExitCode
+	// - State.StartedAt
+	// - State.FinishedAt
 }
