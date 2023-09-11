@@ -15,7 +15,7 @@ func (svc PersistentVolumeClaimService) DeletePersistentVolumeClaim(r *restful.R
 
 	err := svc.adapter.DeletePersistentVolumeClaim(r.Request.Context(), persistentVolumeClaimName, namespace)
 	if err != nil {
-		utils.HttpError(r, w, http.StatusInternalServerError, fmt.Errorf("unable to delete network: %w", err))
+		utils.HttpError(r, w, http.StatusInternalServerError, fmt.Errorf("unable to delete persistent volume claim: %w", err))
 		return
 	}
 

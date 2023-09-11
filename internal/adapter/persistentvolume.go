@@ -15,6 +15,15 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core"
 )
 
+func (adapter *KubeDockerAdapter) DeletePersistentVolume(ctx context.Context, persistentVolumeName string) error {
+	err := adapter.cli.VolumeRemove(ctx, persistentVolumeName, true)
+	if err != nil {
+		return fmt.Errorf("unable to remove Docker volume: %w", err)
+	}
+
+	return nil
+}
+
 func (adapter *KubeDockerAdapter) GetPersistentVolume(ctx context.Context, persistentVolumeName string) (*corev1.PersistentVolume, error) {
 	volume, err := adapter.cli.VolumeInspect(ctx, persistentVolumeName)
 	if err != nil {
@@ -56,7 +65,7 @@ func (adapter *KubeDockerAdapter) ListPersistentVolumes(ctx context.Context) (co
 func (adapter *KubeDockerAdapter) GetPersistentVolumeTable(ctx context.Context) (*metav1.Table, error) {
 	persistentVolumeList, err := adapter.listPersistentVolumes(ctx)
 	if err != nil {
-		return &metav1.Table{}, fmt.Errorf("unable to list nodes: %w", err)
+		return &metav1.Table{}, fmt.Errorf("unable to list persistent volumes: %w", err)
 	}
 
 	return k8s.GenerateTable(&persistentVolumeList)

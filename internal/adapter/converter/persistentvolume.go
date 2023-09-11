@@ -37,7 +37,7 @@ func (converter *DockerAPIConverter) ConvertVolumeToPersistentVolume(volume volu
 			AccessModes: []core.PersistentVolumeAccessMode{
 				core.ReadWriteOnce,
 			},
-			PersistentVolumeReclaimPolicy: core.PersistentVolumeReclaimDelete,
+			PersistentVolumeReclaimPolicy: core.PersistentVolumeReclaimRetain,
 			PersistentVolumeSource: core.PersistentVolumeSource{
 				HostPath: &core.HostPathVolumeSource{
 					Path: volume.Mountpoint,
