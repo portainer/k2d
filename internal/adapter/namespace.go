@@ -71,7 +71,9 @@ func (adapter *KubeDockerAdapter) DeleteNamespace(ctx context.Context, namespace
 	}
 
 	for _, container := range containers {
-		adapter.DeleteContainer(ctx, container.Names[0], namespaceName)
+		// the container name has to come from the label as the container name itself was already built
+		// with the function naming.BuildContainerName
+		adapter.DeleteContainer(ctx, container.Labels[k2dtypes.WorkloadNameLabelKey], namespaceName)
 	}
 
 	// This is just to make sure that the containers have been properly deleted
