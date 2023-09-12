@@ -25,6 +25,7 @@ func (converter *DockerAPIConverter) ConvertVolumeToPersistentVolume(volume volu
 
 	configMap, err := converter.configMapStore.GetConfigMap(volume.Labels[k2dtypes.PersistentVolumeClaimLabelKey], volume.Labels[k2dtypes.NamespaceLabelKey])
 	if err != nil {
+		// how to make this logged as an info
 		fmt.Printf("unable to retrieve config map for volume %s: %s\n. Setting the phase to released and no claim reference", volume.Name, err)
 	}
 

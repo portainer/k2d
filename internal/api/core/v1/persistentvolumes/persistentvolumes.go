@@ -24,6 +24,6 @@ func (svc PersistentVolumeService) RegisterPersistentVolumeAPI(ws *restful.WebSe
 		Param(ws.PathParameter("name", "name of the persistentvolume").DataType("string")))
 
 	ws.Route(ws.DELETE("/v1/persistentvolumes/{name}").
-		To(svc.GetPersistentVolume).
-		Param(ws.PathParameter("name", "name of the persistentvolumes").DataType("string")))
+		To(svc.DeletePersistentVolume).
+		Param(ws.PathParameter("name", "name of the persistentvolume").DataType("string")))
 }
