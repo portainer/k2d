@@ -12,7 +12,15 @@ import (
 )
 
 func (converter *DockerAPIConverter) UpdateConfigMapToPersistentVolumeClaim(persistentVolumeClaim *core.PersistentVolumeClaim, configMap *corev1.ConfigMap) error {
-	creationDate, err := time.Parse(time.RFC3339, configMap.Labels["store.k2d.io/filesystem/creation-timestamp"])
+	// creation-timestamp can be obtained from a label or directly from the metadata, based on how the K2D_STORE_BACKEND is set
+	creationDate := ""
+	if configMap.Labels["store.k2d.io/filesystem/creation-timestamp"] != "" {
+		creationDate = configMap.Labels["store.k2d.io/filesystem/creation-timestamp"]
+	} else {
+		creationDate = configMap.CreationTimestamp.Format(time.RFC3339)
+	}
+
+	timeConvertedCreationDate, err := time.Parse(time.RFC3339, creationDate)
 	if err != nil {
 		return fmt.Errorf("unable to parse persistent volume claim creation date: %w", err)
 	}
@@ -28,7 +36,7 @@ func (converter *DockerAPIConverter) UpdateConfigMapToPersistentVolumeClaim(pers
 		Name:      configMap.Labels[k2dtypes.PersistentVolumeClaimLabelKey],
 		Namespace: configMap.Labels[k2dtypes.NamespaceLabelKey],
 		CreationTimestamp: metav1.Time{
-			Time: creationDate,
+			Time: timeConvertedCreationDate,
 		},
 		Annotations: map[string]string{
 			"kubectl.kubernetes.io/last-applied-configuration": configMap.Labels[k2dtypes.PersistentVolumeClaimLastAppliedConfigLabelKey],

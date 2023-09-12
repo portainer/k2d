@@ -4,11 +4,10 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/volume"
 	"github.com/docker/docker/errdefs"
 	adaptererr "github.com/portainer/k2d/internal/adapter/errors"
-	k2dtypes "github.com/portainer/k2d/internal/adapter/types"
+	"github.com/portainer/k2d/internal/adapter/filters"
 	"github.com/portainer/k2d/internal/k8s"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -72,10 +71,9 @@ func (adapter *KubeDockerAdapter) GetPersistentVolumeTable(ctx context.Context) 
 }
 
 func (adapter *KubeDockerAdapter) listPersistentVolumes(ctx context.Context) (core.PersistentVolumeList, error) {
-	labelFilter := filters.NewArgs()
-	labelFilter.Add("label", k2dtypes.PersistentVolumeLabelKey)
+	filter := filters.AllPersistentVolumes()
 
-	volumeList, err := adapter.cli.VolumeList(ctx, volume.ListOptions{Filters: labelFilter})
+	volumeList, err := adapter.cli.VolumeList(ctx, volume.ListOptions{Filters: filter})
 	if err != nil {
 		return core.PersistentVolumeList{}, fmt.Errorf("unable to list volumes to return the output values from a Docker volume: %w", err)
 	}
