@@ -23,9 +23,3 @@ func BuildNetworkName(namespace string) string {
 func BuildPersistentVolumeName(volumeName string, namespace string) string {
 	return fmt.Sprintf("k2d-pv-%s-%s", namespace, volumeName)
 }
-
-// Each persistentVolumeClaim is named using the following format:
-// k2d-pvc-[namespace]-[volume-name]
-func BuildPersistentVolumeClaimName(volumeName string, namespace string) string {
-	return fmt.Sprintf("k2d-pvc-%s-%s", namespace, volumeName)
-}
