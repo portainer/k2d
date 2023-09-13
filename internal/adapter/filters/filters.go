@@ -140,3 +140,19 @@ func ByService(namespace, serviceName string) filters.Args {
 	filter.Add("label", fmt.Sprintf("%s=%s", types.NamespaceLabelKey, namespace))
 	return filter
 }
+
+// AllPersistentVolumes creates a Docker filter argument to list persistent volumes if the PersistentVolumeLabelKey exists.
+//
+// Parameters:
+//   - None.
+//
+// Returns:
+// - filters.Args: A Docker filter object to be used in Docker API calls to filter persistent volumes.
+//
+// Usage Example:
+//
+//	filter := AllPersistentVolumes()
+//	// Now 'filter' can be used in Docker API calls to filter persistent volumes.
+func AllPersistentVolumes() filters.Args {
+	return filters.NewArgs(filters.Arg("label", types.PersistentVolumeLabelKey))
+}

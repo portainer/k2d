@@ -16,10 +16,22 @@ func (converter *DockerAPIConverter) ConvertVolumeToPersistentVolume(volume volu
 		return nil, fmt.Errorf("unable to parse volume creation date: %w", err)
 	}
 
+	phase := core.VolumeBound
 	persistentVolumeClaimReference := &core.ObjectReference{
 		Kind:      "PersistentVolumeClaim",
 		Namespace: volume.Labels[k2dtypes.NamespaceLabelKey],
 		Name:      volume.Labels[k2dtypes.PersistentVolumeClaimLabelKey],
+	}
+
+	configMap, err := converter.configMapStore.GetConfigMap(volume.Labels[k2dtypes.PersistentVolumeClaimLabelKey], volume.Labels[k2dtypes.NamespaceLabelKey])
+	if err != nil {
+		// how to make this logged as an info
+		fmt.Printf("unable to retrieve config map for volume %s: %s\n. Setting the phase to released and no claim reference", volume.Name, err)
+	}
+
+	if configMap == nil {
+		phase = core.VolumeReleased
+		persistentVolumeClaimReference = nil
 	}
 
 	return &core.PersistentVolume{
@@ -37,7 +49,7 @@ func (converter *DockerAPIConverter) ConvertVolumeToPersistentVolume(volume volu
 			AccessModes: []core.PersistentVolumeAccessMode{
 				core.ReadWriteOnce,
 			},
-			PersistentVolumeReclaimPolicy: core.PersistentVolumeReclaimDelete,
+			PersistentVolumeReclaimPolicy: core.PersistentVolumeReclaimRetain,
 			PersistentVolumeSource: core.PersistentVolumeSource{
 				HostPath: &core.HostPathVolumeSource{
 					Path: volume.Mountpoint,
@@ -47,7 +59,7 @@ func (converter *DockerAPIConverter) ConvertVolumeToPersistentVolume(volume volu
 			StorageClassName: "local",
 		},
 		Status: core.PersistentVolumeStatus{
-			Phase: core.VolumeBound,
+			Phase: phase,
 		},
 	}, nil
 }

@@ -6,8 +6,10 @@ import (
 
 	adaptererr "github.com/portainer/k2d/internal/adapter/errors"
 	"github.com/portainer/k2d/internal/k8s"
+	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/storage"
 )
 
@@ -15,6 +17,8 @@ func (adapter *KubeDockerAdapter) GetStorageClass(ctx context.Context, storageCl
 	if storageClassName != "local" {
 		return nil, adaptererr.ErrResourceNotFound
 	}
+
+	reclaimPolicy := corev1.PersistentVolumeReclaimPolicy("Retain")
 
 	return &storagev1.StorageClass{
 		ObjectMeta: metav1.ObjectMeta{
@@ -24,7 +28,8 @@ func (adapter *KubeDockerAdapter) GetStorageClass(ctx context.Context, storageCl
 			Kind:       "StorageClass",
 			APIVersion: "storage.k8s.io/v1",
 		},
-		Provisioner: "local",
+		Provisioner:   "local",
+		ReclaimPolicy: &reclaimPolicy,
 	}, nil
 }
 
@@ -48,6 +53,8 @@ func (adapter *KubeDockerAdapter) GetStorageClassTable(ctx context.Context) (*me
 
 func (adapter *KubeDockerAdapter) listStorageClasses(ctx context.Context) (storage.StorageClassList, error) {
 	storageClasses := []storage.StorageClass{}
+
+	reclaimPolicy := core.PersistentVolumeReclaimPolicy("Retain")
 	storageClasses = append(storageClasses, storage.StorageClass{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "local",
@@ -56,7 +63,8 @@ func (adapter *KubeDockerAdapter) listStorageClasses(ctx context.Context) (stora
 			Kind:       "StorageClass",
 			APIVersion: "storage.k8s.io/v1",
 		},
-		Provisioner: "local",
+		Provisioner:   "local",
+		ReclaimPolicy: &reclaimPolicy,
 	})
 
 	return storage.StorageClassList{

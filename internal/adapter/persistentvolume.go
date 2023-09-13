@@ -4,16 +4,24 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/volume"
 	"github.com/docker/docker/errdefs"
 	adaptererr "github.com/portainer/k2d/internal/adapter/errors"
-	k2dtypes "github.com/portainer/k2d/internal/adapter/types"
+	"github.com/portainer/k2d/internal/adapter/filters"
 	"github.com/portainer/k2d/internal/k8s"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/apis/core"
 )
+
+func (adapter *KubeDockerAdapter) DeletePersistentVolume(ctx context.Context, persistentVolumeName string) error {
+	err := adapter.cli.VolumeRemove(ctx, persistentVolumeName, true)
+	if err != nil {
+		return fmt.Errorf("unable to remove Docker volume: %w", err)
+	}
+
+	return nil
+}
 
 func (adapter *KubeDockerAdapter) GetPersistentVolume(ctx context.Context, persistentVolumeName string) (*corev1.PersistentVolume, error) {
 	volume, err := adapter.cli.VolumeInspect(ctx, persistentVolumeName)
@@ -56,17 +64,16 @@ func (adapter *KubeDockerAdapter) ListPersistentVolumes(ctx context.Context) (co
 func (adapter *KubeDockerAdapter) GetPersistentVolumeTable(ctx context.Context) (*metav1.Table, error) {
 	persistentVolumeList, err := adapter.listPersistentVolumes(ctx)
 	if err != nil {
-		return &metav1.Table{}, fmt.Errorf("unable to list nodes: %w", err)
+		return &metav1.Table{}, fmt.Errorf("unable to list persistent volumes: %w", err)
 	}
 
 	return k8s.GenerateTable(&persistentVolumeList)
 }
 
 func (adapter *KubeDockerAdapter) listPersistentVolumes(ctx context.Context) (core.PersistentVolumeList, error) {
-	labelFilter := filters.NewArgs()
-	labelFilter.Add("label", k2dtypes.PersistentVolumeLabelKey)
+	filter := filters.AllPersistentVolumes()
 
-	volumeList, err := adapter.cli.VolumeList(ctx, volume.ListOptions{Filters: labelFilter})
+	volumeList, err := adapter.cli.VolumeList(ctx, volume.ListOptions{Filters: filter})
 	if err != nil {
 		return core.PersistentVolumeList{}, fmt.Errorf("unable to list volumes to return the output values from a Docker volume: %w", err)
 	}

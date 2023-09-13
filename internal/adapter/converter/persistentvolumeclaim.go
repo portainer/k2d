@@ -4,17 +4,25 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/docker/docker/api/types/volume"
 	"github.com/portainer/k2d/internal/adapter/naming"
 	k2dtypes "github.com/portainer/k2d/internal/adapter/types"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/apis/core"
 )
 
-func (converter *DockerAPIConverter) UpdateVolumeToPersistentVolumeClaim(persistentVolumeClaim *core.PersistentVolumeClaim, volume volume.Volume) error {
-	creationDate, err := time.Parse(time.RFC3339, volume.CreatedAt)
+func (converter *DockerAPIConverter) UpdateConfigMapToPersistentVolumeClaim(persistentVolumeClaim *core.PersistentVolumeClaim, configMap *corev1.ConfigMap) error {
+	// creation-timestamp can be obtained from a label or directly from the metadata, based on how the K2D_STORE_BACKEND is set
+	creationDate := ""
+	if configMap.Labels["store.k2d.io/filesystem/creation-timestamp"] != "" {
+		creationDate = configMap.Labels["store.k2d.io/filesystem/creation-timestamp"]
+	} else {
+		creationDate = configMap.CreationTimestamp.Format(time.RFC3339)
+	}
+
+	timeConvertedCreationDate, err := time.Parse(time.RFC3339, creationDate)
 	if err != nil {
-		return fmt.Errorf("unable to parse volume creation date: %w", err)
+		return fmt.Errorf("unable to parse persistent volume claim creation date: %w", err)
 	}
 
 	storageClassName := "local"
@@ -25,19 +33,19 @@ func (converter *DockerAPIConverter) UpdateVolumeToPersistentVolumeClaim(persist
 	}
 
 	persistentVolumeClaim.ObjectMeta = metav1.ObjectMeta{
-		Name:      volume.Labels[k2dtypes.PersistentVolumeClaimLabelKey],
-		Namespace: volume.Labels[k2dtypes.NamespaceLabelKey],
+		Name:      configMap.Labels[k2dtypes.PersistentVolumeClaimLabelKey],
+		Namespace: configMap.Labels[k2dtypes.NamespaceLabelKey],
 		CreationTimestamp: metav1.Time{
-			Time: creationDate,
+			Time: timeConvertedCreationDate,
 		},
 		Annotations: map[string]string{
-			"kubectl.kubernetes.io/last-applied-configuration": volume.Labels[k2dtypes.PersistentVolumeClaimLastAppliedConfigLabelKey],
+			"kubectl.kubernetes.io/last-applied-configuration": configMap.Labels[k2dtypes.PersistentVolumeClaimLastAppliedConfigLabelKey],
 		},
 	}
 
 	persistentVolumeClaim.Spec = core.PersistentVolumeClaimSpec{
 		StorageClassName: &storageClassName,
-		VolumeName:       naming.BuildPersistentVolumeName(volume.Labels[k2dtypes.PersistentVolumeClaimLabelKey], volume.Labels[k2dtypes.NamespaceLabelKey]),
+		VolumeName:       naming.BuildPersistentVolumeName(configMap.Labels[k2dtypes.PersistentVolumeClaimLabelKey], configMap.Labels[k2dtypes.NamespaceLabelKey]),
 		AccessModes: []core.PersistentVolumeAccessMode{
 			core.ReadWriteOnce,
 		},

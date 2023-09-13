@@ -122,6 +122,12 @@ func LoadMetadataFromDisk(storagePath, fileName string) (map[string]string, erro
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		line := scanner.Text()
+		// configmap may contain an empty line at the end
+		// in this case, skip it
+		if line == "" {
+			continue
+		}
+
 		parts := strings.SplitN(line, "=", 2)
 		if len(parts) != 2 {
 			return nil, fmt.Errorf("invalid data format: %s", line)
