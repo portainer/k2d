@@ -80,8 +80,47 @@ func (converter *DockerAPIConverter) ConvertContainerToPod(container types.Conta
 		pod.Status.ContainerStatuses[0].State.Running = &core.ContainerStateRunning{
 			StartedAt: metav1.NewTime(time.Unix(container.Created, 0)),
 		}
+
+		// the conditions block with PodReady, PodScheduled, PodInitialized, and ContainersReady
+		// are required for the pod to be considered ready
+		pod.Status.Conditions = []core.PodCondition{
+			{
+				Type:               core.PodReady,
+				Status:             "True",
+				Message:            "Pod is ready",
+				LastTransitionTime: metav1.NewTime(time.Now()),
+			},
+			{
+				Type:               core.PodScheduled,
+				Status:             "True",
+				Message:            "Pod is scheduled",
+				LastTransitionTime: metav1.NewTime(time.Now()),
+			},
+			{
+				Type:               core.PodInitialized,
+				Status:             "True",
+				Message:            "Pod has been initialized",
+				LastTransitionTime: metav1.NewTime(time.Now()),
+			},
+			{
+				Type:               core.ContainersReady,
+				Status:             "True",
+				Message:            "Containers are ready",
+				LastTransitionTime: metav1.NewTime(time.Now()),
+			},
+		}
 	} else {
 		pod.Status.Phase = core.PodUnknown
+
+		// this is to mark the pod's condition as unknown
+		pod.Status.Conditions = []core.PodCondition{
+			{
+				Type:               core.PodConditionType(core.PodUnknown),
+				Status:             "False",
+				Message:            "Pod is not running",
+				LastTransitionTime: metav1.NewTime(time.Now()),
+			},
+		}
 	}
 
 	return pod

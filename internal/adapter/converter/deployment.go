@@ -35,7 +35,38 @@ func (converter *DockerAPIConverter) UpdateDeploymentFromContainerInfo(deploymen
 		deployment.Status.UpdatedReplicas = 1
 		deployment.Status.ReadyReplicas = 1
 		deployment.Status.AvailableReplicas = 1
+
+		// set the deployment conditions to available and progressing
+		// if the container is running
+		deployment.Status.Conditions = []apps.DeploymentCondition{
+			{
+				Type:               apps.DeploymentAvailable,
+				Status:             "True",
+				Message:            "Deployment is available",
+				Reason:             "MinimumReplicasAvailable",
+				LastTransitionTime: metav1.NewTime(time.Now()),
+			},
+			{
+				Type:               apps.DeploymentProgressing,
+				Status:             "True",
+				Message:            "NewReplicaSetAvailable",
+				Reason:             "NewReplicaSetAvailable",
+				LastTransitionTime: metav1.NewTime(time.Now()),
+			},
+		}
 	} else {
 		deployment.Status.UnavailableReplicas = 1
+
+		// set the deployment conditions to unavailable and progressing
+		// if the container is not running
+		deployment.Status.Conditions = []apps.DeploymentCondition{
+			{
+				Type:               apps.DeploymentAvailable,
+				Status:             "False",
+				Message:            "Deployment is not available",
+				Reason:             "MinimumReplicasUnavailable",
+				LastTransitionTime: metav1.NewTime(time.Now()),
+			},
+		}
 	}
 }
