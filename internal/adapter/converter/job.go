@@ -9,7 +9,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/batch"
 )
 
-func (converter *DockerAPIConverter) UpdateJobFromContainerInfo(job *batch.Job, container types.Container) {
+func (converter *DockerAPIConverter) UpdateJobFromContainerInfo(job *batch.Job, container types.Container, json types.ContainerJSON) {
 	job.TypeMeta = metav1.TypeMeta{
 		Kind:       "Job",
 		APIVersion: "batch/v1",
@@ -30,7 +30,12 @@ func (converter *DockerAPIConverter) UpdateJobFromContainerInfo(job *batch.Job, 
 		job.Status.Active = 1
 	} else {
 		// TODO: handle completion status?
-		job.Status.Failed = 1
+		if json.State.ExitCode == 0 {
+			job.Status.Succeeded = 1
+		} else {
+			job.Status.Failed = 1
+		}
+
 	}
 
 	// TODO: handle duration?
@@ -38,4 +43,5 @@ func (converter *DockerAPIConverter) UpdateJobFromContainerInfo(job *batch.Job, 
 	// - State.ExitCode
 	// - State.StartedAt
 	// - State.FinishedAt
+	job.Status.CompletionTime.Time, _ = time.Parse("", json.State.FinishedAt)
 }
