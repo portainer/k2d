@@ -52,13 +52,25 @@ func (adapter *KubeDockerAdapter) GetPersistentVolume(ctx context.Context, persi
 	return &versionedPersistentVolume, nil
 }
 
-func (adapter *KubeDockerAdapter) ListPersistentVolumes(ctx context.Context) (core.PersistentVolumeList, error) {
+func (adapter *KubeDockerAdapter) ListPersistentVolumes(ctx context.Context) (corev1.PersistentVolumeList, error) {
 	persistentVolumes, err := adapter.listPersistentVolumes(ctx)
 	if err != nil {
-		return core.PersistentVolumeList{}, fmt.Errorf("unable to list nodes: %w", err)
+		return corev1.PersistentVolumeList{}, fmt.Errorf("unable to list nodes: %w", err)
 	}
 
-	return persistentVolumes, nil
+	versionedPersistentVolumeList := corev1.PersistentVolumeList{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "PersistentVolumeList",
+			APIVersion: "v1",
+		},
+	}
+
+	err = adapter.ConvertK8SResource(&persistentVolumes, &versionedPersistentVolumeList)
+	if err != nil {
+		return corev1.PersistentVolumeList{}, fmt.Errorf("unable to convert internal PersistentVolumeList to versioned PersistentVolumeList: %w", err)
+	}
+
+	return versionedPersistentVolumeList, nil
 }
 
 func (adapter *KubeDockerAdapter) GetPersistentVolumeTable(ctx context.Context) (*metav1.Table, error) {

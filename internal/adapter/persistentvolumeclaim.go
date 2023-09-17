@@ -143,13 +143,25 @@ func (adapter *KubeDockerAdapter) updatePersistentVolumeClaimFromVolume(persiste
 	return &persistentVolumeClaim, nil
 }
 
-func (adapter *KubeDockerAdapter) ListPersistentVolumeClaims(ctx context.Context, namespaceName string) (core.PersistentVolumeClaimList, error) {
+func (adapter *KubeDockerAdapter) ListPersistentVolumeClaims(ctx context.Context, namespaceName string) (corev1.PersistentVolumeClaimList, error) {
 	persistentVolumeClaims, err := adapter.listPersistentVolumeClaims(ctx, namespaceName)
 	if err != nil {
-		return core.PersistentVolumeClaimList{}, fmt.Errorf("unable to list persistent volume claims: %w", err)
+		return corev1.PersistentVolumeClaimList{}, fmt.Errorf("unable to list persistent volume claims: %w", err)
 	}
 
-	return *persistentVolumeClaims, nil
+	versionedPersistentVolumeClaimList := corev1.PersistentVolumeClaimList{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "PersistentVolumeClaimList",
+			APIVersion: "v1",
+		},
+	}
+
+	err = adapter.ConvertK8SResource(&persistentVolumeClaims, &versionedPersistentVolumeClaimList)
+	if err != nil {
+		return corev1.PersistentVolumeClaimList{}, fmt.Errorf("unable to convert internal PersistentVolumeClaimList to versioned PersistentVolumeClaimList: %w", err)
+	}
+
+	return versionedPersistentVolumeClaimList, nil
 }
 
 func (adapter *KubeDockerAdapter) GetPersistentVolumeClaimTable(ctx context.Context, namespaceName string) (*metav1.Table, error) {
@@ -158,13 +170,13 @@ func (adapter *KubeDockerAdapter) GetPersistentVolumeClaimTable(ctx context.Cont
 		return &metav1.Table{}, fmt.Errorf("unable to list persistent volume claim: %w", err)
 	}
 
-	return k8s.GenerateTable(persistentVolumeClaims)
+	return k8s.GenerateTable(&persistentVolumeClaims)
 }
 
-func (adapter *KubeDockerAdapter) listPersistentVolumeClaims(ctx context.Context, namespaceName string) (*core.PersistentVolumeClaimList, error) {
+func (adapter *KubeDockerAdapter) listPersistentVolumeClaims(ctx context.Context, namespaceName string) (core.PersistentVolumeClaimList, error) {
 	configMaps, err := adapter.ListConfigMaps(namespaceName)
 	if err != nil {
-		return nil, fmt.Errorf("unable to list configmaps: %w", err)
+		return core.PersistentVolumeClaimList{}, fmt.Errorf("unable to list configmaps: %w", err)
 	}
 
 	persistentVolumeClaims := core.PersistentVolumeClaimList{
@@ -175,25 +187,21 @@ func (adapter *KubeDockerAdapter) listPersistentVolumeClaims(ctx context.Context
 	}
 
 	for _, configMap := range configMaps.Items {
-		persistentVolumeClaimConfigMap, err := adapter.GetConfigMap(configMap.Labels[k2dtypes.PersistentVolumeClaimLabelKey], namespaceName)
+		persistentVolumeLabelKey := configMap.Labels[k2dtypes.PersistentVolumeClaimLabelKey]
 
-		if err != nil {
-			return nil, fmt.Errorf("unable to get persistent volume claim: %w", err)
-		}
+		if persistentVolumeLabelKey != "" {
+			persistentvolumeClaimLastAppliedConfigLabelKey := configMap.Labels[k2dtypes.PersistentVolumeClaimLastAppliedConfigLabelKey]
 
-		if persistentVolumeClaimConfigMap == nil {
-			continue
-		}
+			if persistentvolumeClaimLastAppliedConfigLabelKey != "" {
+				persistentVolumeClaim, err := adapter.updatePersistentVolumeClaimFromVolume(persistentvolumeClaimLastAppliedConfigLabelKey, &configMap)
+				if err != nil {
+					return core.PersistentVolumeClaimList{}, fmt.Errorf("unable to update persistent volume claim from volume: %w", err)
+				}
 
-		if persistentVolumeClaimConfigMap.Labels[k2dtypes.PersistentVolumeClaimLastAppliedConfigLabelKey] != "" {
-			persistentVolumeClaim, err := adapter.updatePersistentVolumeClaimFromVolume(persistentVolumeClaimConfigMap.Labels[k2dtypes.PersistentVolumeClaimLastAppliedConfigLabelKey], persistentVolumeClaimConfigMap)
-			if err != nil {
-				return nil, fmt.Errorf("unable to update persistent volume claim from volume: %w", err)
+				persistentVolumeClaims.Items = append(persistentVolumeClaims.Items, *persistentVolumeClaim)
 			}
-
-			persistentVolumeClaims.Items = append(persistentVolumeClaims.Items, *persistentVolumeClaim)
 		}
 	}
 
-	return &persistentVolumeClaims, nil
+	return persistentVolumeClaims, nil
 }
