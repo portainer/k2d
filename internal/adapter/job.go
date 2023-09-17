@@ -76,7 +76,7 @@ func (adapter *KubeDockerAdapter) GetJob(ctx context.Context, jobName string, na
 		return nil, fmt.Errorf("unable to get container from job name: %w", err)
 	}
 
-	job, err := adapter.buildJobFromContainer(container)
+	job, err := adapter.buildJobFromContainer(ctx, container)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get job: %w", err)
 	}
@@ -126,7 +126,7 @@ func (adapter *KubeDockerAdapter) ListJobs(ctx context.Context, namespace string
 	return versionedJobList, nil
 }
 
-func (adapter *KubeDockerAdapter) buildJobFromContainer(container types.Container) (*batch.Job, error) {
+func (adapter *KubeDockerAdapter) buildJobFromContainer(ctx context.Context, container types.Container) (*batch.Job, error) {
 	if container.Labels[k2dtypes.WorkloadLastAppliedConfigLabelKey] == "" {
 		return nil, fmt.Errorf("unable to build job, missing %s label on container %s", k2dtypes.WorkloadLastAppliedConfigLabelKey, container.Names[0])
 	}
@@ -146,7 +146,12 @@ func (adapter *KubeDockerAdapter) buildJobFromContainer(container types.Containe
 		return nil, fmt.Errorf("unable to convert versioned job spec to internal job spec: %w", err)
 	}
 
-	adapter.converter.UpdateJobFromContainerInfo(&job, container)
+	containerInspect, err := adapter.cli.ContainerInspect(ctx, container.ID)
+	if err != nil {
+		return nil, fmt.Errorf("unable to inspect the container: %w", err)
+	}
+
+	adapter.converter.UpdateJobFromContainerInfo(&job, container, containerInspect)
 
 	return &job, nil
 }
@@ -161,7 +166,7 @@ func (adapter *KubeDockerAdapter) listJobs(ctx context.Context, namespace string
 	jobs := []batch.Job{}
 
 	for _, container := range containers {
-		job, err := adapter.buildJobFromContainer(container)
+		job, err := adapter.buildJobFromContainer(ctx, container)
 		if err != nil {
 			return batch.JobList{}, fmt.Errorf("unable to get job: %w", err)
 		}
