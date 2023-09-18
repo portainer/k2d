@@ -19,27 +19,47 @@ func (adapter *KubeDockerAdapter) GetStorageClass(ctx context.Context, storageCl
 	}
 
 	reclaimPolicy := corev1.PersistentVolumeReclaimPolicy("Retain")
+	volumeBindingMode := storagev1.VolumeBindingMode("WaitForFirstConsumer")
 
 	return &storagev1.StorageClass{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "local",
+			Annotations: map[string]string{
+				"storageclass.kubernetes.io/is-default-class": "true",
+			},
+			CreationTimestamp: metav1.Time{
+				Time: adapter.startTime,
+			},
 		},
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "StorageClass",
 			APIVersion: "storage.k8s.io/v1",
 		},
-		Provisioner:   "local",
-		ReclaimPolicy: &reclaimPolicy,
+		Provisioner:       "k2d.io/local",
+		ReclaimPolicy:     &reclaimPolicy,
+		VolumeBindingMode: &volumeBindingMode,
 	}, nil
 }
 
-func (adapter *KubeDockerAdapter) ListStorageClasses(ctx context.Context) (storage.StorageClassList, error) {
+func (adapter *KubeDockerAdapter) ListStorageClasses(ctx context.Context) (storagev1.StorageClassList, error) {
 	storageClassList, err := adapter.listStorageClasses(ctx)
 	if err != nil {
-		return storage.StorageClassList{}, fmt.Errorf("unable to list storageClasses: %w", err)
+		return storagev1.StorageClassList{}, fmt.Errorf("unable to list storage classes: %w", err)
 	}
 
-	return storageClassList, nil
+	versionedStorageClassList := storagev1.StorageClassList{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "StorageClassList",
+			APIVersion: "storage.k8s.io/v1",
+		},
+	}
+
+	err = adapter.ConvertK8SResource(&storageClassList, &versionedStorageClassList)
+	if err != nil {
+		return storagev1.StorageClassList{}, fmt.Errorf("unable to convert internal StorageClassList to versioned StorageClassList: %w", err)
+	}
+
+	return versionedStorageClassList, nil
 }
 
 func (adapter *KubeDockerAdapter) GetStorageClassTable(ctx context.Context) (*metav1.Table, error) {
@@ -55,16 +75,25 @@ func (adapter *KubeDockerAdapter) listStorageClasses(ctx context.Context) (stora
 	storageClasses := []storage.StorageClass{}
 
 	reclaimPolicy := core.PersistentVolumeReclaimPolicy("Retain")
+	volumeBindingMode := storage.VolumeBindingMode("WaitForFirstConsumer")
+
 	storageClasses = append(storageClasses, storage.StorageClass{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "local",
+			Annotations: map[string]string{
+				"storageclass.kubernetes.io/is-default-class": "true",
+			},
+			CreationTimestamp: metav1.Time{
+				Time: adapter.startTime,
+			},
 		},
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "StorageClass",
 			APIVersion: "storage.k8s.io/v1",
 		},
-		Provisioner:   "local",
-		ReclaimPolicy: &reclaimPolicy,
+		Provisioner:       "k2d.io/local",
+		ReclaimPolicy:     &reclaimPolicy,
+		VolumeBindingMode: &volumeBindingMode,
 	})
 
 	return storage.StorageClassList{
