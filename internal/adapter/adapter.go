@@ -14,11 +14,13 @@ import (
 	"github.com/portainer/k2d/internal/config"
 	"github.com/portainer/k2d/internal/types"
 	"go.uber.org/zap"
+	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	appsv1 "k8s.io/kubernetes/pkg/apis/apps/v1"
 	"k8s.io/kubernetes/pkg/apis/core"
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
+	"k8s.io/kubernetes/pkg/apis/storage"
 )
 
 type (
@@ -106,6 +108,8 @@ func NewKubeDockerAdapter(options *KubeDockerAdapterOptions) (*KubeDockerAdapter
 	appsv1.AddToScheme(scheme)
 	core.AddToScheme(scheme)
 	corev1.AddToScheme(scheme)
+	storage.AddToScheme(scheme)
+	storagev1.AddToScheme(scheme)
 
 	return &KubeDockerAdapter{
 		cli:                    cli,

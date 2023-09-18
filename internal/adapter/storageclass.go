@@ -27,6 +27,9 @@ func (adapter *KubeDockerAdapter) GetStorageClass(ctx context.Context, storageCl
 			Annotations: map[string]string{
 				"storageclass.kubernetes.io/is-default-class": "true",
 			},
+			CreationTimestamp: metav1.Time{
+				Time: adapter.startTime,
+			},
 		},
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "StorageClass",
@@ -79,6 +82,9 @@ func (adapter *KubeDockerAdapter) listStorageClasses(ctx context.Context) (stora
 			Name: "local",
 			Annotations: map[string]string{
 				"storageclass.kubernetes.io/is-default-class": "true",
+			},
+			CreationTimestamp: metav1.Time{
+				Time: adapter.startTime,
 			},
 		},
 		TypeMeta: metav1.TypeMeta{
