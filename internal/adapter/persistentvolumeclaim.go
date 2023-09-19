@@ -6,7 +6,6 @@ import (
 	"fmt"
 
 	"github.com/docker/docker/api/types/volume"
-	"github.com/docker/docker/errdefs"
 	"github.com/portainer/k2d/internal/adapter/naming"
 	k2dtypes "github.com/portainer/k2d/internal/adapter/types"
 	"github.com/portainer/k2d/internal/k8s"
@@ -15,41 +14,65 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core"
 )
 
-// TODO: use function comment instead of code comment
-// The logic is quite simple, when we create a new PVC we check whether a volume exists.
-// The volume name is defined by the PVC name and namespace if the volumeName property is not set on the PVC.
-// Otherwise, the volumeName is set to the volumeName property.
-// If the volume does not exist, we create it.
+// CreatePersistentVolumeClaim handles the creation or assignment of a Docker volume for a Kubernetes PersistentVolumeClaim (PVC).
+//
+// Parameters:
+//   - ctx:                      A context for managing the lifetime of the request.
+//   - persistentVolumeClaim:    A pointer to a Kubernetes PersistentVolumeClaim object that describes the claim.
+//
+// Returns:
+// - An error if any step in the creation or assignment process fails.
+//
+// Behavior:
+//
+//   - Static Volume Assignment:
+//     If the `Spec.VolumeName` field of the PVC is not empty, the function assumes that this is a static assignment of an existing Docker volume to a PVC.
+//     1. Inspects the Docker volume to ensure it exists.
+//     2. If the volume does not exist, returns an error.
+//
+//   - Dynamic Volume Creation:
+//     If the `Spec.VolumeName` field of the PVC is empty, the function creates a new Docker volume.
+//     1. Generates a dynamic name for the Docker volume based on the PVC name and namespace.
+//     2. Creates a new Docker volume with the generated name.
+//     3. Labels the Docker volume to identify it as a k2d-managed volume. (See `k2dtypes.PersistentVolumeNameLabelKey`)
+//
+//   - Helm-managed PVCs:
+//     If the PVC has a label "app.kubernetes.io/managed-by" set to "Helm", it serializes the PVC and stores it in an annotation for later use.
+//
+//   - ConfigMap Creation:
+//     Creates a ConfigMap that represents system-level information for the PVC, which includes:
+//     1. The namespace of the PVC.
+//     2. The name of the Docker volume.
+//     3. The name of the PVC.
+//     4. The last applied configuration of the PVC
 func (adapter *KubeDockerAdapter) CreatePersistentVolumeClaim(ctx context.Context, persistentVolumeClaim *corev1.PersistentVolumeClaim) error {
-	// if volume name is set, then set the volumeName to the volume name
-	// else set the volumeName as a combination of the PVC name and namespace
+	var volumeName string
 
-	volumeName := naming.BuildPersistentVolumeName(persistentVolumeClaim.Name, persistentVolumeClaim.Namespace)
 	if persistentVolumeClaim.Spec.VolumeName != "" {
+		// This is a static assignment of a volume to a PVC.
+		// In this case, we're not creating a volume, we're just assigning an existing volume to a PVC.
+		// If the volume is not found, we return an error.
 		volumeName = persistentVolumeClaim.Spec.VolumeName
-	}
+		adapter.logger.Debugf("using existing persistent volume %s for the requested persistent volume claim", volumeName)
 
-	// check if the volume already exists
-	// this is to ensure that we don't create a volume if it already exists
-	_, err := adapter.cli.VolumeInspect(ctx, volumeName)
+		_, err := adapter.cli.VolumeInspect(ctx, volumeName)
+		if err != nil {
+			return fmt.Errorf("unable to find volume %s: %w", volumeName, err)
+		}
+	} else {
+		// No volume name is specified, this is a dynamic assignment of a volume to a PVC.
+		// In this case, we need to create a volume. We don't need to inspect whether a volume exists or not.
+		// Building a dynamic volume name based on the PVC name and namespace
+		volumeName = naming.BuildPersistentVolumeName(persistentVolumeClaim.Name, persistentVolumeClaim.Namespace)
+		adapter.logger.Debugf("creating persistent volume %s for the requested persistent volume claim", volumeName)
 
-	// TODO: The condition is also not valid, any non nil, non not found error will be caught here
-	if !errdefs.IsNotFound(err) {
-		// the volume already exists. Update the PVC with the volume name
-		// this is a static assignment of a volume to a PVC.
-
-		// TODO: I'm not sure I understand this case. If the volume already exists, why do we need to update the PVC?
-		// This property is likely to be set already
-		persistentVolumeClaim.Spec.VolumeName = volumeName
-	} else if errdefs.IsNotFound(err) {
-		// the volume does not exist. Create it
-		// this is a dynamic assignment of a volume to a PVC
-		_, err = adapter.cli.VolumeCreate(ctx, volume.CreateOptions{
+		_, err := adapter.cli.VolumeCreate(ctx, volume.CreateOptions{
 			Name:   volumeName,
 			Driver: "local",
 			Labels: map[string]string{
-				k2dtypes.PersistentVolumeNameLabelKey:      volumeName,
-				k2dtypes.PersistentVolumeClaimNameLabelKey: persistentVolumeClaim.Name,
+				// We're using a special label to identify the volume as a k2d volume
+				// This should be documented in the function comment
+				k2dtypes.PersistentVolumeNameLabelKey: volumeName,
 			},
 		})
 
@@ -76,14 +99,12 @@ func (adapter *KubeDockerAdapter) CreatePersistentVolumeClaim(ctx context.Contex
 				k2dtypes.PersistentVolumeClaimLastAppliedConfigLabelKey: persistentVolumeClaim.ObjectMeta.Annotations["kubectl.kubernetes.io/last-applied-configuration"],
 			},
 		},
-		// TODO: there is a way to do a bit of optimization here
-		// an empty configmap should work but the disk backend store needs to be updated to support empty configmaps
 		Data: map[string]string{
 			"persistentVolumeClaim": persistentVolumeClaim.Name,
 		},
 	}
 
-	err = adapter.CreateSystemConfigMap(pvcConfigMap)
+	err := adapter.CreateSystemConfigMap(pvcConfigMap)
 	if err != nil {
 		return fmt.Errorf("unable to create system configmap for persistent volume claim: %w", err)
 	}
@@ -105,7 +126,7 @@ func (adapter *KubeDockerAdapter) GetPersistentVolumeClaim(ctx context.Context, 
 	pvcName := naming.BuildPVCSystemConfigMapName(persistentVolumeClaimName, namespaceName)
 	persistentVolumeClaimConfigMap, err := adapter.GetSystemConfigMap(pvcName)
 	if err != nil {
-		return nil, fmt.Errorf("unable to get persistent volume claim: %w", err)
+		return nil, fmt.Errorf("unable to get the system configmap associated to the persistent volume claim: %w", err)
 	}
 
 	// TODO: review the updatePersistentVolumeClaimFromVolume function / pattern

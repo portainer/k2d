@@ -16,10 +16,10 @@ const (
 	// PersistentVolumeClaimLastAppliedConfigLabelKey is the key used to store the service specific last applied configuration in the container labels
 	PersistentVolumeClaimLastAppliedConfigLabelKey = "persistentvolumeclaim.k2d.io/last-applied-configuration"
 
-	// PersistentVolumeClaimNameLabelKey is the key used to store the persistent volume name in the container labels
+	// PersistentVolumeClaimNameLabelKey is the key used to store the persistent volume claim name in the labels of a system configmap
 	PersistentVolumeClaimNameLabelKey = "storage.k2d.io/pvc-name"
 
-	// PersistentVolumeNameLabelKey is the key used to store the persistent volume name in the container labels
+	// PersistentVolumeNameLabelKey is the key used to store the persistent volume name in the labels of a system configmap or a Docker volume
 	PersistentVolumeNameLabelKey = "storage.k2d.io/pv-name"
 
 	// PodLastAppliedConfigLabelKey is the key used to store the pod specific last applied configuration in the container labels
