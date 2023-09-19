@@ -52,7 +52,7 @@ func (adapter *KubeDockerAdapter) GetPersistentVolume(ctx context.Context, persi
 		)
 	}
 
-	persistentVolume, err := adapter.converter.ConvertVolumeToPersistentVolume(volume, boundPVCConfigMap)
+	persistentVolume, err := adapter.converter.ConvertVolumeToPersistentVolume(&volume, boundPVCConfigMap)
 	if err != nil {
 		return nil, fmt.Errorf("unable to convert Docker volume to PersistentVolume: %w", err)
 	}
@@ -64,7 +64,7 @@ func (adapter *KubeDockerAdapter) GetPersistentVolume(ctx context.Context, persi
 		},
 	}
 
-	err = adapter.ConvertK8SResource(persistentVolume, &versionedPersistentVolume)
+	err = adapter.ConvertK8SResource(&persistentVolume, &versionedPersistentVolume)
 	if err != nil {
 		return nil, fmt.Errorf("unable to convert internal object to versioned object: %w", err)
 	}
@@ -133,12 +133,12 @@ func (adapter *KubeDockerAdapter) listPersistentVolumes(ctx context.Context) (co
 			)
 		}
 
-		persistentVolume, err := adapter.converter.ConvertVolumeToPersistentVolume(*volume, boundPVCConfigMap)
+		persistentVolume, err := adapter.converter.ConvertVolumeToPersistentVolume(volume, boundPVCConfigMap)
 		if err != nil {
 			return core.PersistentVolumeList{}, fmt.Errorf("unable to convert Docker volume to PersistentVolume: %w", err)
 		}
 
-		persistentVolumes = append(persistentVolumes, *persistentVolume)
+		persistentVolumes = append(persistentVolumes, persistentVolume)
 
 	}
 

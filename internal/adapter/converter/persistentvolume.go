@@ -11,10 +11,10 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core"
 )
 
-func (converter *DockerAPIConverter) ConvertVolumeToPersistentVolume(volume volume.Volume, pvcConfigMap *corev1.ConfigMap) (*core.PersistentVolume, error) {
+func (converter *DockerAPIConverter) ConvertVolumeToPersistentVolume(volume *volume.Volume, pvcConfigMap *corev1.ConfigMap) (core.PersistentVolume, error) {
 	creationDate, err := time.Parse(time.RFC3339, volume.CreatedAt)
 	if err != nil {
-		return nil, fmt.Errorf("unable to parse volume creation date: %w", err)
+		return core.PersistentVolume{}, fmt.Errorf("unable to parse volume creation date: %w", err)
 	}
 
 	var persistentVolumeClaimReference *core.ObjectReference
@@ -29,7 +29,7 @@ func (converter *DockerAPIConverter) ConvertVolumeToPersistentVolume(volume volu
 		}
 	}
 
-	return &core.PersistentVolume{
+	return core.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: volume.Name,
 			CreationTimestamp: metav1.Time{
