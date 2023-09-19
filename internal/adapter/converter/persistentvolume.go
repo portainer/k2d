@@ -6,26 +6,27 @@ import (
 
 	"github.com/docker/docker/api/types/volume"
 	k2dtypes "github.com/portainer/k2d/internal/adapter/types"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/apis/core"
 )
 
-func (converter *DockerAPIConverter) ConvertVolumeToPersistentVolume(volume volume.Volume, boundToPersistentVolumeClaim bool) (*core.PersistentVolume, error) {
+func (converter *DockerAPIConverter) ConvertVolumeToPersistentVolume(volume volume.Volume, pvcConfigMap *corev1.ConfigMap) (*core.PersistentVolume, error) {
 	creationDate, err := time.Parse(time.RFC3339, volume.CreatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse volume creation date: %w", err)
 	}
 
-	phase := core.VolumeBound
-	persistentVolumeClaimReference := &core.ObjectReference{
-		Kind:      "PersistentVolumeClaim",
-		Namespace: volume.Labels[k2dtypes.NamespaceNameLabelKey],
-		Name:      volume.Labels[k2dtypes.PersistentVolumeClaimNameLabelKey],
-	}
+	var persistentVolumeClaimReference *core.ObjectReference
+	phase := core.VolumeReleased
 
-	if !boundToPersistentVolumeClaim {
-		phase = core.VolumeReleased
-		persistentVolumeClaimReference = nil
+	if pvcConfigMap != nil {
+		phase = core.VolumeBound
+		persistentVolumeClaimReference = &core.ObjectReference{
+			Kind:      "PersistentVolumeClaim",
+			Namespace: pvcConfigMap.Labels[k2dtypes.NamespaceNameLabelKey],
+			Name:      pvcConfigMap.Labels[k2dtypes.PersistentVolumeClaimNameLabelKey],
+		}
 	}
 
 	return &core.PersistentVolume{

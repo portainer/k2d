@@ -241,7 +241,6 @@ func (converter *DockerAPIConverter) setResourceRequirements(hostConfig *contain
 //
 // It returns an error if any occurred fetching the Secret or obtaining the bind mappings fails.
 func (converter *DockerAPIConverter) SetServiceAccountTokenAndCACert(hostConfig *container.HostConfig) error {
-	// TODO: this is also a system resource
 	secret, err := converter.secretStore.GetSecret(k2dtypes.K2dServiceAccountSecretName, k2dtypes.K2DNamespaceName)
 	if err != nil {
 		return fmt.Errorf("unable to get secret %s: %w", k2dtypes.K2dServiceAccountSecretName, err)
