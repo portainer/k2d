@@ -47,7 +47,7 @@ func (adapter *KubeDockerAdapter) CreateNetworkFromNamespace(ctx context.Context
 	networkOptions := types.NetworkCreate{
 		Driver: "bridge",
 		Labels: map[string]string{
-			k2dtypes.NamespaceLabelKey:                  namespace.Name,
+			k2dtypes.NamespaceNameLabelKey:              namespace.Name,
 			k2dtypes.NamespaceLastAppliedConfigLabelKey: lastAppliedConfiguration,
 		},
 		Options: map[string]string{
@@ -166,7 +166,7 @@ func (adapter *KubeDockerAdapter) listNamespaces(ctx context.Context) (core.Name
 	namespaceList := []core.Namespace{}
 
 	for _, network := range networks {
-		namespace := network.Labels[k2dtypes.NamespaceLabelKey]
+		namespace := network.Labels[k2dtypes.NamespaceNameLabelKey]
 		namespaceList = append(namespaceList, adapter.converter.ConvertNetworkToNamespace(namespace, network))
 	}
 

@@ -173,9 +173,9 @@ func (s *VolumeStore) StoreSecret(secret *corev1.Secret) error {
 	volumeName := buildSecretVolumeName(secret.Name, secret.Namespace)
 
 	labels := map[string]string{
-		ResourceTypeLabelKey:    s.secretKind,
-		SecretTypeLabelKey:      string(secret.Type),
-		types.NamespaceLabelKey: secret.Namespace,
+		ResourceTypeLabelKey:        s.secretKind,
+		SecretTypeLabelKey:          string(secret.Type),
+		types.NamespaceNameLabelKey: secret.Namespace,
 	}
 	maputils.MergeMapsInPlace(labels, secret.Labels)
 
@@ -208,7 +208,7 @@ func (s *VolumeStore) StoreSecret(secret *corev1.Secret) error {
 // createSecretFromVolume constructs a Kubernetes Secret object from a Docker volume.
 // Returns a Secret object, and an error if any occurs (e.g., if the volume's creation timestamp is not parseable).
 func createSecretFromVolume(volume *volume.Volume) (core.Secret, error) {
-	namespace := volume.Labels[types.NamespaceLabelKey]
+	namespace := volume.Labels[types.NamespaceNameLabelKey]
 
 	secret := core.Secret{
 		TypeMeta: metav1.TypeMeta{

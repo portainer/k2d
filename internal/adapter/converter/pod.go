@@ -45,7 +45,7 @@ func (converter *DockerAPIConverter) ConvertContainerToPod(container types.Conta
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              containerName,
 			CreationTimestamp: metav1.NewTime(time.Unix(container.Created, 0)),
-			Namespace:         container.Labels[k2dtypes.NamespaceLabelKey],
+			Namespace:         container.Labels[k2dtypes.NamespaceNameLabelKey],
 			Annotations: map[string]string{
 				"kubectl.kubernetes.io/last-applied-configuration": container.Labels[k2dtypes.WorkloadLastAppliedConfigLabelKey],
 			},
@@ -241,6 +241,7 @@ func (converter *DockerAPIConverter) setResourceRequirements(hostConfig *contain
 //
 // It returns an error if any occurred fetching the Secret or obtaining the bind mappings fails.
 func (converter *DockerAPIConverter) SetServiceAccountTokenAndCACert(hostConfig *container.HostConfig) error {
+	// TODO: this is also a system resource
 	secret, err := converter.secretStore.GetSecret(k2dtypes.K2dServiceAccountSecretName, k2dtypes.K2DNamespaceName)
 	if err != nil {
 		return fmt.Errorf("unable to get secret %s: %w", k2dtypes.K2dServiceAccountSecretName, err)
@@ -473,27 +474,29 @@ func (converter *DockerAPIConverter) setVolumeMounts(namespace string, hostConfi
 }
 
 // handleVolumeSource configures the Docker host configuration's volume bindings based on a Kubernetes VolumeSource.
-// The VolumeSource can be of type ConfigMap, Secret, or HostPath.
-//
-// For PersistentVolumeClaim:
-// The function uses the volume name and namespace to generate a unique name for the volume.
+// The VolumeSource can be of type ConfigMap, Secret, HostPath, or PersistentVolumeClaim.
 //
 // Parameters:
-// - namespace:    The Kubernetes namespace where the volume resources (ConfigMap or Secret) are located.
+// - namespace:    The Kubernetes namespace where the volume resources (ConfigMap, Secret, or PersistentVolumeClaim) are located.
 // - hostConfig:   A pointer to the Docker host configuration to which the volume bindings will be appended.
 // - volume:       A Kubernetes Volume object describing the source of the volume.
 // - volumeMount:  A Kubernetes VolumeMount object containing additional specifications for mounting the volume.
 //
 // Behavior:
 // - For ConfigMap and Secret:
-//  1. Retrieves the resource (ConfigMap or Secret) from the store based on the volume source.
+//
+//  1. Retrieves the resource (ConfigMap or Secret) from the corresponding store based on the volume source.
+//
 //  2. Utilizes the store's specific implementation to generate a list of filesystem binds.
+//
 //  3. Appends these binds to the 'Binds' field of the Docker host configuration.
 //     - For HostPath:
 //     Directly appends a bind between the HostPath and the volume mount path to the Docker host configuration.
+//     - For PersistentVolumeClaim:
+//     Utilizes the volume name and namespace to generate the volume name and appends a bind to the Docker host configuration.
 //
 // Returns:
-// - An error if retrieval of the ConfigMap or Secret fails or if bind generation encounters issues.
+// - An error if the retrieval of the ConfigMap, Secret, or PersistentVolumeClaim fails, or if bind generation encounters issues.
 // - Nil if the volume bindings are successfully appended to the Docker host configuration.
 func (converter *DockerAPIConverter) handleVolumeSource(namespace string, hostConfig *container.HostConfig, volume core.Volume, volumeMount core.VolumeMount) error {
 	if volume.VolumeSource.ConfigMap != nil {

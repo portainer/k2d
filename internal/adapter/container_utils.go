@@ -239,7 +239,7 @@ func (adapter *KubeDockerAdapter) createContainerFromPodSpec(ctx context.Context
 		return fmt.Errorf("unable to marshal internal pod spec: %w", err)
 	}
 	options.labels[k2dtypes.PodLastAppliedConfigLabelKey] = string(internalPodSpecData)
-	options.labels[k2dtypes.NamespaceLabelKey] = options.namespace
+	options.labels[k2dtypes.NamespaceNameLabelKey] = options.namespace
 	options.labels[k2dtypes.WorkloadNameLabelKey] = options.containerName
 	options.labels[k2dtypes.NetworkNameLabelKey] = naming.BuildNetworkName(options.namespace)
 

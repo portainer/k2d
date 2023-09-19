@@ -10,7 +10,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core"
 )
 
-func (converter *DockerAPIConverter) ConvertVolumeToPersistentVolume(volume volume.Volume) (*core.PersistentVolume, error) {
+func (converter *DockerAPIConverter) ConvertVolumeToPersistentVolume(volume volume.Volume, boundToPersistentVolumeClaim bool) (*core.PersistentVolume, error) {
 	creationDate, err := time.Parse(time.RFC3339, volume.CreatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse volume creation date: %w", err)
@@ -19,17 +19,11 @@ func (converter *DockerAPIConverter) ConvertVolumeToPersistentVolume(volume volu
 	phase := core.VolumeBound
 	persistentVolumeClaimReference := &core.ObjectReference{
 		Kind:      "PersistentVolumeClaim",
-		Namespace: volume.Labels[k2dtypes.NamespaceLabelKey],
-		Name:      volume.Labels[k2dtypes.PersistentVolumeClaimLabelKey],
+		Namespace: volume.Labels[k2dtypes.NamespaceNameLabelKey],
+		Name:      volume.Labels[k2dtypes.PersistentVolumeClaimNameLabelKey],
 	}
 
-	configMap, err := converter.configMapStore.GetConfigMap(volume.Labels[k2dtypes.PersistentVolumeClaimLabelKey], volume.Labels[k2dtypes.NamespaceLabelKey])
-	if err != nil {
-		// how to make this logged as an info
-		fmt.Printf("unable to retrieve config map for volume %s: %s\n. Setting the phase to released and no claim reference", volume.Name, err)
-	}
-
-	if configMap == nil {
+	if !boundToPersistentVolumeClaim {
 		phase = core.VolumeReleased
 		persistentVolumeClaimReference = nil
 	}

@@ -12,6 +12,7 @@ import (
 )
 
 func (converter *DockerAPIConverter) UpdateConfigMapToPersistentVolumeClaim(persistentVolumeClaim *core.PersistentVolumeClaim, configMap *corev1.ConfigMap) error {
+	// TODO: this should be reviewed, there should be a single way to retrieve information from the store interface
 	// creation-timestamp can be obtained from a label or directly from the metadata, based on how the K2D_STORE_BACKEND is set
 	creationDate := ""
 	if configMap.Labels["store.k2d.io/filesystem/creation-timestamp"] != "" {
@@ -33,8 +34,8 @@ func (converter *DockerAPIConverter) UpdateConfigMapToPersistentVolumeClaim(pers
 	}
 
 	persistentVolumeClaim.ObjectMeta = metav1.ObjectMeta{
-		Name:      configMap.Labels[k2dtypes.PersistentVolumeClaimLabelKey],
-		Namespace: configMap.Labels[k2dtypes.NamespaceLabelKey],
+		Name:      configMap.Labels[k2dtypes.PersistentVolumeClaimNameLabelKey],
+		Namespace: configMap.Labels[k2dtypes.NamespaceNameLabelKey],
 		CreationTimestamp: metav1.Time{
 			Time: timeConvertedCreationDate,
 		},
@@ -45,7 +46,7 @@ func (converter *DockerAPIConverter) UpdateConfigMapToPersistentVolumeClaim(pers
 
 	persistentVolumeClaim.Spec = core.PersistentVolumeClaimSpec{
 		StorageClassName: &storageClassName,
-		VolumeName:       naming.BuildPersistentVolumeName(configMap.Labels[k2dtypes.PersistentVolumeClaimLabelKey], configMap.Labels[k2dtypes.NamespaceLabelKey]),
+		VolumeName:       naming.BuildPersistentVolumeName(configMap.Labels[k2dtypes.PersistentVolumeClaimNameLabelKey], configMap.Labels[k2dtypes.NamespaceNameLabelKey]),
 		AccessModes: []core.PersistentVolumeAccessMode{
 			core.ReadWriteOnce,
 		},

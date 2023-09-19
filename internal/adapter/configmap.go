@@ -3,6 +3,7 @@ package adapter
 import (
 	"fmt"
 
+	"github.com/portainer/k2d/internal/adapter/types"
 	"github.com/portainer/k2d/internal/k8s"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -13,8 +14,19 @@ func (adapter *KubeDockerAdapter) CreateConfigMap(configMap *corev1.ConfigMap) e
 	return adapter.configMapStore.StoreConfigMap(configMap)
 }
 
+// CreateSystemConfigMap is a wrapper around CreateConfigMap for clarity purpose. It creates a configmap in the k2d namespace.
+func (adapter *KubeDockerAdapter) CreateSystemConfigMap(configMap *corev1.ConfigMap) error {
+	configMap.Namespace = types.K2DNamespaceName
+	return adapter.configMapStore.StoreConfigMap(configMap)
+}
+
 func (adapter *KubeDockerAdapter) DeleteConfigMap(configMapName, namespace string) error {
 	return adapter.configMapStore.DeleteConfigMap(configMapName, namespace)
+}
+
+// DeleteSystemConfigMap is a wrapper around DeleteConfigMap for clarity purpose. It deletes a configmap from the k2d namespace.
+func (adapter *KubeDockerAdapter) DeleteSystemConfigMap(configMapName string) error {
+	return adapter.configMapStore.DeleteConfigMap(configMapName, types.K2DNamespaceName)
 }
 
 func (adapter *KubeDockerAdapter) GetConfigMap(configMapName, namespace string) (*corev1.ConfigMap, error) {
@@ -38,6 +50,11 @@ func (adapter *KubeDockerAdapter) GetConfigMap(configMapName, namespace string) 
 	versionedConfigMap.ObjectMeta.Annotations["kubectl.kubernetes.io/last-applied-configuration"] = ""
 
 	return &versionedConfigMap, nil
+}
+
+// GetSystemConfigMap is a wrapper around GetConfigMap for clarity purpose. It retrieves a configmap from the k2d namespace.
+func (adapter *KubeDockerAdapter) GetSystemConfigMap(configMapName string) (*corev1.ConfigMap, error) {
+	return adapter.GetConfigMap(configMapName, types.K2DNamespaceName)
 }
 
 func (adapter *KubeDockerAdapter) GetConfigMapTable(namespace string) (*metav1.Table, error) {
@@ -68,6 +85,11 @@ func (adapter *KubeDockerAdapter) ListConfigMaps(namespace string) (corev1.Confi
 	}
 
 	return versionedConfigMapList, nil
+}
+
+// ListSystemConfigMaps is a wrapper around ListConfigMaps for clarity purpose. It lists configmaps from the k2d namespace.
+func (adapter *KubeDockerAdapter) ListSystemConfigMaps() (corev1.ConfigMapList, error) {
+	return adapter.ListConfigMaps(types.K2DNamespaceName)
 }
 
 func (adapter *KubeDockerAdapter) listConfigMaps(namespace string) (core.ConfigMapList, error) {
