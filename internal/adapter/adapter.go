@@ -39,7 +39,7 @@ type (
 	// - Logging: For debugging and operational insight, it utilizes a logging framework.
 	//
 	// - Time-Tracking: The `startTime` field records when this adapter was initialized. This
-	//   timestamp is used as the creation time for certain Kubernetes resources.
+	//   timestamp is used as the creation time for certain Kubernetes resources (node, default storage class).
 	//
 	// - Server Configuration: Contains configuration related to the k2d server, which is used when
 	//   creating certain resources.
@@ -102,19 +102,10 @@ func NewKubeDockerAdapter(options *KubeDockerAdapterOptions) (*KubeDockerAdapter
 		return nil, fmt.Errorf("unable to initialize registry secret store: %w", err)
 	}
 
-	scheme := runtime.NewScheme()
-
-	apps.AddToScheme(scheme)
-	appsv1.AddToScheme(scheme)
-	core.AddToScheme(scheme)
-	corev1.AddToScheme(scheme)
-	storage.AddToScheme(scheme)
-	storagev1.AddToScheme(scheme)
-
 	return &KubeDockerAdapter{
 		cli:                    cli,
 		converter:              converter.NewDockerAPIConverter(configMapStore, secretStore, options.ServerConfiguration),
-		conversionScheme:       scheme,
+		conversionScheme:       initConversionScheme(),
 		configMapStore:         configMapStore,
 		k2dServerConfiguration: options.ServerConfiguration,
 		logger:                 options.Logger,
@@ -178,4 +169,37 @@ func (adapter *KubeDockerAdapter) ProvisionSystemResources(ctx context.Context, 
 	}
 
 	return nil
+}
+
+// initConversionScheme initializes and returns a new runtime.Scheme populated with
+// Kubernetes resource types from various API groups. The runtime.Scheme serves as
+// a hub for managing the collection of known Go types and offers functionalities
+// like conversion, encoding, and decoding of these types.
+//
+// General Usage of runtime.Scheme:
+// A runtime.Scheme is fundamental for various serialization and deserialization
+// operations in Kubernetes. It acts as a registry for Go types and allows for
+// their conversion between different versions.
+//
+// The function adds the schemes for the following API groups to the new Scheme object:
+// - 'apps': API group for managing workloads like deployments and stateful sets
+// - 'appsv1': Version 1 of the 'apps' API group
+// - 'core': Core API group for basic Kubernetes resources like Pods and Services
+// - 'corev1': Version 1 of the 'core' API group
+// - 'storage': API group for storage resources like PersistentVolume and PersistentVolumeClaim
+// - 'storagev1': Version 1 of the 'storage' API group
+//
+// Returns:
+// - A pointer to the initialized runtime.Scheme containing the added API groups.
+func initConversionScheme() *runtime.Scheme {
+	scheme := runtime.NewScheme()
+
+	apps.AddToScheme(scheme)
+	appsv1.AddToScheme(scheme)
+	core.AddToScheme(scheme)
+	corev1.AddToScheme(scheme)
+	storage.AddToScheme(scheme)
+	storagev1.AddToScheme(scheme)
+
+	return scheme
 }

@@ -110,6 +110,7 @@ func StoreMetadataOnDisk(storagePath, fileName string, data map[string]string) e
 // LoadMetadataFromDisk takes a path where the data is stored (storagePath) and a filename (fileName),
 // and reads the contents of the specified file. It expects the file contents to be in the format "key=value\n".
 // It returns a map where the keys and values are taken from the lines in the file.
+// The process will skip empty lines.
 // If an error occurs during this process, it returns the error and a nil map.
 func LoadMetadataFromDisk(storagePath, fileName string) (map[string]string, error) {
 	file, err := os.Open(path.Join(storagePath, fileName))
@@ -122,8 +123,7 @@ func LoadMetadataFromDisk(storagePath, fileName string) (map[string]string, erro
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		line := scanner.Text()
-		// configmap may contain an empty line at the end
-		// in this case, skip it
+
 		if line == "" {
 			continue
 		}

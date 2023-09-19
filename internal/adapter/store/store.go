@@ -133,10 +133,11 @@ func ConfigureStore(opts StoreOptions) (ConfigMapStore, SecretStore, error) {
 func ConfigureRegistrySecretStore(opts StoreOptions, encryptionKeyFolder string) (SecretStore, error) {
 	switch opts.RegistryBackend {
 	case "memory":
-
 		opts.Logger.Info("using memory store for registry Secrets")
 		return memory.NewInMemoryStore(), nil
 	case "volume":
+		opts.Logger.Info("using encrypted volume store for registry Secrets")
+
 		encryptionKey, err := volume.GenerateOrRetrieveEncryptionKey(opts.Logger, encryptionKeyFolder)
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate encryption key: %w", err)
@@ -150,7 +151,6 @@ func ConfigureRegistrySecretStore(opts StoreOptions, encryptionKeyFolder string)
 			return nil, fmt.Errorf("failed to create volume store: %w", err)
 		}
 
-		opts.Logger.Info("using encrypted volume store for registry Secrets")
 		return volumeStore, nil
 	default:
 		return nil, fmt.Errorf("invalid registry secret store backend: %s", opts.RegistryBackend)

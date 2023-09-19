@@ -21,6 +21,7 @@ func (adapter *KubeDockerAdapter) GetStorageClass(ctx context.Context, storageCl
 	reclaimPolicy := corev1.PersistentVolumeReclaimPolicy("Retain")
 	volumeBindingMode := storagev1.VolumeBindingMode("WaitForFirstConsumer")
 
+	// TODO: create in the converter package
 	return &storagev1.StorageClass{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "local",
@@ -77,6 +78,7 @@ func (adapter *KubeDockerAdapter) listStorageClasses(ctx context.Context) (stora
 	reclaimPolicy := core.PersistentVolumeReclaimPolicy("Retain")
 	volumeBindingMode := storage.VolumeBindingMode("WaitForFirstConsumer")
 
+	// TODO: introduce a converter method to centralize the default storage class object creation
 	storageClasses = append(storageClasses, storage.StorageClass{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "local",
