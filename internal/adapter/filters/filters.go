@@ -40,7 +40,7 @@ func AllDeployments(namespace string) filters.Args {
 //	filter := AllNamespaces()
 //	// Now 'filter' can be used in Docker API calls to filter resources that are labeled with any Kubernetes namespace.
 func AllNamespaces() filters.Args {
-	return filters.NewArgs(filters.Arg("label", types.NamespaceLabelKey))
+	return filters.NewArgs(filters.Arg("label", types.NamespaceNameLabelKey))
 }
 
 // AllServices creates a Docker filter argument to target all Docker resources labeled as services within a specific Kubernetes namespace.
@@ -98,7 +98,7 @@ func ByNamespace(namespace string) filters.Args {
 	if namespace == "" {
 		return AllNamespaces()
 	}
-	return filters.NewArgs(filters.Arg("label", fmt.Sprintf("%s=%s", types.NamespaceLabelKey, namespace)))
+	return filters.NewArgs(filters.Arg("label", fmt.Sprintf("%s=%s", types.NamespaceNameLabelKey, namespace)))
 }
 
 // ByPod creates a Docker filter argument to target a specific pod within a specific Kubernetes namespace.
@@ -116,7 +116,7 @@ func ByNamespace(namespace string) filters.Args {
 //	// Now 'filter' can be used in Docker API calls to filter resources of pod 'mypod' in the 'default' Kubernetes namespace.
 func ByPod(namespace, podName string) filters.Args {
 	filter := filters.NewArgs()
-	filter.Add("label", fmt.Sprintf("%s=%s", types.NamespaceLabelKey, namespace))
+	filter.Add("label", fmt.Sprintf("%s=%s", types.NamespaceNameLabelKey, namespace))
 	filter.Add("label", fmt.Sprintf("%s=%s", types.WorkloadNameLabelKey, podName))
 	return filter
 }
@@ -137,22 +137,23 @@ func ByPod(namespace, podName string) filters.Args {
 func ByService(namespace, serviceName string) filters.Args {
 	filter := filters.NewArgs()
 	filter.Add("label", fmt.Sprintf("%s=%s", types.ServiceNameLabelKey, serviceName))
-	filter.Add("label", fmt.Sprintf("%s=%s", types.NamespaceLabelKey, namespace))
+	filter.Add("label", fmt.Sprintf("%s=%s", types.NamespaceNameLabelKey, namespace))
 	return filter
 }
 
-// AllPersistentVolumes creates a Docker filter argument to list persistent volumes if the PersistentVolumeLabelKey exists.
+// AllPersistentVolumes creates a Docker filter argument that targets resources labeled with a Kubernetes persistent volume name.
+// This function uses the types.PersistentVolumeNameLabelKey constant as the base label key to filter Docker resources.
 //
 // Parameters:
-//   - None.
+//   - None
 //
 // Returns:
-// - filters.Args: A Docker filter object to be used in Docker API calls to filter persistent volumes.
+// - filters.Args: A Docker filter object that can be used to filter Docker API calls based on the presence of the persistent volume name label.
 //
 // Usage Example:
 //
 //	filter := AllPersistentVolumes()
-//	// Now 'filter' can be used in Docker API calls to filter persistent volumes.
+//	// Now 'filter' can be used in Docker API calls to filter resources that are labeled with any Kubernetes persistent volume name.
 func AllPersistentVolumes() filters.Args {
-	return filters.NewArgs(filters.Arg("label", types.PersistentVolumeLabelKey))
+	return filters.NewArgs(filters.Arg("label", types.PersistentVolumeNameLabelKey))
 }

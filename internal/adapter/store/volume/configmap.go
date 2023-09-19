@@ -163,8 +163,8 @@ func (store *VolumeStore) StoreConfigMap(configMap *corev1.ConfigMap) error {
 	volumeName := buildConfigMapVolumeName(configMap.Name, configMap.Namespace)
 
 	labels := map[string]string{
-		ResourceTypeLabelKey:    ConfigMapResourceType,
-		types.NamespaceLabelKey: configMap.Namespace,
+		ResourceTypeLabelKey:        ConfigMapResourceType,
+		types.NamespaceNameLabelKey: configMap.Namespace,
 	}
 	maputils.MergeMapsInPlace(labels, configMap.Labels)
 
@@ -187,7 +187,7 @@ func (store *VolumeStore) StoreConfigMap(configMap *corev1.ConfigMap) error {
 // createConfigMapFromVolume constructs a Kubernetes ConfigMap object from a Docker volume.
 // Returns a ConfigMap object, and an error if any occurs (e.g., if the volume's creation timestamp is not parseable).
 func createConfigMapFromVolume(volume *volume.Volume) (core.ConfigMap, error) {
-	namespace := volume.Labels[types.NamespaceLabelKey]
+	namespace := volume.Labels[types.NamespaceNameLabelKey]
 
 	configMap := core.ConfigMap{
 		TypeMeta: metav1.TypeMeta{

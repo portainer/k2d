@@ -41,7 +41,7 @@ func (svc StorageService) ListAPIResources(r *restful.Request, w *restful.Respon
 				SingularName: "",
 				Name:         "storageclasses",
 				ShortNames:   []string{"sc"},
-				Verbs:        []string{"get,list"},
+				Verbs:        []string{"list", "get"},
 				Namespaced:   false,
 			},
 		},
@@ -51,6 +51,6 @@ func (svc StorageService) ListAPIResources(r *restful.Request, w *restful.Respon
 }
 
 func (svc StorageService) RegisterStorageAPI(routes *restful.WebService) {
-	// storage
+	// storageclasses
 	svc.storageclasses.RegisterStorageClassAPI(routes)
 }
