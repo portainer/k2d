@@ -184,7 +184,6 @@ func (adapter *KubeDockerAdapter) GetPersistentVolumeClaimTable(ctx context.Cont
 }
 
 func (adapter *KubeDockerAdapter) listPersistentVolumeClaims(ctx context.Context, namespaceName string) (core.PersistentVolumeClaimList, error) {
-	// configMaps, err := adapter.ListConfigMaps(namespaceName)
 	configMaps, err := adapter.ListSystemConfigMaps()
 	if err != nil {
 		return core.PersistentVolumeClaimList{}, fmt.Errorf("unable to list configmaps: %w", err)
@@ -198,11 +197,8 @@ func (adapter *KubeDockerAdapter) listPersistentVolumeClaims(ctx context.Context
 	}
 
 	for _, configMap := range configMaps.Items {
-		// persistentVolumeClaimName := configMap.Labels[k2dtypes.PersistentVolumeClaimNameLabelKey]
 		namespace := configMap.Labels[k2dtypes.NamespaceNameLabelKey]
 
-		// TODO: not sure about this condition, seems to me that it is always set
-		// if persistentVolumeClaimName != "" {
 		if namespaceName == "" || namespace == namespaceName {
 			persistentvolumeClaimLastAppliedConfigLabelKey := configMap.Labels[k2dtypes.PersistentVolumeClaimLastAppliedConfigLabelKey]
 
