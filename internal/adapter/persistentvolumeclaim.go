@@ -213,10 +213,10 @@ func (adapter *KubeDockerAdapter) listPersistentVolumeClaims(ctx context.Context
 		namespace := configMap.Labels[k2dtypes.NamespaceNameLabelKey]
 
 		if namespaceName == "" || namespace == namespaceName {
-			LastAppliedConfigLabelKey := configMap.Labels[k2dtypes.LastAppliedConfigLabelKey]
+			pvcLastAppliedConfig := configMap.Labels[k2dtypes.LastAppliedConfigLabelKey]
 
-			if LastAppliedConfigLabelKey != "" {
-				persistentVolumeClaim, err := adapter.updatePersistentVolumeClaimFromVolume(LastAppliedConfigLabelKey, &configMap)
+			if pvcLastAppliedConfig != "" {
+				persistentVolumeClaim, err := adapter.updatePersistentVolumeClaimFromVolume(pvcLastAppliedConfig, &configMap)
 				if err != nil {
 					return core.PersistentVolumeClaimList{}, fmt.Errorf("unable to update persistent volume claim from volume: %w", err)
 				}
