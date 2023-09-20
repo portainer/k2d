@@ -117,8 +117,6 @@ func (adapter *KubeDockerAdapter) GetPersistentVolumeClaim(ctx context.Context, 
 		return nil, fmt.Errorf("unable to get the system configmap associated to the persistent volume claim: %w", err)
 	}
 
-	// TODO: review the updatePersistentVolumeClaimFromVolume function / pattern
-	// if possible, review the entire converter pattern
 	persistentVolumeClaim, err := adapter.updatePersistentVolumeClaimFromVolume(persistentVolumeClaimConfigMap.Labels[k2dtypes.LastAppliedConfigLabelKey], persistentVolumeClaimConfigMap)
 	if err != nil {
 		return nil, fmt.Errorf("unable to update persistent volume claim from volume: %w", err)
@@ -153,7 +151,6 @@ func (adapter *KubeDockerAdapter) updatePersistentVolumeClaimFromVolume(persiste
 		return nil, fmt.Errorf("unable to convert internal object to versioned object: %w", err)
 	}
 
-	// TODO: review the UpdateConfigMapToPersistentVolumeClaim function / pattern
 	err = adapter.converter.UpdateConfigMapToPersistentVolumeClaim(&persistentVolumeClaim, configMap)
 	if err != nil {
 		return nil, fmt.Errorf("unable to convert Docker volume to PersistentVolumeClaim: %w", err)
