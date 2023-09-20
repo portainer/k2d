@@ -47,7 +47,7 @@ func (converter *DockerAPIConverter) ConvertContainerToPod(container types.Conta
 			CreationTimestamp: metav1.NewTime(time.Unix(container.Created, 0)),
 			Namespace:         container.Labels[k2dtypes.NamespaceNameLabelKey],
 			Annotations: map[string]string{
-				"kubectl.kubernetes.io/last-applied-configuration": container.Labels[k2dtypes.WorkloadLastAppliedConfigLabelKey],
+				"kubectl.kubernetes.io/last-applied-configuration": container.Labels[k2dtypes.LastAppliedConfigLabelKey],
 			},
 		},
 		Spec: core.PodSpec{

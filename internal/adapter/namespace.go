@@ -47,8 +47,8 @@ func (adapter *KubeDockerAdapter) CreateNetworkFromNamespace(ctx context.Context
 	networkOptions := types.NetworkCreate{
 		Driver: "bridge",
 		Labels: map[string]string{
-			k2dtypes.NamespaceNameLabelKey:              namespace.Name,
-			k2dtypes.NamespaceLastAppliedConfigLabelKey: lastAppliedConfiguration,
+			k2dtypes.NamespaceNameLabelKey:     namespace.Name,
+			k2dtypes.LastAppliedConfigLabelKey: lastAppliedConfiguration,
 		},
 		Options: map[string]string{
 			"com.docker.network.bridge.name": networkName,

@@ -41,7 +41,7 @@ func (adapter *KubeDockerAdapter) CreateContainerFromDeployment(ctx context.Cont
 		if err != nil {
 			return fmt.Errorf("unable to marshal deployment: %w", err)
 		}
-		opts.labels[k2dtypes.WorkloadLastAppliedConfigLabelKey] = string(deploymentData)
+		opts.labels[k2dtypes.LastAppliedConfigLabelKey] = string(deploymentData)
 	}
 
 	opts.lastAppliedConfiguration = deployment.ObjectMeta.Annotations["kubectl.kubernetes.io/last-applied-configuration"]
@@ -124,11 +124,11 @@ func (adapter *KubeDockerAdapter) ListDeployments(ctx context.Context, namespace
 }
 
 func (adapter *KubeDockerAdapter) buildDeploymentFromContainer(container types.Container) (*apps.Deployment, error) {
-	if container.Labels[k2dtypes.WorkloadLastAppliedConfigLabelKey] == "" {
-		return nil, fmt.Errorf("unable to build deployment, missing %s label on container %s", k2dtypes.WorkloadLastAppliedConfigLabelKey, container.Names[0])
+	if container.Labels[k2dtypes.LastAppliedConfigLabelKey] == "" {
+		return nil, fmt.Errorf("unable to build deployment, missing %s label on container %s", k2dtypes.LastAppliedConfigLabelKey, container.Names[0])
 	}
 
-	deploymentData := container.Labels[k2dtypes.WorkloadLastAppliedConfigLabelKey]
+	deploymentData := container.Labels[k2dtypes.LastAppliedConfigLabelKey]
 
 	versionedDeployment := appsv1.Deployment{}
 

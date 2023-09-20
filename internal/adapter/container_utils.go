@@ -225,7 +225,7 @@ func (adapter *KubeDockerAdapter) getContainer(ctx context.Context, containerNam
 //     the function returns an error wrapped with a description of the failed step.
 func (adapter *KubeDockerAdapter) createContainerFromPodSpec(ctx context.Context, options ContainerCreationOptions) error {
 	if options.lastAppliedConfiguration != "" {
-		options.labels[k2dtypes.WorkloadLastAppliedConfigLabelKey] = options.lastAppliedConfiguration
+		options.labels[k2dtypes.LastAppliedConfigLabelKey] = options.lastAppliedConfiguration
 	}
 
 	internalPodSpec := core.PodSpec{}
@@ -255,7 +255,7 @@ func (adapter *KubeDockerAdapter) createContainerFromPodSpec(ctx context.Context
 	}
 
 	if existingContainer != nil {
-		if options.lastAppliedConfiguration == existingContainer.Config.Labels[k2dtypes.WorkloadLastAppliedConfigLabelKey] {
+		if options.lastAppliedConfiguration == existingContainer.Config.Labels[k2dtypes.LastAppliedConfigLabelKey] {
 			adapter.logger.Infof("container with the name %s already exists with the same configuration. The update will be skipped", containerCfg.ContainerName)
 			return nil
 		}

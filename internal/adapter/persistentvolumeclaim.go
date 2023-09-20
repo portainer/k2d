@@ -49,9 +49,6 @@ func (adapter *KubeDockerAdapter) CreatePersistentVolumeClaim(ctx context.Contex
 	var volumeName string
 
 	if persistentVolumeClaim.Spec.VolumeName != "" {
-		// This is a static assignment of a volume to a PVC.
-		// In this case, we're not creating a volume, we're just assigning an existing volume to a PVC.
-		// If the volume is not found, we return an error.
 		volumeName = persistentVolumeClaim.Spec.VolumeName
 		adapter.logger.Debugf("using existing persistent volume %s for the requested persistent volume claim", volumeName)
 
@@ -60,9 +57,6 @@ func (adapter *KubeDockerAdapter) CreatePersistentVolumeClaim(ctx context.Contex
 			return fmt.Errorf("unable to find volume %s: %w", volumeName, err)
 		}
 	} else {
-		// No volume name is specified, this is a dynamic assignment of a volume to a PVC.
-		// In this case, we need to create a volume. We don't need to inspect whether a volume exists or not.
-		// Building a dynamic volume name based on the PVC name and namespace
 		volumeName = naming.BuildPersistentVolumeName(persistentVolumeClaim.Name, persistentVolumeClaim.Namespace)
 		adapter.logger.Debugf("creating persistent volume %s for the requested persistent volume claim", volumeName)
 
@@ -70,8 +64,6 @@ func (adapter *KubeDockerAdapter) CreatePersistentVolumeClaim(ctx context.Contex
 			Name:   volumeName,
 			Driver: "local",
 			Labels: map[string]string{
-				// We're using a special label to identify the volume as a k2d volume
-				// This should be documented in the function comment
 				k2dtypes.PersistentVolumeNameLabelKey: volumeName,
 			},
 		})
@@ -93,17 +85,18 @@ func (adapter *KubeDockerAdapter) CreatePersistentVolumeClaim(ctx context.Contex
 		ObjectMeta: metav1.ObjectMeta{
 			Name: naming.BuildPVCSystemConfigMapName(persistentVolumeClaim.Name, persistentVolumeClaim.Namespace),
 			Labels: map[string]string{
-				k2dtypes.NamespaceNameLabelKey:                          persistentVolumeClaim.Namespace,
-				k2dtypes.PersistentVolumeNameLabelKey:                   volumeName,
-				k2dtypes.PersistentVolumeClaimNameLabelKey:              persistentVolumeClaim.Name,
-				k2dtypes.PersistentVolumeClaimLastAppliedConfigLabelKey: persistentVolumeClaim.ObjectMeta.Annotations["kubectl.kubernetes.io/last-applied-configuration"],
+				k2dtypes.NamespaceNameLabelKey:                    persistentVolumeClaim.Namespace,
+				k2dtypes.PersistentVolumeNameLabelKey:             volumeName,
+				k2dtypes.PersistentVolumeClaimNameLabelKey:        persistentVolumeClaim.Name,
+				k2dtypes.GenericResourceLastAppliedConfigLabelKey: persistentVolumeClaim.ObjectMeta.Annotations["kubectl.kubernetes.io/last-applied-configuration"],
 			},
 		},
+		// TODO: optimize this by only storing the necessary data in the metadata
 		Data: map[string]string{
 			"persistentVolumeClaim": persistentVolumeClaim.Name,
 		},
 	}
-
+LastAppliedConfigLabelKey
 	err := adapter.CreateSystemConfigMap(pvcConfigMap)
 	if err != nil {
 		return fmt.Errorf("unable to create system configmap for persistent volume claim: %w", err)
@@ -131,14 +124,14 @@ func (adapter *KubeDockerAdapter) GetPersistentVolumeClaim(ctx context.Context, 
 
 	// TODO: review the updatePersistentVolumeClaimFromVolume function / pattern
 	// if possible, review the entire converter pattern
-	persistentVolumeClaim, err := adapter.updatePersistentVolumeClaimFromVolume(persistentVolumeClaimConfigMap.Labels[k2dtypes.PersistentVolumeClaimLastAppliedConfigLabelKey], persistentVolumeClaimConfigMap)
+	persistentVolumeClaim, err := adapter.updatePersistentVolumeClaimFromVolume(persistentVolumeClaimConfigMap.Labels[k2dtypes.GenericResourceLastAppliedConfigLabelKey], persistentVolumeClaimConfigMap)
 	if err != nil {
 		return nil, fmt.Errorf("unable to update persistent volume claim from volume: %w", err)
 	}
 
 	versionedpersistentVolumeClaim := corev1.PersistentVolumeClaim{
 		TypeMeta: metav1.TypeMeta{
-			Kind:       "PersistentVolumeClaim",
+			Kind:       "PersistentVolumeClaim",LastAppliedConfigLabelKey
 			APIVersion: "v1",
 		},
 	}
@@ -221,14 +214,14 @@ func (adapter *KubeDockerAdapter) listPersistentVolumeClaims(ctx context.Context
 		namespace := configMap.Labels[k2dtypes.NamespaceNameLabelKey]
 
 		if namespaceName == "" || namespace == namespaceName {
-			persistentvolumeClaimLastAppliedConfigLabelKey := configMap.Labels[k2dtypes.PersistentVolumeClaimLastAppliedConfigLabelKey]
+			GenericResourceLastAppliedConfigLabelKey := configMap.Labels[k2dtypes.GenericResourceLastAppliedConfigLabelKey]
 
-			if persistentvolumeClaimLastAppliedConfigLabelKey != "" {
-				persistentVolumeClaim, err := adapter.updatePersistentVolumeClaimFromVolume(persistentvolumeClaimLastAppliedConfigLabelKey, &configMap)
+			if GenericResourceLastAppliedConfigLabelKey != "" {
+				persistentVolumeClaim, err := adapter.updatePersistentVolumeClaimFromVolume(GenericResourceLastAppliedConfigLabelKey, &configMap)
 				if err != nil {
 					return core.PersistentVolumeClaimList{}, fmt.Errorf("unable to update persistent volume claim from volume: %w", err)
 				}
-
+LastAppliedConfigLabelKey
 				persistentVolumeClaims.Items = append(persistentVolumeClaims.Items, *persistentVolumeClaim)
 			}
 		}
