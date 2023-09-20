@@ -35,23 +35,29 @@ func (s *FileSystemStore) DeleteConfigMap(configMapName, namespace string) error
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
+	metadataFileName := buildConfigMapMetadataFileName(configMapName, namespace)
+	metadataFilePath := path.Join(s.configMapPath, metadataFileName)
+
+	metadataFileExists, err := filesystem.FileExists(metadataFilePath)
+	if err != nil {
+		return fmt.Errorf("unable to check if configmap metadata file %s exists: %w", metadataFileName, err)
+	}
+
+	if !metadataFileExists {
+		return errors.ErrResourceNotFound
+	}
+
+	err = os.Remove(metadataFilePath)
+	if err != nil {
+		return fmt.Errorf("unable to remove configmap metadata file %s: %w", metadataFileName, err)
+	}
+
 	files, err := os.ReadDir(s.configMapPath)
 	if err != nil {
 		return fmt.Errorf("unable to read configmap directory: %w", err)
 	}
 
 	filePrefix := buildConfigMapFilePrefix(configMapName, namespace)
-	configMapFileFound := containsFileWithPrefix(files, filePrefix)
-	if !configMapFileFound {
-		return errors.ErrResourceNotFound
-	}
-
-	metadataFileName := buildConfigMapMetadataFileName(configMapName, namespace)
-	err = os.Remove(path.Join(s.configMapPath, metadataFileName))
-	if err != nil {
-		return fmt.Errorf("unable to remove configmap metadata file %s: %w", metadataFileName, err)
-	}
-
 	for _, file := range files {
 		if strings.HasPrefix(file.Name(), filePrefix) {
 			err := os.Remove(path.Join(s.configMapPath, file.Name()))
@@ -102,19 +108,19 @@ func (s *FileSystemStore) GetConfigMap(configMapName, namespace string) (*core.C
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 
-	files, err := os.ReadDir(s.configMapPath)
+	metadataFileName := buildConfigMapMetadataFileName(configMapName, namespace)
+	metadataFilePath := path.Join(s.configMapPath, metadataFileName)
+
+	metadataFileExists, err := filesystem.FileExists(metadataFilePath)
 	if err != nil {
-		return nil, fmt.Errorf("unable to read configmap directory: %w", err)
+		return nil, fmt.Errorf("unable to check if configmap metadata file %s exists: %w", metadataFileName, err)
 	}
 
-	filePrefix := buildConfigMapFilePrefix(configMapName, namespace)
-	configMapFileFound := containsFileWithPrefix(files, filePrefix)
-	if !configMapFileFound {
+	if !metadataFileExists {
 		return nil, errors.ErrResourceNotFound
 	}
 
-	metadataFileName := buildConfigMapMetadataFileName(configMapName, namespace)
-	metadata, err := filesystem.LoadMetadataFromDisk(s.configMapPath, metadataFileName)
+	metadata, err := filesystem.LoadMetadataFromDisk(metadataFilePath)
 	if err != nil {
 		return nil, fmt.Errorf("unable to load configmap metadata from disk: %w", err)
 	}
@@ -124,6 +130,12 @@ func (s *FileSystemStore) GetConfigMap(configMapName, namespace string) (*core.C
 		return nil, fmt.Errorf("unable to build configmap from metadata: %w", err)
 	}
 
+	files, err := os.ReadDir(s.configMapPath)
+	if err != nil {
+		return nil, fmt.Errorf("unable to read configmap directory: %w", err)
+	}
+
+	filePrefix := buildConfigMapFilePrefix(configMapName, namespace)
 	for _, file := range files {
 		if strings.HasPrefix(file.Name(), filePrefix) {
 			err := s.updateConfigMapDataFromFile(&configMap, file.Name())
@@ -278,7 +290,8 @@ func (s *FileSystemStore) loadMetadataAndInitConfigMaps(metadataFiles []string, 
 	configMaps := map[string]core.ConfigMap{}
 
 	for _, metadataFile := range metadataFiles {
-		metadata, err := filesystem.LoadMetadataFromDisk(s.configMapPath, metadataFile)
+		metadataFilePath := path.Join(s.configMapPath, metadataFile)
+		metadata, err := filesystem.LoadMetadataFromDisk(metadataFilePath)
 		if err != nil {
 			return configMaps, fmt.Errorf("unable to load configmap metadata from disk: %w", err)
 		}

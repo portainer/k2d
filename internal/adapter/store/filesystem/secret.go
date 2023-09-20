@@ -35,23 +35,29 @@ func (s *FileSystemStore) DeleteSecret(secretName, namespace string) error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
+	metadataFileName := buildSecretMetadataFileName(secretName, namespace)
+	metadataFilePath := path.Join(s.secretPath, metadataFileName)
+
+	metadataFileExists, err := filesystem.FileExists(metadataFilePath)
+	if err != nil {
+		return fmt.Errorf("unable to check if secret metadata file %s exists: %w", metadataFileName, err)
+	}
+
+	if !metadataFileExists {
+		return errors.ErrResourceNotFound
+	}
+
+	err = os.Remove(metadataFilePath)
+	if err != nil {
+		return fmt.Errorf("unable to remove secret metadata file %s: %w", metadataFileName, err)
+	}
+
 	files, err := os.ReadDir(s.secretPath)
 	if err != nil {
 		return fmt.Errorf("unable to read secret directory: %w", err)
 	}
 
 	filePrefix := buildSecretFilePrefix(secretName, namespace)
-	secretFileFound := containsFileWithPrefix(files, filePrefix)
-	if !secretFileFound {
-		return errors.ErrResourceNotFound
-	}
-
-	metadataFileName := buildSecretMetadataFileName(secretName, namespace)
-	err = os.Remove(path.Join(s.secretPath, metadataFileName))
-	if err != nil {
-		return fmt.Errorf("unable to remove secret metadata file %s: %w", metadataFileName, err)
-	}
-
 	for _, file := range files {
 		if strings.HasPrefix(file.Name(), filePrefix) {
 			err := os.Remove(path.Join(s.secretPath, file.Name()))
@@ -102,19 +108,19 @@ func (s *FileSystemStore) GetSecret(secretName, namespace string) (*core.Secret,
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 
-	files, err := os.ReadDir(s.secretPath)
+	metadataFileName := buildSecretMetadataFileName(secretName, namespace)
+	metadataFilePath := path.Join(s.secretPath, metadataFileName)
+
+	metadataFileExists, err := filesystem.FileExists(metadataFilePath)
 	if err != nil {
-		return nil, fmt.Errorf("unable to read secret directory: %w", err)
+		return nil, fmt.Errorf("unable to check if secret metadata file %s exists: %w", metadataFileName, err)
 	}
 
-	filePrefix := buildSecretFilePrefix(secretName, namespace)
-	secretFileFound := containsFileWithPrefix(files, filePrefix)
-	if !secretFileFound {
+	if !metadataFileExists {
 		return nil, errors.ErrResourceNotFound
 	}
 
-	metadataFileName := buildSecretMetadataFileName(secretName, namespace)
-	metadata, err := filesystem.LoadMetadataFromDisk(s.secretPath, metadataFileName)
+	metadata, err := filesystem.LoadMetadataFromDisk(metadataFilePath)
 	if err != nil {
 		return nil, fmt.Errorf("unable to load secret metadata from disk: %w", err)
 	}
@@ -124,6 +130,12 @@ func (s *FileSystemStore) GetSecret(secretName, namespace string) (*core.Secret,
 		return nil, fmt.Errorf("unable to build secret from metadata: %w", err)
 	}
 
+	files, err := os.ReadDir(s.secretPath)
+	if err != nil {
+		return nil, fmt.Errorf("unable to read secret directory: %w", err)
+	}
+
+	filePrefix := buildSecretFilePrefix(secretName, namespace)
 	for _, file := range files {
 		if strings.HasPrefix(file.Name(), filePrefix) {
 
@@ -294,7 +306,8 @@ func (s *FileSystemStore) loadMetadataAndInitSecrets(metadataFiles []string, nam
 	secrets := map[string]core.Secret{}
 
 	for _, metadataFile := range metadataFiles {
-		metadata, err := filesystem.LoadMetadataFromDisk(s.secretPath, metadataFile)
+		metadataFilePath := path.Join(s.secretPath, metadataFile)
+		metadata, err := filesystem.LoadMetadataFromDisk(metadataFilePath)
 		if err != nil {
 			return secrets, fmt.Errorf("unable to load secret metadata from disk: %w", err)
 		}
