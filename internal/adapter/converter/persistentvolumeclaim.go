@@ -22,7 +22,7 @@ func (converter *DockerAPIConverter) UpdateConfigMapToPersistentVolumeClaim(pers
 			Time: configMap.CreationTimestamp.Time,
 		},
 		Annotations: map[string]string{
-			"kubectl.kubernetes.io/last-applied-configuration": configMap.Labels[k2dtypes.PersistentVolumeClaimLastAppliedConfigLabelKey],
+			"kubectl.kubernetes.io/last-applied-configuration": configMap.Labels[k2dtypes.LastAppliedConfigLabelKey],
 		},
 	}
 

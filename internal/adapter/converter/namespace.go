@@ -19,7 +19,7 @@ func (converter *DockerAPIConverter) ConvertNetworkToNamespace(namespaceName str
 			Name:              namespaceName,
 			CreationTimestamp: metav1.NewTime(time.Unix(network.Created.Unix(), 0)),
 			Annotations: map[string]string{
-				"kubectl.kubernetes.io/last-applied-configuration": network.Labels[k2dtypes.NamespaceLastAppliedConfigLabelKey],
+				"kubectl.kubernetes.io/last-applied-configuration": network.Labels[k2dtypes.LastAppliedConfigLabelKey],
 			},
 		},
 		Status: core.NamespaceStatus{
