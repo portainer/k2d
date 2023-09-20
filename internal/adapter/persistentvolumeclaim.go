@@ -91,10 +91,6 @@ func (adapter *KubeDockerAdapter) CreatePersistentVolumeClaim(ctx context.Contex
 				k2dtypes.LastAppliedConfigLabelKey:         persistentVolumeClaim.ObjectMeta.Annotations["kubectl.kubernetes.io/last-applied-configuration"],
 			},
 		},
-		// TODO: optimize this by only storing the necessary data in the metadata
-		Data: map[string]string{
-			"persistentVolumeClaim": persistentVolumeClaim.Name,
-		},
 	}
 	err := adapter.CreateSystemConfigMap(pvcConfigMap)
 	if err != nil {

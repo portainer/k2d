@@ -112,8 +112,8 @@ func StoreMetadataOnDisk(storagePath, fileName string, data map[string]string) e
 // It returns a map where the keys and values are taken from the lines in the file.
 // The process will skip empty lines.
 // If an error occurs during this process, it returns the error and a nil map.
-func LoadMetadataFromDisk(storagePath, fileName string) (map[string]string, error) {
-	file, err := os.Open(path.Join(storagePath, fileName))
+func LoadMetadataFromDisk(metadataFilePath string) (map[string]string, error) {
+	file, err := os.Open(metadataFilePath)
 	if err != nil {
 		return nil, fmt.Errorf("an error occurred while opening the file: %w", err)
 	}
