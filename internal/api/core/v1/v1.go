@@ -21,11 +21,11 @@ type V1Service struct {
 	events                 events.EventService
 	namespaces             namespaces.NamespaceService
 	nodes                  nodes.NodeService
+	persistentvolumes      persistentvolumes.PersistentVolumeService
+	persistentvolumeclaims persistentvolumeclaims.PersistentVolumeClaimService
 	pods                   pods.PodService
 	secrets                secrets.SecretService
 	services               services.ServiceService
-	persistentvolumes      persistentvolumes.PersistentVolumeService
-	persistentvolumeclaims persistentvolumeclaims.PersistentVolumeClaimService
 }
 
 func NewV1Service(adapter *adapter.KubeDockerAdapter, operations chan controller.Operation) V1Service {
@@ -34,11 +34,11 @@ func NewV1Service(adapter *adapter.KubeDockerAdapter, operations chan controller
 		events:                 events.NewEventService(adapter),
 		namespaces:             namespaces.NewNamespaceService(adapter, operations),
 		nodes:                  nodes.NewNodeService(adapter),
+		persistentvolumes:      persistentvolumes.NewPersistentVolumeService(adapter),
+		persistentvolumeclaims: persistentvolumeclaims.NewPersistentVolumeClaimService(adapter, operations),
 		pods:                   pods.NewPodService(adapter, operations),
 		secrets:                secrets.NewSecretService(adapter, operations),
 		services:               services.NewServiceService(adapter, operations),
-		persistentvolumes:      persistentvolumes.NewPersistentVolumeService(adapter),
-		persistentvolumeclaims: persistentvolumeclaims.NewPersistentVolumeClaimService(adapter, operations),
 	}
 }
 
@@ -62,36 +62,6 @@ func (svc V1Service) ListAPIResources(r *restful.Request, w *restful.Response) {
 		GroupVersion: "v1",
 		APIResources: []metav1.APIResource{
 			{
-				Kind:         "Namespace",
-				SingularName: "",
-				Name:         "namespaces",
-				Verbs:        []string{"create", "list", "delete", "get", "patch"},
-				Namespaced:   false,
-				ShortNames:   []string{"ns"},
-			},
-			{
-				Kind:         "Pod",
-				SingularName: "",
-				Name:         "pods",
-				Verbs:        []string{"create", "list", "delete", "get", "patch"},
-				Namespaced:   true,
-			},
-			{
-				Kind:         "Node",
-				SingularName: "",
-				Name:         "nodes",
-				Verbs:        []string{"list", "get"},
-				Namespaced:   false,
-			},
-			{
-				Kind:         "Service",
-				SingularName: "",
-				Name:         "services",
-				Verbs:        []string{"create", "list", "delete", "get", "patch"},
-				Namespaced:   true,
-				ShortNames:   []string{"svc"},
-			},
-			{
 				Kind:         "ConfigMap",
 				SingularName: "",
 				Name:         "configmaps",
@@ -100,17 +70,25 @@ func (svc V1Service) ListAPIResources(r *restful.Request, w *restful.Response) {
 				ShortNames:   []string{"cm"},
 			},
 			{
-				Kind:         "Secret",
-				SingularName: "",
-				Name:         "secrets",
-				Verbs:        []string{"create", "list", "delete", "get", "patch"},
-				Namespaced:   true,
-			},
-			{
 				Kind:         "Event",
 				SingularName: "",
 				Name:         "events",
 				Verbs:        []string{"list"},
+				Namespaced:   false,
+			},
+			{
+				Kind:         "Namespace",
+				SingularName: "",
+				Name:         "namespaces",
+				Verbs:        []string{"create", "list", "delete", "get", "patch"},
+				Namespaced:   false,
+				ShortNames:   []string{"ns"},
+			},
+			{
+				Kind:         "Node",
+				SingularName: "",
+				Name:         "nodes",
+				Verbs:        []string{"list", "get"},
 				Namespaced:   false,
 			},
 			{
@@ -128,6 +106,28 @@ func (svc V1Service) ListAPIResources(r *restful.Request, w *restful.Response) {
 				Verbs:        []string{"create", "list", "delete", "get", "patch"},
 				Namespaced:   true,
 				ShortNames:   []string{"pvc"},
+			},
+			{
+				Kind:         "Pod",
+				SingularName: "",
+				Name:         "pods",
+				Verbs:        []string{"create", "list", "delete", "get", "patch"},
+				Namespaced:   true,
+			},
+			{
+				Kind:         "Secret",
+				SingularName: "",
+				Name:         "secrets",
+				Verbs:        []string{"create", "list", "delete", "get", "patch"},
+				Namespaced:   true,
+			},
+			{
+				Kind:         "Service",
+				SingularName: "",
+				Name:         "services",
+				Verbs:        []string{"create", "list", "delete", "get", "patch"},
+				Namespaced:   true,
+				ShortNames:   []string{"svc"},
 			},
 		},
 	}
