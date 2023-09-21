@@ -8,21 +8,24 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 )
 
-// ExecuteResetRoutine performs a cleanup routine that removes all k2d resources from the host.
+// ExecuteResetRoutine performs a cleanup routine that removes all k2d resources from the host,
+// as well as content within the specified k2d data directory.
 // This function is intended to be used as a "reset mode" operation for cleaning up any resources
 // managed by k2d on the host.
 //
 // Parameters:
 //   - ctx context.Context: The context for carrying out the reset routine.
+//   - k2dDataPath string: The path to the k2d data directory that needs to be cleaned up.
 //
 // Returns:
-//   - error: Returns an error if any of the resource removal operations fail.
+//   - error: Returns an error if any of the resource removal or file system operations fail.
 //
 // Steps:
 //  1. Removes all workload resources (like deployments, pods) by invoking removeAllWorkloads.
 //  2. Removes all Persistent Volumes and Persistent Volume Claims by invoking removeAllPersistentVolumeAndClaims.
 //  3. Removes all ConfigMaps and Secrets by invoking removeAllConfigMapsAndSecrets.
 //  4. Removes all namespaces by invoking removeAllNamespaces.
+//  5. Removes all content in the k2d data directory by invoking filesystem.RemoveAllContent.
 func (adapter *KubeDockerAdapter) ExecuteResetRoutine(ctx context.Context, k2dDataPath string) error {
 	adapter.logger.Infoln("reset mode enabled, removing all k2d resources on this host")
 
