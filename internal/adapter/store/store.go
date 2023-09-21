@@ -40,6 +40,7 @@ import (
 	"github.com/portainer/k2d/internal/adapter/store/filesystem"
 	"github.com/portainer/k2d/internal/adapter/store/memory"
 	"github.com/portainer/k2d/internal/adapter/store/volume"
+	"github.com/portainer/k2d/internal/types"
 	"go.uber.org/zap"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -92,7 +93,7 @@ type StoreOptions struct {
 // - Returns an error if an invalid backend type is provided.
 func ConfigureStore(opts StoreOptions) (ConfigMapStore, SecretStore, error) {
 	switch opts.Backend {
-	case "disk":
+	case types.DiskStoreBackend:
 		filesystemStore, err := filesystem.NewFileSystemStore(opts.Logger, opts.Filesystem)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to create filesystem store: %w", err)
@@ -100,7 +101,7 @@ func ConfigureStore(opts StoreOptions) (ConfigMapStore, SecretStore, error) {
 
 		opts.Logger.Info("using disk store for ConfigMaps and Secrets")
 		return filesystemStore, filesystemStore, nil
-	case "volume":
+	case types.VolumeStoreBackend:
 		opts.Volume.SecretKind = volume.SecretResourceType
 		volumeStore, err := volume.NewVolumeStore(opts.Logger, opts.Volume)
 		if err != nil {
@@ -132,10 +133,10 @@ func ConfigureStore(opts StoreOptions) (ConfigMapStore, SecretStore, error) {
 // - Returns an error if an invalid registry secret store backend is provided.
 func ConfigureRegistrySecretStore(opts StoreOptions, encryptionKeyFolder string) (SecretStore, error) {
 	switch opts.RegistryBackend {
-	case "memory":
+	case types.MemoryRegistryStoreBackend:
 		opts.Logger.Info("using memory store for registry Secrets")
 		return memory.NewInMemoryStore(), nil
-	case "volume":
+	case types.VolumeRegistryStoreBackend:
 		opts.Logger.Info("using encrypted volume store for registry Secrets")
 
 		encryptionKey, err := volume.GenerateOrRetrieveEncryptionKey(opts.Logger, encryptionKeyFolder)
