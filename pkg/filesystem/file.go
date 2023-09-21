@@ -10,17 +10,6 @@ import (
 	"strings"
 )
 
-// FileExists checks if a file exists on the filesystem
-func FileExists(path string) (bool, error) {
-	if _, err := os.Stat(path); err == nil {
-		return true, nil
-	} else if errors.Is(err, os.ErrNotExist) {
-		return false, nil
-	} else {
-		return false, fmt.Errorf("an error occurred while checking if the file exists: %w", err)
-	}
-}
-
 // CreateDir creates all directories along a path.
 // It returns an error, if any occurs during the operation.
 func CreateDir(path string) error {
@@ -57,6 +46,87 @@ func CreateFileWithDirectories(filePath string, content []byte) error {
 	_, err = file.Write(content)
 	if err != nil {
 		return fmt.Errorf("unable to write to file: %w", err)
+	}
+
+	return nil
+}
+
+// FileExists checks if a file exists on the filesystem
+func FileExists(path string) (bool, error) {
+	if _, err := os.Stat(path); err == nil {
+		return true, nil
+	} else if errors.Is(err, os.ErrNotExist) {
+		return false, nil
+	} else {
+		return false, fmt.Errorf("an error occurred while checking if the file exists: %w", err)
+	}
+}
+
+// LoadMetadataFromDisk takes a path where the data is stored (storagePath) and a filename (fileName),
+// and reads the contents of the specified file. It expects the file contents to be in the format "key=value\n".
+// It returns a map where the keys and values are taken from the lines in the file.
+// The process will skip empty lines.
+// If an error occurs during this process, it returns the error and a nil map.
+func LoadMetadataFromDisk(metadataFilePath string) (map[string]string, error) {
+	file, err := os.Open(metadataFilePath)
+	if err != nil {
+		return nil, fmt.Errorf("an error occurred while opening the file: %w", err)
+	}
+	defer file.Close()
+
+	data := make(map[string]string)
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := scanner.Text()
+
+		if line == "" {
+			continue
+		}
+
+		parts := strings.SplitN(line, "=", 2)
+		if len(parts) != 2 {
+			return nil, fmt.Errorf("invalid data format: %s", line)
+		}
+		data[parts[0]] = parts[1]
+	}
+
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("an error occurred while reading the file: %w", err)
+	}
+
+	return data, nil
+}
+
+// ReadFileAsString reads the content of the file at the given file path and returns it as a string.
+// If an error occurs while opening the file, an error is returned with a description of the problem.
+func ReadFileAsString(filePath string) (string, error) {
+	fileBytes, err := os.ReadFile(filePath)
+	if err != nil {
+		return "", fmt.Errorf("an error occured while opening the file: %w", err)
+	}
+
+	return string(fileBytes), nil
+}
+
+// RemoveAllContent removes all files and folders in the given directory path.
+func RemoveAllContent(dir string) error {
+	d, err := os.Open(dir)
+	if err != nil {
+		return fmt.Errorf("an error occurred while opening the directory: %w", err)
+	}
+	defer d.Close()
+
+	names, err := d.Readdirnames(-1)
+	if err != nil {
+		return fmt.Errorf("an error occurred while reading the directory: %w", err)
+	}
+
+	for _, name := range names {
+		filePath := filepath.Join(dir, name)
+		err = os.RemoveAll(filePath)
+		if err != nil {
+			return fmt.Errorf("an error occurred while removing the file %s: %w", filePath, err)
+		}
 	}
 
 	return nil
@@ -105,50 +175,4 @@ func StoreMetadataOnDisk(storagePath, fileName string, data map[string]string) e
 	}
 
 	return nil
-}
-
-// LoadMetadataFromDisk takes a path where the data is stored (storagePath) and a filename (fileName),
-// and reads the contents of the specified file. It expects the file contents to be in the format "key=value\n".
-// It returns a map where the keys and values are taken from the lines in the file.
-// The process will skip empty lines.
-// If an error occurs during this process, it returns the error and a nil map.
-func LoadMetadataFromDisk(metadataFilePath string) (map[string]string, error) {
-	file, err := os.Open(metadataFilePath)
-	if err != nil {
-		return nil, fmt.Errorf("an error occurred while opening the file: %w", err)
-	}
-	defer file.Close()
-
-	data := make(map[string]string)
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		line := scanner.Text()
-
-		if line == "" {
-			continue
-		}
-
-		parts := strings.SplitN(line, "=", 2)
-		if len(parts) != 2 {
-			return nil, fmt.Errorf("invalid data format: %s", line)
-		}
-		data[parts[0]] = parts[1]
-	}
-
-	if err := scanner.Err(); err != nil {
-		return nil, fmt.Errorf("an error occurred while reading the file: %w", err)
-	}
-
-	return data, nil
-}
-
-// ReadFileAsString reads the content of the file at the given file path and returns it as a string.
-// If an error occurs while opening the file, an error is returned with a description of the problem.
-func ReadFileAsString(filePath string) (string, error) {
-	fileBytes, err := os.ReadFile(filePath)
-	if err != nil {
-		return "", fmt.Errorf("an error occured while opening the file: %w", err)
-	}
-
-	return string(fileBytes), nil
 }

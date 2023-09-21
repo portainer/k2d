@@ -6,7 +6,7 @@ ARCH="$(shell go env GOARCH)"
 ARM=""
 VERSION="latest"
 
-.PHONY: pre dev build release image image-arm-6 image-arm-7 image-multiarch clean
+.PHONY: pre dev build release image image-arm-6 image-arm-7 image-multiarch clean reset
 
 dist := dist
 bin := $(shell basename $(CURDIR))
@@ -54,3 +54,6 @@ clean:
 	rm -rf $(dist)/*
 	rm -rf /opt/dev-toolkit/k2d/*
 	rm -rf /var/lib/k2d
+
+reset: build
+	$(dist)/$(bin) -reset
