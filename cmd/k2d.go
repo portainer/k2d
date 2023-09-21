@@ -2,10 +2,12 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"log"
 	"net"
 	"net/http"
+	"os"
 	"path"
 
 	restfulspec "github.com/emicklei/go-restful-openapi/v2"
@@ -24,6 +26,7 @@ import (
 	"github.com/portainer/k2d/internal/token"
 	"github.com/portainer/k2d/internal/types"
 	"github.com/portainer/k2d/pkg/network"
+	"github.com/portainer/k2d/pkg/prompt"
 	"github.com/sethvargo/go-envconfig"
 )
 
@@ -38,6 +41,9 @@ func getAdvertiseIpAddr(advertiseAddr string) (net.IP, error) {
 func main() {
 	ctx := context.Background()
 
+	resetMode := flag.Bool("reset", false, "Reset this host by removing all resources created by k2d and created via k2d")
+	flag.Parse()
+
 	var cfg config.Config
 	if err := envconfig.Process(ctx, &cfg); err != nil {
 		log.Fatalf("unable to parse configuration: %s", err)
@@ -48,6 +54,34 @@ func main() {
 		log.Fatalf("unable to initialize logger: %s", err)
 	}
 	defer logger.Sync()
+
+	if *resetMode {
+		fmt.Println("Are you sure you want to this host? This will remove everything created by or via k2d including workload and data. y/N")
+		confirm, err := prompt.AskForConfirmation()
+		if err != nil {
+			logger.Fatalf("unable to ask for confirmation: %s", err)
+		}
+
+		if confirm {
+			kubeDockerAdapterOptions := &adapter.KubeDockerAdapterOptions{
+				K2DConfig:           &cfg,
+				Logger:              logger,
+				ServerConfiguration: nil,
+			}
+
+			kubeDockerAdapter, err := adapter.NewKubeDockerAdapter(kubeDockerAdapterOptions)
+			if err != nil {
+				logger.Fatalf("unable to create docker adapter: %s", err)
+			}
+
+			err = kubeDockerAdapter.ExecuteResetRoutine(ctx, cfg.DataPath)
+			if err != nil {
+				logger.Fatalf("an error occured during reset routine: %s", err)
+			}
+		}
+
+		os.Exit(0)
+	}
 
 	// We add the logger to the main context
 	ctx = logging.ContextWithLogger(ctx, logger)
