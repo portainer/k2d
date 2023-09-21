@@ -92,16 +92,18 @@ func (adapter *KubeDockerAdapter) reCreateContainerWithNewConfiguration(ctx cont
 	if err != nil {
 		// If the new container fails to start, remove the old container and leave the new container in the created state.
 		// This way, the container can be inspected to see what went wrong.
-		if removeErr := adapter.cli.ContainerRemove(ctx, containerID, types.ContainerRemoveOptions{}); removeErr != nil {
+		removeErr := adapter.cli.ContainerRemove(ctx, containerID, types.ContainerRemoveOptions{})
+		if removeErr != nil {
 			return fmt.Errorf("unable to remove the old container after failed start: %w", removeErr)
 		}
 
 		// Rename the new container to the original name
 		// This way, the container with the known name can be inspected to see what went wrong.
-		err = adapter.cli.ContainerRename(ctx, containerCreateResponse.ID, newContainerCfg.ContainerName)
-		if err != nil {
-			return fmt.Errorf("unable to rename container for the new container: %w", err)
+		renameErr := adapter.cli.ContainerRename(ctx, containerCreateResponse.ID, newContainerCfg.ContainerName)
+		if renameErr != nil {
+			return fmt.Errorf("unable to rename container for the new container: %w", renameErr)
 		}
+
 		return fmt.Errorf("unable to start container: %w", err)
 	}
 
