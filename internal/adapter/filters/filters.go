@@ -8,7 +8,7 @@ import (
 )
 
 // AllDeployments creates a Docker filter argument for Kubernetes Deployments within a given namespace.
-// The function filters Docker resources based on the Workload and Namespace labels, specifically for Deployments.
+// The function filters Docker resources based on the workload type and namespace labels, specifically for Deployments.
 //
 // Parameters:
 //   - namespace: The Kubernetes namespace to filter by.

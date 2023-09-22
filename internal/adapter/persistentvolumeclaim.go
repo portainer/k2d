@@ -17,34 +17,34 @@ import (
 // CreatePersistentVolumeClaim handles the creation or assignment of a Docker volume for a Kubernetes PersistentVolumeClaim (PVC).
 //
 // Parameters:
-//   - ctx:                      A context for managing the lifetime of the request.
-//   - persistentVolumeClaim:    A pointer to a Kubernetes PersistentVolumeClaim object that describes the claim.
+//   - ctx: Context for managing the lifetime of the request.
+//   - persistentVolumeClaim: Pointer to a Kubernetes PersistentVolumeClaim object describing the desired claim.
 //
 // Returns:
-// - An error if any step in the creation or assignment process fails.
+//   - An error if any step in the creation, inspection, or labeling process fails.
 //
 // Behavior:
 //
 //   - Static Volume Assignment:
-//     If the `Spec.VolumeName` field of the PVC is not empty, the function assumes that this is a static assignment of an existing Docker volume to a PVC.
-//     1. Inspects the Docker volume to ensure it exists.
-//     2. If the volume does not exist, returns an error.
+//     If the PVC's `Spec.VolumeName` is not empty, the function assumes a static assignment to an existing Docker volume.
+//     1. Inspects the existing Docker volume to verify it exists.
+//     2. Returns an error if the volume does not exist.
 //
 //   - Dynamic Volume Creation:
-//     If the `Spec.VolumeName` field of the PVC is empty, the function creates a new Docker volume.
-//     1. Generates a dynamic name for the Docker volume based on the PVC name and namespace.
-//     2. Creates a new Docker volume with the generated name.
-//     3. Labels the Docker volume to identify it as a k2d-managed volume. (See `k2dtypes.PersistentVolumeNameLabelKey`)
+//     If the PVC's `Spec.VolumeName` is empty, the function dynamically creates a Docker volume.
+//     1. Generates a name for the Docker volume based on the PVC's name and namespace.
+//     2. Creates the Docker volume with the generated name.
+//     3. Labels the volume with k2d-specific labels for identification (See `k2dtypes.StorageTypeLabelKey` and `k2dtypes.PersistentVolumeNameLabelKey`).
 //
 //   - Helm-managed PVCs:
-//     If the PVC has a label "app.kubernetes.io/managed-by" set to "Helm", it serializes the PVC and stores it in an annotation for later use.
+//     If the PVC has a label "app.kubernetes.io/managed-by" set to "Helm," the PVC's state is serialized and stored as an annotation for later use.
 //
 //   - ConfigMap Creation:
-//     Creates a ConfigMap that represents system-level information for the PVC, which includes:
-//     1. The namespace of the PVC.
-//     2. The name of the Docker volume.
-//     3. The name of the PVC.
-//     4. The last applied configuration of the PVC
+//     Creates a ConfigMap that represents system-level metadata about the PVC, which includes:
+//     1. The target namespace of the PVC.
+//     2. The name of the corresponding Docker volume.
+//     3. The name of the PVC itself.
+//     4. The last-applied configuration of the PVC, if available.
 func (adapter *KubeDockerAdapter) CreatePersistentVolumeClaim(ctx context.Context, persistentVolumeClaim *corev1.PersistentVolumeClaim) error {
 	var volumeName string
 
@@ -64,8 +64,8 @@ func (adapter *KubeDockerAdapter) CreatePersistentVolumeClaim(ctx context.Contex
 			Name:   volumeName,
 			Driver: "local",
 			Labels: map[string]string{
-				k2dtypes.PersistentVolumeNameLabelKey: volumeName,
 				k2dtypes.StorageTypeLabelKey:          k2dtypes.PersistentVolumeStorageType,
+				k2dtypes.PersistentVolumeNameLabelKey: volumeName,
 			},
 		})
 
