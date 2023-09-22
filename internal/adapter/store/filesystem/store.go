@@ -24,11 +24,6 @@ const (
 )
 
 const (
-	// NamespaceNameLabelKey is the key used to store the namespace of a Configmap or Secret resource
-	// in the associated metadata file
-	// It is used to identify the namespace associated with a ConfigMap or a Secret
-	NamespaceNameLabelKey = "store.k2d.io/filesystem/namespace-name"
-
 	// CreationTimestampLabelKey is the key used to store the creation timestamp of a Configmap or Secret resource
 	// in the associated metadata file
 	CreationTimestampLabelKey = "store.k2d.io/filesystem/creation-timestamp"

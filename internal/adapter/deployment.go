@@ -24,7 +24,7 @@ func (adapter *KubeDockerAdapter) CreateContainerFromDeployment(ctx context.Cont
 		labels:        deployment.Spec.Template.Labels,
 	}
 
-	opts.labels[k2dtypes.WorkloadLabelKey] = k2dtypes.DeploymentWorkloadType
+	opts.labels[k2dtypes.WorkloadTypeLabelKey] = k2dtypes.DeploymentWorkloadType
 
 	if deployment.Labels["app.kubernetes.io/managed-by"] == "Helm" {
 		deploymentData, err := json.Marshal(deployment)

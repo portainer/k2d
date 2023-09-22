@@ -65,6 +65,7 @@ func (adapter *KubeDockerAdapter) CreatePersistentVolumeClaim(ctx context.Contex
 			Driver: "local",
 			Labels: map[string]string{
 				k2dtypes.PersistentVolumeNameLabelKey: volumeName,
+				k2dtypes.StorageTypeLabelKey:          k2dtypes.PersistentVolumeStorageType,
 			},
 		})
 
@@ -85,13 +86,14 @@ func (adapter *KubeDockerAdapter) CreatePersistentVolumeClaim(ctx context.Contex
 		ObjectMeta: metav1.ObjectMeta{
 			Name: naming.BuildPVCSystemConfigMapName(persistentVolumeClaim.Name, persistentVolumeClaim.Namespace),
 			Labels: map[string]string{
-				k2dtypes.NamespaceNameLabelKey:             persistentVolumeClaim.Namespace,
-				k2dtypes.PersistentVolumeNameLabelKey:      volumeName,
-				k2dtypes.PersistentVolumeClaimNameLabelKey: persistentVolumeClaim.Name,
-				k2dtypes.LastAppliedConfigLabelKey:         persistentVolumeClaim.ObjectMeta.Annotations["kubectl.kubernetes.io/last-applied-configuration"],
+				k2dtypes.PersistentVolumeNameLabelKey:                 volumeName,
+				k2dtypes.PersistentVolumeClaimNameLabelKey:            persistentVolumeClaim.Name,
+				k2dtypes.PersistentVolumeClaimTargetNamespaceLabelKey: persistentVolumeClaim.Namespace,
+				k2dtypes.LastAppliedConfigLabelKey:                    persistentVolumeClaim.ObjectMeta.Annotations["kubectl.kubernetes.io/last-applied-configuration"],
 			},
 		},
 	}
+
 	err := adapter.CreateSystemConfigMap(pvcConfigMap)
 	if err != nil {
 		return fmt.Errorf("unable to create system configmap for persistent volume claim: %w", err)
@@ -203,7 +205,7 @@ func (adapter *KubeDockerAdapter) listPersistentVolumeClaims(ctx context.Context
 	}
 
 	for _, configMap := range configMaps.Items {
-		namespace := configMap.Labels[k2dtypes.NamespaceNameLabelKey]
+		namespace := configMap.Labels[k2dtypes.PersistentVolumeClaimTargetNamespaceLabelKey]
 
 		if namespaceName == "" || namespace == namespaceName {
 			pvcLastAppliedConfig := configMap.Labels[k2dtypes.LastAppliedConfigLabelKey]
