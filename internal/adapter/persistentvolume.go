@@ -40,7 +40,7 @@ func (adapter *KubeDockerAdapter) GetPersistentVolume(ctx context.Context, persi
 
 	var boundPVCConfigMap *corev1.ConfigMap
 	for _, configMap := range configMaps.Items {
-		if configMap.Data[k2dtypes.PersistentVolumeNameLabelKey] == volume.Name {
+		if configMap.Labels[k2dtypes.PersistentVolumeNameLabelKey] == volume.Name {
 			boundPVCConfigMap = &configMap
 			break
 		}

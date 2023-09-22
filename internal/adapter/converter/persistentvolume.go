@@ -24,7 +24,7 @@ func (converter *DockerAPIConverter) ConvertVolumeToPersistentVolume(volume *vol
 		phase = core.VolumeBound
 		persistentVolumeClaimReference = &core.ObjectReference{
 			Kind:      "PersistentVolumeClaim",
-			Namespace: pvcConfigMap.Labels[k2dtypes.NamespaceNameLabelKey],
+			Namespace: pvcConfigMap.Labels[k2dtypes.PersistentVolumeClaimTargetNamespaceLabelKey],
 			Name:      pvcConfigMap.Labels[k2dtypes.PersistentVolumeClaimNameLabelKey],
 		}
 	}
