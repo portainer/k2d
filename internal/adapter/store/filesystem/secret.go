@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/portainer/k2d/internal/adapter/errors"
+	"github.com/portainer/k2d/internal/adapter/types"
 	"github.com/portainer/k2d/pkg/filesystem"
 	"github.com/portainer/k2d/pkg/maputils"
 	corev1 "k8s.io/api/core/v1"
@@ -213,8 +214,8 @@ func (s *FileSystemStore) StoreSecret(secret *corev1.Secret) error {
 	defer s.mutex.Unlock()
 
 	labels := map[string]string{
-		NamespaceNameLabelKey:     secret.Namespace,
-		CreationTimestampLabelKey: time.Now().UTC().Format(time.RFC3339),
+		types.NamespaceNameLabelKey: secret.Namespace,
+		CreationTimestampLabelKey:   time.Now().UTC().Format(time.RFC3339),
 	}
 	maputils.MergeMapsInPlace(labels, secret.Labels)
 
@@ -316,7 +317,7 @@ func (s *FileSystemStore) loadMetadataAndInitSecrets(metadataFiles []string, nam
 			continue
 		}
 
-		namespaceName := metadata[NamespaceNameLabelKey]
+		namespaceName := metadata[types.NamespaceNameLabelKey]
 		if namespace != "" && namespace != namespaceName {
 			continue
 		}

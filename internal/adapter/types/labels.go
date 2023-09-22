@@ -27,14 +27,28 @@ const (
 
 	// PersistentVolumeNameLabelKey is the key used to store the persistent volume name in the labels of a system configmap or a Docker volume
 	PersistentVolumeNameLabelKey = "storage.k2d.io/pv-name"
+
+	// PersistentVolumeClaimTargetNamespaceLabelKey is the key used to store the target namespace of a persistent volume claim in the labels of a system configmap
+	// This is used to identify the namespace where the persistent volume claim is used (e.g. the namespace of the workload)
+	PersistentVolumeClaimTargetNamespaceLabelKey = "storage.k2d.io/pvc-target-namespace"
+
+	// StorageTypeLabelKey is the key used to store the storage type in the labels of a system configmap or a Docker volume
+	// It is used to differentiate between persistent volumes and config maps when listing volumes
+	StorageTypeLabelKey = "storage.k2d.io/type"
+)
+
+const (
+	// PersistentVolumeStorageType is the label value used to identify a persistent volume storage
+	// It is stored inside metadata as a label and used to filter persistent volumes when listing persistent volumes
+	PersistentVolumeStorageType = "pv"
 )
 
 const (
 	// ServiceNameLabelKey is the key used to store the service name associated to the workload in the container labels
 	ServiceNameLabelKey = "workload.k2d.io/service-name"
 
-	// WorkloadLabelKey is the key used to store the workload type in the container labels
-	WorkloadLabelKey = "workload.k2d.io/type"
+	// WorkloadTypeLabelKey is the key used to store the workload type in the container labels
+	WorkloadTypeLabelKey = "workload.k2d.io/type"
 
 	// WorkloadNameLabelKey is the key used to store the workload name in the container labels
 	WorkloadNameLabelKey = "workload.k2d.io/name"

@@ -8,7 +8,7 @@ import (
 )
 
 // AllDeployments creates a Docker filter argument for Kubernetes Deployments within a given namespace.
-// The function filters Docker resources based on the Workload and Namespace labels, specifically for Deployments.
+// The function filters Docker resources based on the workload type and namespace labels, specifically for Deployments.
 //
 // Parameters:
 //   - namespace: The Kubernetes namespace to filter by.
@@ -22,7 +22,7 @@ import (
 //	// Now 'filter' can be used in Docker API calls to filter Deployment resources in the 'default' Kubernetes namespace.
 func AllDeployments(namespace string) filters.Args {
 	filter := ByNamespace(namespace)
-	filter.Add("label", fmt.Sprintf("%s=%s", types.WorkloadLabelKey, types.DeploymentWorkloadType))
+	filter.Add("label", fmt.Sprintf("%s=%s", types.WorkloadTypeLabelKey, types.DeploymentWorkloadType))
 	return filter
 }
 
@@ -141,19 +141,19 @@ func ByService(namespace, serviceName string) filters.Args {
 	return filter
 }
 
-// AllPersistentVolumes creates a Docker filter argument that targets resources labeled with a Kubernetes persistent volume name.
-// This function uses the types.PersistentVolumeNameLabelKey constant as the base label key to filter Docker resources.
+// AllPersistentVolumes creates a Docker filter argument that targets resources labeled with a specific type of storage, in this case, Kubernetes persistent volumes.
+// This function uses the types.StorageTypeLabelKey and types.PersistentVolumeStorageType constants to filter Docker resources.
 //
 // Parameters:
 //   - None
 //
 // Returns:
-// - filters.Args: A Docker filter object that can be used to filter Docker API calls based on the presence of the persistent volume name label.
+//   - filters.Args: A Docker filter object that can be used to filter Docker API calls based on the presence of a label indicating the storage type as a Kubernetes persistent volume.
 //
 // Usage Example:
 //
 //	filter := AllPersistentVolumes()
-//	// Now 'filter' can be used in Docker API calls to filter resources that are labeled with any Kubernetes persistent volume name.
+//	// Now 'filter' can be used in Docker API calls to filter resources that are labeled with a specific type of storage as a Kubernetes persistent volume.
 func AllPersistentVolumes() filters.Args {
-	return filters.NewArgs(filters.Arg("label", types.PersistentVolumeNameLabelKey))
+	return filters.NewArgs(filters.Arg("label", fmt.Sprintf("%s=%s", types.StorageTypeLabelKey, types.PersistentVolumeStorageType)))
 }

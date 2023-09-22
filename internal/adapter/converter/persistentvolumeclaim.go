@@ -17,7 +17,7 @@ func (converter *DockerAPIConverter) UpdateConfigMapToPersistentVolumeClaim(pers
 
 	persistentVolumeClaim.ObjectMeta = metav1.ObjectMeta{
 		Name:      configMap.Labels[k2dtypes.PersistentVolumeClaimNameLabelKey],
-		Namespace: configMap.Labels[k2dtypes.NamespaceNameLabelKey],
+		Namespace: configMap.Labels[k2dtypes.PersistentVolumeClaimTargetNamespaceLabelKey],
 		CreationTimestamp: metav1.Time{
 			Time: configMap.CreationTimestamp.Time,
 		},

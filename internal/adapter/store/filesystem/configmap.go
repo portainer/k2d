@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/portainer/k2d/internal/adapter/errors"
+	"github.com/portainer/k2d/internal/adapter/types"
 	"github.com/portainer/k2d/pkg/filesystem"
 	"github.com/portainer/k2d/pkg/maputils"
 	corev1 "k8s.io/api/core/v1"
@@ -207,8 +208,8 @@ func (s *FileSystemStore) StoreConfigMap(configMap *corev1.ConfigMap) error {
 	defer s.mutex.Unlock()
 
 	labels := map[string]string{
-		NamespaceNameLabelKey:     configMap.Namespace,
-		CreationTimestampLabelKey: time.Now().UTC().Format(time.RFC3339),
+		types.NamespaceNameLabelKey: configMap.Namespace,
+		CreationTimestampLabelKey:   time.Now().UTC().Format(time.RFC3339),
 	}
 	maputils.MergeMapsInPlace(labels, configMap.Labels)
 
@@ -296,7 +297,7 @@ func (s *FileSystemStore) loadMetadataAndInitConfigMaps(metadataFiles []string, 
 			return configMaps, fmt.Errorf("unable to load configmap metadata from disk: %w", err)
 		}
 
-		namespaceName := metadata[NamespaceNameLabelKey]
+		namespaceName := metadata[types.NamespaceNameLabelKey]
 		if namespace != "" && namespace != namespaceName {
 			continue
 		}
