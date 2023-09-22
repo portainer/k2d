@@ -9,7 +9,6 @@ import (
 	"github.com/docker/docker/errdefs"
 	"github.com/portainer/k2d/internal/adapter/errors"
 	"github.com/portainer/k2d/internal/adapter/types"
-	"github.com/portainer/k2d/pkg/maputils"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/apis/core"
@@ -162,15 +161,13 @@ func (store *VolumeStore) GetConfigMaps(namespace string) (core.ConfigMapList, e
 func (store *VolumeStore) StoreConfigMap(configMap *corev1.ConfigMap) error {
 	volumeName := buildConfigMapVolumeName(configMap.Name, configMap.Namespace)
 
-	labels := map[string]string{
-		ResourceTypeLabelKey:        ConfigMapResourceType,
-		types.NamespaceNameLabelKey: configMap.Namespace,
-	}
-	maputils.MergeMapsInPlace(labels, configMap.Labels)
+	// override is required for the configmap to be treated as the k2d system configmap
+	configMap.Labels[types.NamespaceNameLabelKey] = configMap.Namespace
+	configMap.Labels[ResourceTypeLabelKey] = ConfigMapResourceType
 
 	volume, err := store.cli.VolumeCreate(context.TODO(), volume.CreateOptions{
 		Name:   volumeName,
-		Labels: labels,
+		Labels: configMap.Labels,
 	})
 	if err != nil {
 		return fmt.Errorf("unable to create Docker volume: %w", err)

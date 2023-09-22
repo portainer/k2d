@@ -118,28 +118,29 @@ func (adapter *KubeDockerAdapter) listPersistentVolumes(ctx context.Context) (co
 	persistentVolumes := []core.PersistentVolume{}
 
 	for _, volume := range volumeList.Volumes {
-		var boundPVCConfigMap *corev1.ConfigMap
+		if volume.Labels[k2dtypes.NamespaceNameLabelKey] == "" {
+			var boundPVCConfigMap *corev1.ConfigMap
 
-		for _, configMap := range configMaps.Items {
-			if configMap.Labels[k2dtypes.PersistentVolumeNameLabelKey] == volume.Name {
-				boundPVCConfigMap = &configMap
-				break
+			for _, configMap := range configMaps.Items {
+				if configMap.Labels[k2dtypes.PersistentVolumeNameLabelKey] == volume.Name {
+					boundPVCConfigMap = &configMap
+					break
+				}
 			}
+
+			if boundPVCConfigMap == nil {
+				adapter.logger.Debugw("unable to retrieve system configmap for volume, setting phase to released and no claim reference",
+					"volume", volume.Name,
+				)
+			}
+
+			persistentVolume, err := adapter.converter.ConvertVolumeToPersistentVolume(volume, boundPVCConfigMap)
+			if err != nil {
+				return core.PersistentVolumeList{}, fmt.Errorf("unable to convert Docker volume to PersistentVolume: %w", err)
+			}
+
+			persistentVolumes = append(persistentVolumes, persistentVolume)
 		}
-
-		if boundPVCConfigMap == nil {
-			adapter.logger.Debugw("unable to retrieve system configmap for volume, setting phase to released and no claim reference",
-				"volume", volume.Name,
-			)
-		}
-
-		persistentVolume, err := adapter.converter.ConvertVolumeToPersistentVolume(volume, boundPVCConfigMap)
-		if err != nil {
-			return core.PersistentVolumeList{}, fmt.Errorf("unable to convert Docker volume to PersistentVolume: %w", err)
-		}
-
-		persistentVolumes = append(persistentVolumes, persistentVolume)
-
 	}
 
 	return core.PersistentVolumeList{
