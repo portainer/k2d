@@ -6,6 +6,7 @@ import (
 	"github.com/portainer/k2d/internal/api/apis/apps"
 	"github.com/portainer/k2d/internal/api/apis/authorization.k8s.io"
 	"github.com/portainer/k2d/internal/api/apis/events.k8s.io"
+	"github.com/portainer/k2d/internal/api/apis/metrics.k8s.io"
 	"github.com/portainer/k2d/internal/api/apis/storage.k8s.io"
 	"github.com/portainer/k2d/internal/controller"
 )
@@ -16,6 +17,7 @@ type (
 		events        events.EventsService
 		authorization authorization.AuthorizationService
 		storage       storage.StorageService
+		metrics       metrics.MetricsService
 	}
 )
 
@@ -23,6 +25,7 @@ func NewApisAPI(adapter *adapter.KubeDockerAdapter, operations chan controller.O
 	return &ApisAPI{
 		apps:          apps.NewAppsService(operations, adapter),
 		events:        events.NewEventsService(adapter),
+		metrics:       metrics.NewMetricsService(adapter),
 		authorization: authorization.NewAuthorizationService(),
 		storage:       storage.NewStorageService(adapter),
 	}
@@ -76,6 +79,25 @@ func (api ApisAPI) Events() *restful.WebService {
 		To(api.events.ListAPIResources))
 
 	api.events.RegisterEventAPI(routes)
+	return routes
+}
+
+// /apis/metrics.k8s.io
+func (api ApisAPI) Metrics() *restful.WebService {
+	routes := new(restful.WebService).
+		Path("/apis/metrics.k8s.io").
+		Consumes(restful.MIME_JSON, "application/vnd.kubernetes.protobuf").
+		Produces(restful.MIME_JSON, "application/vnd.kubernetes.protobuf")
+
+	// which versions are served by this api
+	routes.Route(routes.GET("").
+		To(api.metrics.GetAPIVersions))
+
+	// which resources are available under /apis/metrics.k8s.io/v1beta
+	routes.Route(routes.GET("/v1beta1").
+		To(api.metrics.ListAPIResources))
+
+	api.metrics.RegisterMetricsAPI(routes)
 	return routes
 }
 

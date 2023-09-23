@@ -182,6 +182,8 @@ func main() {
 	container.Add(apis.Authorization())
 	// /apis/storage.k8s.io
 	container.Add(apis.Storages())
+	// /apis/metrics.k8s.io
+	container.Add(apis.Metrics())
 
 	k2d := k2d.NewK2DAPI(serverConfiguration, kubeDockerAdapter)
 	// /k2d/kubeconfig

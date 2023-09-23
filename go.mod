@@ -18,6 +18,7 @@ require (
 	k8s.io/apimachinery v0.27.3
 	k8s.io/client-go v0.27.3
 	k8s.io/kubernetes v1.27.3
+	k8s.io/metrics v0.27.3
 )
 
 require (

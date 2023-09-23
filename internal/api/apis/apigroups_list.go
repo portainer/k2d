@@ -48,6 +48,15 @@ func ListAPIGroups(r *restful.Request, w *restful.Response) {
 					},
 				},
 			},
+			{
+				Name: "metrics.k8s.io",
+				Versions: []metav1.GroupVersionForDiscovery{
+					{
+						GroupVersion: "metrics.k8s.io/v1beta1",
+						Version:      "v1beta1",
+					},
+				},
+			},
 		},
 	}
 
