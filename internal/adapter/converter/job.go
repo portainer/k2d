@@ -20,7 +20,7 @@ func (converter *DockerAPIConverter) UpdateJobFromContainerInfo(job *batch.Job, 
 		job.ObjectMeta.Annotations = make(map[string]string)
 	}
 
-	job.ObjectMeta.Annotations["kubectl.kubernetes.io/last-applied-configuration"] = container.Labels[k2dtypes.WorkloadLastAppliedConfigLabelKey]
+	job.ObjectMeta.Annotations["kubectl.kubernetes.io/last-applied-configuration"] = container.Labels[k2dtypes.LastAppliedConfigLabelKey]
 
 	containerState := container.State
 

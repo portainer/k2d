@@ -41,8 +41,8 @@ func AllDeployments(namespace string) filters.Args {
 //	// Now 'filter' can be used in Docker API calls to filter Job resources in the 'default' Kubernetes namespace.
 func AllJobs(namespace string) filters.Args {
 	filter := filters.NewArgs()
-	filter.Add("label", fmt.Sprintf("%s=%s", types.WorkloadLabelKey, types.JobWorkloadType))
-	filter.Add("label", fmt.Sprintf("%s=%s", types.NamespaceLabelKey, namespace))
+	filter.Add("label", fmt.Sprintf("%s=%s", types.WorkloadTypeLabelKey, types.JobWorkloadType))
+	filter.Add("label", fmt.Sprintf("%s=%s", types.NamespaceNameLabelKey, namespace))
 	return filter
 }
 

@@ -27,7 +27,7 @@ func (adapter *KubeDockerAdapter) CreateContainerFromJob(ctx context.Context, jo
 		opts.labels = make(map[string]string)
 	}
 
-	opts.labels[k2dtypes.WorkloadLabelKey] = k2dtypes.JobWorkloadType
+	opts.labels[k2dtypes.WorkloadTypeLabelKey] = k2dtypes.JobWorkloadType
 
 	if job.Labels["app.kubernetes.io/managed-by"] == "Helm" {
 		jobData, err := json.Marshal(job)
@@ -44,7 +44,7 @@ func (adapter *KubeDockerAdapter) CreateContainerFromJob(ctx context.Context, jo
 		if err != nil {
 			return fmt.Errorf("unable to marshal job: %w", err)
 		}
-		opts.labels[k2dtypes.WorkloadLastAppliedConfigLabelKey] = string(jobData)
+		opts.labels[k2dtypes.LastAppliedConfigLabelKey] = string(jobData)
 	}
 
 	opts.lastAppliedConfiguration = job.ObjectMeta.Annotations["kubectl.kubernetes.io/last-applied-configuration"]
@@ -127,11 +127,11 @@ func (adapter *KubeDockerAdapter) ListJobs(ctx context.Context, namespace string
 }
 
 func (adapter *KubeDockerAdapter) buildJobFromContainer(ctx context.Context, container types.Container) (*batch.Job, error) {
-	if container.Labels[k2dtypes.WorkloadLastAppliedConfigLabelKey] == "" {
-		return nil, fmt.Errorf("unable to build job, missing %s label on container %s", k2dtypes.WorkloadLastAppliedConfigLabelKey, container.Names[0])
+	if container.Labels[k2dtypes.LastAppliedConfigLabelKey] == "" {
+		return nil, fmt.Errorf("unable to build job, missing %s label on container %s", k2dtypes.LastAppliedConfigLabelKey, container.Names[0])
 	}
 
-	jobData := container.Labels[k2dtypes.WorkloadLastAppliedConfigLabelKey]
+	jobData := container.Labels[k2dtypes.LastAppliedConfigLabelKey]
 
 	versionedJob := batchv1.Job{}
 
