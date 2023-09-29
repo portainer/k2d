@@ -24,24 +24,31 @@ func (converter *DockerAPIConverter) UpdateJobFromContainerInfo(job *batch.Job, 
 
 	containerState := container.State
 
+	startTime, _ := time.Parse(time.RFC3339Nano, json.State.StartedAt)
+
+	metaStartTime := &metav1.Time{
+		Time: startTime,
+	}
+
+	job.Status.StartTime = metaStartTime
+
 	job.Status.Active = 0
 
 	if containerState == "running" {
 		job.Status.Active = 1
 	} else {
-		// TODO: handle completion status?
 		if json.State.ExitCode == 0 {
 			job.Status.Succeeded = 1
+
+			completionTime, _ := time.Parse(time.RFC3339Nano, json.State.FinishedAt)
+
+			metaCompletionTime := &metav1.Time{
+				Time: completionTime,
+			}
+
+			job.Status.CompletionTime = metaCompletionTime
 		} else {
 			job.Status.Failed = 1
 		}
-
 	}
-
-	// TODO: handle duration?
-	// /containers/<container ID>/json ? This will allow getting:
-	// - State.ExitCode
-	// - State.StartedAt
-	// - State.FinishedAt
-	job.Status.CompletionTime.Time, _ = time.Parse("", json.State.FinishedAt)
 }

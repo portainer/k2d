@@ -18,6 +18,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	appsv1 "k8s.io/kubernetes/pkg/apis/apps/v1"
+	"k8s.io/kubernetes/pkg/apis/batch"
+	batchv1 "k8s.io/kubernetes/pkg/apis/batch/v1"
 	"k8s.io/kubernetes/pkg/apis/core"
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/apis/storage"
@@ -196,6 +198,8 @@ func initConversionScheme() *runtime.Scheme {
 
 	apps.AddToScheme(scheme)
 	appsv1.AddToScheme(scheme)
+	batch.AddToScheme(scheme)
+	batchv1.AddToScheme(scheme)
 	core.AddToScheme(scheme)
 	corev1.AddToScheme(scheme)
 	storage.AddToScheme(scheme)
