@@ -10,6 +10,8 @@ import (
 	"github.com/portainer/k2d/internal/types"
 	httputils "github.com/portainer/k2d/pkg/http"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/uuid"
 )
 
 func (svc NamespaceService) CreateNamespace(r *restful.Request, w *restful.Response) {
@@ -28,6 +30,10 @@ func (svc NamespaceService) CreateNamespace(r *restful.Request, w *restful.Respo
 	}
 
 	svc.operations <- controller.NewOperation(namespace, controller.HighPriorityOperation, r.HeaderParameter(types.RequestIDHeader))
+
+	namespace.CreationTimestamp = metav1.Now()
+	namespace.UID = uuid.NewUUID()
+	namespace.ResourceVersion = "1"
 
 	w.WriteAsJson(namespace)
 }
