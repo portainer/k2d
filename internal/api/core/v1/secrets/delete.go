@@ -11,8 +11,10 @@ import (
 
 func (svc SecretService) DeleteSecret(r *restful.Request, w *restful.Response) {
 	namespace := r.PathParameter("namespace")
-	secretName := r.PathParameter("name")
+	// namespace validation. if doesn't exist, return 404
+	utils.ValidateNamespace(r, w, svc.adapter, namespace)
 
+	secretName := r.PathParameter("name")
 	err := svc.adapter.DeleteSecret(secretName, namespace)
 	if err != nil {
 		utils.HttpError(r, w, http.StatusInternalServerError, fmt.Errorf("unable to delete secret: %w", err))
