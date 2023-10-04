@@ -18,8 +18,10 @@ import (
 
 func (svc ConfigMapService) PatchConfigMap(r *restful.Request, w *restful.Response) {
 	namespace := r.PathParameter("namespace")
-	configMapName := r.PathParameter("name")
+	// namespace validation. if doesn't exist, return 404
+	utils.ValidateNamespace(r, w, svc.adapter, namespace)
 
+	configMapName := r.PathParameter("name")
 	patch, err := io.ReadAll(r.Request.Body)
 	if err != nil {
 		utils.HttpError(r, w, http.StatusBadRequest, fmt.Errorf("unable to parse request body: %w", err))
