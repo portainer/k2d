@@ -11,9 +11,9 @@ import (
 )
 
 func (svc NamespaceService) GetNamespace(r *restful.Request, w *restful.Response) {
-	name := r.PathParameter("name")
+	namespaceName := utils.GetNamespaceFromRequest(r)
 
-	namespace, err := svc.adapter.GetNamespace(r.Request.Context(), name)
+	namespace, err := svc.adapter.GetNamespace(r.Request.Context(), namespaceName)
 	if err != nil {
 		if errors.Is(err, adaptererr.ErrResourceNotFound) {
 			w.WriteHeader(http.StatusNotFound)

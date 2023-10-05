@@ -13,14 +13,11 @@ import (
 	"github.com/portainer/k2d/internal/controller"
 	"github.com/portainer/k2d/internal/types"
 	corev1 "k8s.io/api/core/v1"
-
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 )
 
 func (svc SecretService) PatchSecret(r *restful.Request, w *restful.Response) {
-	namespace := r.PathParameter("namespace")
-	// namespace validation. if doesn't exist, return 404
-	utils.ValidateNamespace(r, w, svc.adapter, namespace)
+	namespace := utils.GetNamespaceFromRequest(r)
 
 	secretName := r.PathParameter("name")
 	patch, err := io.ReadAll(r.Request.Body)

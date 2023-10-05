@@ -11,7 +11,7 @@ import (
 )
 
 func (svc PodService) GetPod(r *restful.Request, w *restful.Response) {
-	namespace := r.PathParameter("namespace")
+	namespace := utils.GetNamespaceFromRequest(r)
 	podName := r.PathParameter("name")
 
 	pod, err := svc.adapter.GetPod(r.Request.Context(), podName, namespace)

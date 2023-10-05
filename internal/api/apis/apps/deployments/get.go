@@ -11,7 +11,7 @@ import (
 )
 
 func (svc DeploymentService) GetDeployment(r *restful.Request, w *restful.Response) {
-	namespace := r.PathParameter("namespace")
+	namespace := utils.GetNamespaceFromRequest(r)
 	deploymentName := r.PathParameter("name")
 
 	deployment, err := svc.adapter.GetDeployment(r.Request.Context(), deploymentName, namespace)

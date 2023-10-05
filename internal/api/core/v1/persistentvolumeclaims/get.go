@@ -11,7 +11,7 @@ import (
 )
 
 func (svc PersistentVolumeClaimService) GetPersistentVolumeClaim(r *restful.Request, w *restful.Response) {
-	namespace := r.PathParameter("namespace")
+	namespace := utils.GetNamespaceFromRequest(r)
 	persistentVolumeClaimName := r.PathParameter("name")
 
 	persistentVolumeClaim, err := svc.adapter.GetPersistentVolumeClaim(r.Request.Context(), persistentVolumeClaimName, namespace)
