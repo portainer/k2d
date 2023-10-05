@@ -15,9 +15,9 @@ import (
 )
 
 func (svc PodService) PatchPod(r *restful.Request, w *restful.Response) {
-	namespace := r.PathParameter("namespace")
-	podName := r.PathParameter("name")
+	namespace := utils.GetNamespaceFromRequest(r)
 
+	podName := r.PathParameter("name")
 	patch, err := io.ReadAll(r.Request.Body)
 	if err != nil {
 		utils.HttpError(r, w, http.StatusBadRequest, fmt.Errorf("unable to parse request body: %w", err))

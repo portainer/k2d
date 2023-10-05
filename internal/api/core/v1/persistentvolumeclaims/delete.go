@@ -10,9 +10,9 @@ import (
 )
 
 func (svc PersistentVolumeClaimService) DeletePersistentVolumeClaim(r *restful.Request, w *restful.Response) {
-	namespace := r.PathParameter("namespace")
-	persistentVolumeClaimName := r.PathParameter("name")
+	namespace := utils.GetNamespaceFromRequest(r)
 
+	persistentVolumeClaimName := r.PathParameter("name")
 	err := svc.adapter.DeletePersistentVolumeClaim(r.Request.Context(), persistentVolumeClaimName, namespace)
 	if err != nil {
 		utils.HttpError(r, w, http.StatusInternalServerError, fmt.Errorf("unable to delete persistent volume claim: %w", err))

@@ -12,7 +12,7 @@ import (
 )
 
 func (svc SecretService) ListSecrets(r *restful.Request, w *restful.Response) {
-	namespace := r.PathParameter("namespace")
+	namespace := utils.GetNamespaceFromRequest(r)
 	selectorParam := r.QueryParameter("labelSelector")
 
 	selector, err := labels.Parse(selectorParam)

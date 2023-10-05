@@ -9,7 +9,7 @@ import (
 )
 
 func (svc ConfigMapService) ListConfigMaps(r *restful.Request, w *restful.Response) {
-	namespace := r.PathParameter("namespace")
+	namespace := utils.GetNamespaceFromRequest(r)
 
 	utils.ListResources(
 		r,

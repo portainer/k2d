@@ -15,9 +15,9 @@ import (
 )
 
 func (svc ServiceService) PatchService(r *restful.Request, w *restful.Response) {
-	namespace := r.PathParameter("namespace")
-	serviceName := r.PathParameter("name")
+	namespace := utils.GetNamespaceFromRequest(r)
 
+	serviceName := r.PathParameter("name")
 	patch, err := io.ReadAll(r.Request.Body)
 	if err != nil {
 		utils.HttpError(r, w, http.StatusBadRequest, fmt.Errorf("unable to parse request body: %w", err))

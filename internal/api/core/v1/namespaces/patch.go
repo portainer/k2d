@@ -15,7 +15,7 @@ import (
 )
 
 func (svc NamespaceService) PatchNamespace(r *restful.Request, w *restful.Response) {
-	namespaceName := r.PathParameter("name")
+	namespaceName := utils.GetNamespaceFromRequest(r)
 
 	patch, err := io.ReadAll(r.Request.Body)
 	if err != nil {

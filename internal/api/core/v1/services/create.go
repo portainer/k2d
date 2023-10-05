@@ -13,10 +13,9 @@ import (
 )
 
 func (svc ServiceService) CreateService(r *restful.Request, w *restful.Response) {
-	namespace := r.PathParameter("namespace")
+	namespace := utils.GetNamespaceFromRequest(r)
 
 	service := &corev1.Service{}
-
 	err := httputils.ParseJSONBody(r.Request, &service)
 	if err != nil {
 		utils.HttpError(r, w, http.StatusBadRequest, fmt.Errorf("unable to parse request body: %w", err))

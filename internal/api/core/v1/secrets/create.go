@@ -13,10 +13,9 @@ import (
 )
 
 func (svc SecretService) CreateSecret(r *restful.Request, w *restful.Response) {
-	namespace := r.PathParameter("namespace")
+	namespace := utils.GetNamespaceFromRequest(r)
 
 	secret := &corev1.Secret{}
-
 	err := httputils.ParseJSONBody(r.Request, &secret)
 	if err != nil {
 		utils.HttpError(r, w, http.StatusBadRequest, fmt.Errorf("unable to parse request body: %w", err))

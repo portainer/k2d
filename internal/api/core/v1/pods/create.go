@@ -13,10 +13,9 @@ import (
 )
 
 func (svc PodService) CreatePod(r *restful.Request, w *restful.Response) {
-	namespace := r.PathParameter("namespace")
+	namespace := utils.GetNamespaceFromRequest(r)
 
 	pod := &corev1.Pod{}
-
 	err := httputils.ParseJSONBody(r.Request, &pod)
 	if err != nil {
 		utils.HttpError(r, w, http.StatusBadRequest, fmt.Errorf("unable to parse request body: %w", err))

@@ -3,6 +3,7 @@ package services
 import (
 	"github.com/emicklei/go-restful/v3"
 	"github.com/portainer/k2d/internal/adapter"
+	"github.com/portainer/k2d/internal/api/utils"
 	"github.com/portainer/k2d/internal/controller"
 )
 
@@ -30,6 +31,7 @@ func (svc ServiceService) RegisterServiceAPI(ws *restful.WebService) {
 		Param(ws.QueryParameter("dryRun", "when present, indicates that modifications should not be persisted").DataType("string")))
 
 	ws.Route(ws.POST("/v1/namespaces/{namespace}/services").
+		Filter(utils.NamespaceValidation(svc.adapter)).
 		To(svc.CreateService).
 		Param(ws.PathParameter("namespace", "namespace name").DataType("string")).
 		Param(ws.QueryParameter("dryRun", "when present, indicates that modifications should not be persisted").DataType("string")))
@@ -38,6 +40,7 @@ func (svc ServiceService) RegisterServiceAPI(ws *restful.WebService) {
 		To(svc.ListServices))
 
 	ws.Route(ws.GET("/v1/namespaces/{namespace}/services").
+		Filter(utils.NamespaceValidation(svc.adapter)).
 		To(svc.ListServices).
 		Param(ws.PathParameter("namespace", "namespace name").DataType("string")))
 
@@ -46,6 +49,7 @@ func (svc ServiceService) RegisterServiceAPI(ws *restful.WebService) {
 		Param(ws.PathParameter("name", "name of the service").DataType("string")))
 
 	ws.Route(ws.DELETE("/v1/namespaces/{namespace}/services/{name}").
+		Filter(utils.NamespaceValidation(svc.adapter)).
 		To(svc.DeleteService).
 		Param(ws.PathParameter("namespace", "namespace name").DataType("string")).
 		Param(ws.PathParameter("name", "name of the service").DataType("string")))
@@ -55,6 +59,7 @@ func (svc ServiceService) RegisterServiceAPI(ws *restful.WebService) {
 		Param(ws.PathParameter("name", "name of the service").DataType("string")))
 
 	ws.Route(ws.GET("/v1/namespaces/{namespace}/services/{name}").
+		Filter(utils.NamespaceValidation(svc.adapter)).
 		To(svc.GetService).
 		Param(ws.PathParameter("namespace", "namespace name").DataType("string")).
 		Param(ws.PathParameter("name", "name of the service").DataType("string")))
@@ -66,6 +71,7 @@ func (svc ServiceService) RegisterServiceAPI(ws *restful.WebService) {
 		AddExtension("x-kubernetes-group-version-kind", serviceGVKExtension))
 
 	ws.Route(ws.PATCH("/v1/namespaces/{namespace}/services/{name}").
+		Filter(utils.NamespaceValidation(svc.adapter)).
 		To(svc.PatchService).
 		Param(ws.PathParameter("namespace", "namespace name").DataType("string")).
 		Param(ws.PathParameter("name", "name of the service").DataType("string")).
