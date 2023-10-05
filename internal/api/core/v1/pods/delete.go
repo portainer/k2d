@@ -9,9 +9,7 @@ import (
 )
 
 func (svc PodService) DeletePod(r *restful.Request, w *restful.Response) {
-	namespace := r.PathParameter("namespace")
-	// namespace validation. if doesn't exist, return 404
-	utils.ValidateNamespace(r, w, svc.adapter, namespace)
+	namespace := utils.GetNamespaceFromRequest(r)
 
 	podName := r.PathParameter("name")
 	svc.adapter.DeleteContainer(r.Request.Context(), podName, namespace)

@@ -3,6 +3,7 @@ package pods
 import (
 	"github.com/emicklei/go-restful/v3"
 	"github.com/portainer/k2d/internal/adapter"
+	"github.com/portainer/k2d/internal/api/utils"
 	"github.com/portainer/k2d/internal/controller"
 )
 
@@ -30,6 +31,7 @@ func (svc PodService) RegisterPodAPI(ws *restful.WebService) {
 		Param(ws.QueryParameter("dryRun", "when present, indicates that modifications should not be persisted").DataType("string")))
 
 	ws.Route(ws.POST("/v1/namespaces/{namespace}/pods").
+		Filter(utils.NamespaceValidation(svc.adapter)).
 		To(svc.CreatePod).
 		Param(ws.PathParameter("namespace", "namespace name").DataType("string")).
 		Param(ws.QueryParameter("dryRun", "when present, indicates that modifications should not be persisted").DataType("string")))
@@ -38,6 +40,7 @@ func (svc PodService) RegisterPodAPI(ws *restful.WebService) {
 		To(svc.ListPods))
 
 	ws.Route(ws.GET("/v1/namespaces/{namespace}/pods").
+		Filter(utils.NamespaceValidation(svc.adapter)).
 		To(svc.ListPods).
 		Param(ws.PathParameter("namespace", "namespace name").DataType("string")))
 
@@ -46,6 +49,7 @@ func (svc PodService) RegisterPodAPI(ws *restful.WebService) {
 		Param(ws.PathParameter("name", "name of the pod").DataType("string")))
 
 	ws.Route(ws.DELETE("/v1/namespaces/{namespace}/pods/{name}").
+		Filter(utils.NamespaceValidation(svc.adapter)).
 		To(svc.DeletePod).
 		Param(ws.PathParameter("namespace", "namespace name").DataType("string")).
 		Param(ws.PathParameter("name", "name of the pod").DataType("string")))
@@ -55,6 +59,7 @@ func (svc PodService) RegisterPodAPI(ws *restful.WebService) {
 		Param(ws.PathParameter("name", "name of the pod").DataType("string")))
 
 	ws.Route(ws.GET("/v1/namespaces/{namespace}/pods/{name}").
+		Filter(utils.NamespaceValidation(svc.adapter)).
 		To(svc.GetPod).
 		Param(ws.PathParameter("namespace", "namespace name").DataType("string")).
 		Param(ws.PathParameter("name", "name of the pod").DataType("string")))
@@ -66,6 +71,7 @@ func (svc PodService) RegisterPodAPI(ws *restful.WebService) {
 		AddExtension("x-kubernetes-group-version-kind", podGVKExtension))
 
 	ws.Route(ws.PATCH("/v1/namespaces/{namespace}/pods/{name}").
+		Filter(utils.NamespaceValidation(svc.adapter)).
 		To(svc.PatchPod).
 		Param(ws.PathParameter("namespace", "namespace name").DataType("string")).
 		Param(ws.PathParameter("name", "name of the pod").DataType("string")).
@@ -73,6 +79,7 @@ func (svc PodService) RegisterPodAPI(ws *restful.WebService) {
 		AddExtension("x-kubernetes-group-version-kind", podGVKExtension))
 
 	ws.Route(ws.GET("/v1/namespaces/{namespace}/pods/{name}/log").
+		Filter(utils.NamespaceValidation(svc.adapter)).
 		To(svc.GetPodLogs)).
 		Param(ws.PathParameter("namespace", "namespace name").DataType("string")).
 		Param(ws.PathParameter("name", "name of the pod").DataType("string")).

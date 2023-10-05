@@ -13,9 +13,7 @@ import (
 )
 
 func (svc PodService) CreatePod(r *restful.Request, w *restful.Response) {
-	namespace := r.PathParameter("namespace")
-	// namespace validation. if doesn't exist, return 404
-	utils.ValidateNamespace(r, w, svc.adapter, namespace)
+	namespace := utils.GetNamespaceFromRequest(r)
 
 	pod := &corev1.Pod{}
 	err := httputils.ParseJSONBody(r.Request, &pod)

@@ -13,9 +13,7 @@ import (
 )
 
 func (svc SecretService) CreateSecret(r *restful.Request, w *restful.Response) {
-	namespace := r.PathParameter("namespace")
-	// namespace validation. if doesn't exist, return 404
-	utils.ValidateNamespace(r, w, svc.adapter, namespace)
+	namespace := utils.GetNamespaceFromRequest(r)
 
 	secret := &corev1.Secret{}
 	err := httputils.ParseJSONBody(r.Request, &secret)

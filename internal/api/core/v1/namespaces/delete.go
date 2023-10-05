@@ -10,9 +10,7 @@ import (
 )
 
 func (svc NamespaceService) DeleteNamespace(r *restful.Request, w *restful.Response) {
-	namespaceName := r.PathParameter("namespace")
-	// namespace validation. if doesn't exist, return 404
-	utils.ValidateNamespace(r, w, svc.adapter, namespaceName)
+	namespaceName := utils.GetNamespaceFromRequest(r)
 
 	err := svc.adapter.DeleteNamespace(r.Request.Context(), namespaceName)
 	if err != nil {

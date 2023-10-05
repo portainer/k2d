@@ -11,7 +11,7 @@ import (
 )
 
 func (svc ConfigMapService) GetConfigMap(r *restful.Request, w *restful.Response) {
-	namespace := r.PathParameter("namespace")
+	namespace := utils.GetNamespaceFromRequest(r)
 	configMapName := r.PathParameter("name")
 
 	configMap, err := svc.adapter.GetConfigMap(configMapName, namespace)

@@ -17,9 +17,7 @@ import (
 )
 
 func (svc ConfigMapService) PatchConfigMap(r *restful.Request, w *restful.Response) {
-	namespace := r.PathParameter("namespace")
-	// namespace validation. if doesn't exist, return 404
-	utils.ValidateNamespace(r, w, svc.adapter, namespace)
+	namespace := utils.GetNamespaceFromRequest(r)
 
 	configMapName := r.PathParameter("name")
 	patch, err := io.ReadAll(r.Request.Body)

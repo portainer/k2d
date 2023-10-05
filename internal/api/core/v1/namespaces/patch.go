@@ -15,9 +15,7 @@ import (
 )
 
 func (svc NamespaceService) PatchNamespace(r *restful.Request, w *restful.Response) {
-	namespaceName := r.PathParameter("namespace")
-	// namespace validation. if doesn't exist, return 404
-	utils.ValidateNamespace(r, w, svc.adapter, namespaceName)
+	namespaceName := utils.GetNamespaceFromRequest(r)
 
 	patch, err := io.ReadAll(r.Request.Body)
 	if err != nil {

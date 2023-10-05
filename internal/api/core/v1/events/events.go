@@ -3,6 +3,7 @@ package events
 import (
 	"github.com/emicklei/go-restful/v3"
 	"github.com/portainer/k2d/internal/adapter"
+	"github.com/portainer/k2d/internal/api/utils"
 )
 
 type EventService struct {
@@ -20,5 +21,6 @@ func (svc EventService) RegisterEventAPI(ws *restful.WebService) {
 		To(svc.ListEvents))
 
 	ws.Route(ws.GET("/v1/namespaces/{namespace}/events").
+		Filter(utils.NamespaceValidation(svc.adapter)).
 		To(svc.ListEvents))
 }

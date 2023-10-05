@@ -3,6 +3,7 @@ package secrets
 import (
 	"github.com/emicklei/go-restful/v3"
 	"github.com/portainer/k2d/internal/adapter"
+	"github.com/portainer/k2d/internal/api/utils"
 	"github.com/portainer/k2d/internal/controller"
 )
 
@@ -30,6 +31,7 @@ func (svc SecretService) RegisterSecretAPI(ws *restful.WebService) {
 		Param(ws.QueryParameter("dryRun", "when present, indicates that modifications should not be persisted").DataType("string")))
 
 	ws.Route(ws.POST("/v1/namespaces/{namespace}/secrets").
+		Filter(utils.NamespaceValidation(svc.adapter)).
 		To(svc.CreateSecret).
 		Param(ws.PathParameter("namespace", "namespace name").DataType("string")).
 		Param(ws.QueryParameter("dryRun", "when present, indicates that modifications should not be persisted").DataType("string")))
@@ -39,6 +41,7 @@ func (svc SecretService) RegisterSecretAPI(ws *restful.WebService) {
 		To(svc.ListSecrets))
 
 	ws.Route(ws.GET("/v1/namespaces/{namespace}/secrets").
+		Filter(utils.NamespaceValidation(svc.adapter)).
 		Param(ws.PathParameter("namespace", "namespace name").DataType("string")).
 		Param(ws.QueryParameter("labelSelector", "a selector to restrict the list of returned objects by their labels").DataType("string")).
 		To(svc.ListSecrets))
@@ -48,6 +51,7 @@ func (svc SecretService) RegisterSecretAPI(ws *restful.WebService) {
 		Param(ws.PathParameter("name", "name of the secret").DataType("string")))
 
 	ws.Route(ws.DELETE("/v1/namespaces/{namespace}/secrets/{name}").
+		Filter(utils.NamespaceValidation(svc.adapter)).
 		To(svc.DeleteSecret).
 		Param(ws.PathParameter("namespace", "namespace name").DataType("string")).
 		Param(ws.PathParameter("name", "name of the secret").DataType("string")))
@@ -57,6 +61,7 @@ func (svc SecretService) RegisterSecretAPI(ws *restful.WebService) {
 		Param(ws.PathParameter("name", "name of the secret").DataType("string")))
 
 	ws.Route(ws.GET("/v1/namespaces/{namespace}/secrets/{name}").
+		Filter(utils.NamespaceValidation(svc.adapter)).
 		To(svc.GetSecret).
 		Param(ws.PathParameter("namespace", "namespace name").DataType("string")).
 		Param(ws.PathParameter("name", "name of the secret").DataType("string")))
@@ -68,6 +73,7 @@ func (svc SecretService) RegisterSecretAPI(ws *restful.WebService) {
 		AddExtension("x-kubernetes-group-version-kind", secretGVKExtension))
 
 	ws.Route(ws.PATCH("/v1/namespaces/{namespace}/secrets/{name}").
+		Filter(utils.NamespaceValidation(svc.adapter)).
 		To(svc.PatchSecret).
 		Param(ws.PathParameter("namespace", "namespace name").DataType("string")).
 		Param(ws.PathParameter("name", "name of the secret").DataType("string")).
@@ -81,6 +87,7 @@ func (svc SecretService) RegisterSecretAPI(ws *restful.WebService) {
 		AddExtension("x-kubernetes-group-version-kind", secretGVKExtension))
 
 	ws.Route(ws.PUT("/v1/namespaces/{namespace}/secrets/{name}").
+		Filter(utils.NamespaceValidation(svc.adapter)).
 		To(svc.PutSecret).
 		Param(ws.PathParameter("namespace", "namespace name").DataType("string")).
 		Param(ws.PathParameter("name", "name of the secret").DataType("string")).
