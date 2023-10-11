@@ -49,7 +49,6 @@ func (svc ConfigMapService) RegisterConfigMapAPI(ws *restful.WebService) {
 		Param(ws.PathParameter("name", "name of the configmap").DataType("string")))
 
 	ws.Route(ws.DELETE("/v1/namespaces/{namespace}/configmaps/{name}").
-		Filter(utils.NamespaceValidation(svc.adapter)).
 		To(svc.DeleteConfigMap).
 		Param(ws.PathParameter("namespace", "namespace name").DataType("string")).
 		Param(ws.PathParameter("name", "name of the configmap").DataType("string")))

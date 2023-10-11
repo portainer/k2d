@@ -36,6 +36,13 @@ type Config struct {
 	// the default value is set to 25.
 	OperationBatchMaxSize int `env:"K2D_OPERATION_BATCH_MAX_SIZE,default=25"`
 
+	// OperationNamespaceDeletionDelay represents the delay that k2d waits after a namespace is deleted.
+	// This delay is used to ensure that all resources associated with the namespace are deleted before
+	// k2d attempts to delete the network from the Docker environment.
+	// If not provided through an environment variable named K2D_OPERATION_NAMESPACE_DELETION_DELAY,
+	// the default value is set to 3 seconds (3s).
+	OperationNamespaceDeletionDelay time.Duration `env:"K2D_OPERATION_NAMESPACE_DELETION_DELAY,default=3s"`
+
 	// Port represents the port number for the application.
 	// If not provided through an environment variable named K2D_PORT,
 	// the default value is set to 6443.

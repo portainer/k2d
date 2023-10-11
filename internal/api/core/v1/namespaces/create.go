@@ -6,8 +6,6 @@ import (
 
 	"github.com/emicklei/go-restful/v3"
 	"github.com/portainer/k2d/internal/api/utils"
-	"github.com/portainer/k2d/internal/controller"
-	"github.com/portainer/k2d/internal/types"
 	httputils "github.com/portainer/k2d/pkg/http"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -29,7 +27,11 @@ func (svc NamespaceService) CreateNamespace(r *restful.Request, w *restful.Respo
 		return
 	}
 
-	svc.operations <- controller.NewOperation(namespace, controller.HighPriorityOperation, r.HeaderParameter(types.RequestIDHeader))
+	err = svc.adapter.CreateNetworkFromNamespace(r.Request.Context(), namespace)
+	if err != nil {
+		utils.HttpError(r, w, http.StatusInternalServerError, fmt.Errorf("unable to create namespace: %w", err))
+		return
+	}
 
 	namespace.CreationTimestamp = metav1.Now()
 	namespace.UID = uuid.NewUUID()
