@@ -49,7 +49,6 @@ func (svc DeploymentService) RegisterDeploymentAPI(ws *restful.WebService) {
 		Param(ws.PathParameter("name", "name of the deployment").DataType("string")))
 
 	ws.Route(ws.DELETE("/v1/namespaces/{namespace}/deployments/{name}").
-		Filter(utils.NamespaceValidation(svc.adapter)).
 		To(svc.DeleteDeployment).
 		Param(ws.PathParameter("namespace", "namespace name").DataType("string")).
 		Param(ws.PathParameter("name", "name of the deployment").DataType("string")))

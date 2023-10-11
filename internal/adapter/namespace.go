@@ -78,7 +78,8 @@ func (adapter *KubeDockerAdapter) DeleteNamespace(ctx context.Context, namespace
 
 	// This is just to make sure that the containers have been properly deleted
 	// before we try to delete the network
-	time.Sleep(3 * time.Second)
+	// This is configurable, see OperationNamespaceDeletionDelay in config.go
+	time.Sleep(adapter.namespaceDeletionDelay)
 
 	networkName := naming.BuildNetworkName(namespaceName)
 	err = adapter.cli.NetworkRemove(ctx, networkName)
@@ -90,7 +91,6 @@ func (adapter *KubeDockerAdapter) DeleteNamespace(ctx context.Context, namespace
 }
 
 func (adapter *KubeDockerAdapter) GetNamespace(ctx context.Context, namespaceName string) (*corev1.Namespace, error) {
-
 	networkName := naming.BuildNetworkName(namespaceName)
 
 	network, err := adapter.getNetwork(ctx, networkName)

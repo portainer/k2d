@@ -51,7 +51,6 @@ func (svc SecretService) RegisterSecretAPI(ws *restful.WebService) {
 		Param(ws.PathParameter("name", "name of the secret").DataType("string")))
 
 	ws.Route(ws.DELETE("/v1/namespaces/{namespace}/secrets/{name}").
-		Filter(utils.NamespaceValidation(svc.adapter)).
 		To(svc.DeleteSecret).
 		Param(ws.PathParameter("namespace", "namespace name").DataType("string")).
 		Param(ws.PathParameter("name", "name of the secret").DataType("string")))

@@ -44,6 +44,8 @@ type (
 	// - Server Configuration: Contains configuration related to the k2d server, which is used when
 	//   creating certain resources.
 	//
+	// - Namespace deletion delay: Contains the delay that k2d waits after a namespace is deleted.
+	//
 	// This struct is a comprehensive utility for managing the interactions between Docker and Kubernetes.
 	KubeDockerAdapter struct {
 		cli                    *client.Client
@@ -52,6 +54,7 @@ type (
 		conversionScheme       *runtime.Scheme
 		k2dServerConfiguration *types.K2DServerConfiguration
 		logger                 *zap.SugaredLogger
+		namespaceDeletionDelay time.Duration
 		registrySecretStore    store.SecretStore
 		startTime              time.Time
 		secretStore            store.SecretStore
@@ -109,6 +112,7 @@ func NewKubeDockerAdapter(options *KubeDockerAdapterOptions) (*KubeDockerAdapter
 		configMapStore:         configMapStore,
 		k2dServerConfiguration: options.ServerConfiguration,
 		logger:                 options.Logger,
+		namespaceDeletionDelay: options.K2DConfig.OperationNamespaceDeletionDelay,
 		registrySecretStore:    registrySecretStore,
 		secretStore:            secretStore,
 		startTime:              time.Now(),

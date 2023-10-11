@@ -21,6 +21,9 @@ import (
 // If the namespace is valid, the function adds it as an attribute to the request object and continues
 // the request processing by invoking the next filter in the chain.
 //
+// Note: This filter is not used by any DELETE endpoints because they are usually called sequentially by
+// Kubernetes clients. The namespace is usually deleted before the validation can be performed.
+//
 // Parameters:
 //   - adapter: A pointer to an initialized KubeDockerAdapter object.
 //

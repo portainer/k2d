@@ -49,7 +49,6 @@ func (svc PodService) RegisterPodAPI(ws *restful.WebService) {
 		Param(ws.PathParameter("name", "name of the pod").DataType("string")))
 
 	ws.Route(ws.DELETE("/v1/namespaces/{namespace}/pods/{name}").
-		Filter(utils.NamespaceValidation(svc.adapter)).
 		To(svc.DeletePod).
 		Param(ws.PathParameter("namespace", "namespace name").DataType("string")).
 		Param(ws.PathParameter("name", "name of the pod").DataType("string")))
