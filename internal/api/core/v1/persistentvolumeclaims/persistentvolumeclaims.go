@@ -59,7 +59,6 @@ func (svc PersistentVolumeClaimService) RegisterPersistentVolumeClaimAPI(ws *res
 		Param(ws.PathParameter("name", "name of the persistentvolumeclaim").DataType("string")))
 
 	ws.Route(ws.DELETE("/v1/namespaces/{namespace}/persistentvolumeclaims/{name}").
-		Filter(utils.NamespaceValidation(svc.adapter)).
 		To(svc.DeletePersistentVolumeClaim).
 		Param(ws.PathParameter("namespace", "namespace name").DataType("string")).
 		Param(ws.PathParameter("name", "name of the persistentvolumeclaim").DataType("string")))

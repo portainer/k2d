@@ -49,7 +49,6 @@ func (svc ServiceService) RegisterServiceAPI(ws *restful.WebService) {
 		Param(ws.PathParameter("name", "name of the service").DataType("string")))
 
 	ws.Route(ws.DELETE("/v1/namespaces/{namespace}/services/{name}").
-		Filter(utils.NamespaceValidation(svc.adapter)).
 		To(svc.DeleteService).
 		Param(ws.PathParameter("namespace", "namespace name").DataType("string")).
 		Param(ws.PathParameter("name", "name of the service").DataType("string")))
