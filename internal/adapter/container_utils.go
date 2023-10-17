@@ -152,6 +152,8 @@ func (adapter *KubeDockerAdapter) buildContainerConfigurationFromExistingContain
 		},
 	}
 
+	// We set the ulimits to nil because Podman is not able to create the container when inheriting the ulimits
+	// from the previous container configuration.
 	containerConfiguration.HostConfig.Resources.Ulimits = nil
 
 	return containerConfiguration, nil
