@@ -130,6 +130,8 @@ func (adapter *KubeDockerAdapter) buildContainerConfigurationFromExistingContain
 		return converter.ContainerConfiguration{}, fmt.Errorf("unable to inspect container: %w", err)
 	}
 
+	adapter.logger.Debugf("container details: %+v", containerDetails)
+
 	containerConfiguration := converter.ContainerConfiguration{
 		ContainerName: containerDetails.Name,
 		ContainerConfig: &container.Config{
@@ -151,6 +153,8 @@ func (adapter *KubeDockerAdapter) buildContainerConfigurationFromExistingContain
 			EndpointsConfig: containerDetails.NetworkSettings.Networks,
 		},
 	}
+
+	adapter.logger.Debugf("container configuration: %+v", containerConfiguration)
 
 	// We set the ulimits to nil because Podman is not able to create the container when inheriting the ulimits
 	// from the previous container configuration.
