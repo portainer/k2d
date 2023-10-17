@@ -133,7 +133,7 @@ func (adapter *KubeDockerAdapter) buildContainerConfigurationFromExistingContain
 	adapter.logger.Debugf("container details: %+v", containerDetails)
 
 	containerConfiguration := converter.ContainerConfiguration{
-		ContainerName: containerDetails.Name,
+		ContainerName: strings.TrimPrefix(containerDetails.Name, "/"),
 		ContainerConfig: &container.Config{
 			Image:        containerDetails.Image,
 			Labels:       containerDetails.Config.Labels,
