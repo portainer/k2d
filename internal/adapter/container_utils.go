@@ -130,7 +130,7 @@ func (adapter *KubeDockerAdapter) buildContainerConfigurationFromExistingContain
 		return converter.ContainerConfiguration{}, fmt.Errorf("unable to inspect container: %w", err)
 	}
 
-	return converter.ContainerConfiguration{
+	containerConfiguration := converter.ContainerConfiguration{
 		ContainerName: containerDetails.Name,
 		ContainerConfig: &container.Config{
 			Image:        containerDetails.Image,
@@ -150,7 +150,11 @@ func (adapter *KubeDockerAdapter) buildContainerConfigurationFromExistingContain
 		NetworkConfig: &network.NetworkingConfig{
 			EndpointsConfig: containerDetails.NetworkSettings.Networks,
 		},
-	}, nil
+	}
+
+	containerConfiguration.HostConfig.Resources.Ulimits = nil
+
+	return containerConfiguration, nil
 }
 
 // ContainerCreationOptions serves as a parameter object for container creation operations.
