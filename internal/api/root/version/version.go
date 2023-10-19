@@ -17,7 +17,7 @@ func (svc VersionService) Version(r *restful.Request, w *restful.Response) {
 	version := version.Info{
 		Major:      "1",
 		Minor:      "28",
-		GitVersion: "v1.28.2-k2d",
+		GitVersion: "v1.28.2+k2d.100b",
 		GoVersion:  runtime.Version(),
 		Compiler:   "gc",
 		Platform:   "linux/amd64",
