@@ -10,6 +10,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+func isDefaultOrEmptyNamespace(namespace string) bool {
+	return namespace == "" || namespace == "default"
+}
+
 // provisionNamespace provisions a Kubernetes namespace and its corresponding Docker network.
 //
 // The function performs the following steps:
