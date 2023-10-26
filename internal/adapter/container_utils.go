@@ -498,3 +498,7 @@ func (adapter *KubeDockerAdapter) DeployPortainerEdgeAgent(ctx context.Context, 
 
 	return nil
 }
+
+func isContainerInNamespace(container *types.Container, namespace string) bool {
+	return namespace == "" || container.Labels[k2dtypes.NamespaceNameLabelKey] == namespace
+}
