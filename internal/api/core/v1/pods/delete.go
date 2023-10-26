@@ -12,7 +12,7 @@ func (svc PodService) DeletePod(r *restful.Request, w *restful.Response) {
 	namespace := utils.GetNamespaceFromRequest(r)
 
 	podName := r.PathParameter("name")
-	svc.adapter.DeletePod(r.Request.Context(), podName, namespace)
+	svc.adapter.DeleteContainer(r.Request.Context(), podName, namespace)
 
 	w.WriteAsJson(metav1.Status{
 		TypeMeta: metav1.TypeMeta{
