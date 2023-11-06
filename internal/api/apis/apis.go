@@ -5,6 +5,7 @@ import (
 	"github.com/portainer/k2d/internal/adapter"
 	"github.com/portainer/k2d/internal/api/apis/apps"
 	"github.com/portainer/k2d/internal/api/apis/authorization.k8s.io"
+	"github.com/portainer/k2d/internal/api/apis/batch"
 	"github.com/portainer/k2d/internal/api/apis/events.k8s.io"
 	"github.com/portainer/k2d/internal/api/apis/storage.k8s.io"
 	"github.com/portainer/k2d/internal/controller"
@@ -13,6 +14,7 @@ import (
 type (
 	ApisAPI struct {
 		apps          apps.AppsService
+		batch         batch.BatchService
 		events        events.EventsService
 		authorization authorization.AuthorizationService
 		storage       storage.StorageService
@@ -22,6 +24,7 @@ type (
 func NewApisAPI(adapter *adapter.KubeDockerAdapter, operations chan controller.Operation) *ApisAPI {
 	return &ApisAPI{
 		apps:          apps.NewAppsService(operations, adapter),
+		batch:         batch.NewBatchService(operations, adapter),
 		events:        events.NewEventsService(adapter),
 		authorization: authorization.NewAuthorizationService(),
 		storage:       storage.NewStorageService(adapter),
@@ -114,5 +117,24 @@ func (api ApisAPI) Apps() *restful.WebService {
 		To(api.apps.ListAPIResources))
 
 	api.apps.RegisterAppsAPI(routes)
+	return routes
+}
+
+// /apis/batch
+func (api ApisAPI) Batch() *restful.WebService {
+	routes := new(restful.WebService).
+		Path("/apis/batch").
+		Consumes(restful.MIME_JSON, "application/yml", "application/json-patch+json", "application/merge-patch+json", "application/strategic-merge-patch+json").
+		Produces(restful.MIME_JSON)
+
+	// which versions are served by this api
+	routes.Route(routes.GET("").
+		To(api.batch.GetAPIVersions))
+
+	// which resources are available under /apis/batch/v1
+	routes.Route(routes.GET("/v1").
+		To(api.batch.ListAPIResources))
+
+	api.batch.RegisterBatchAPI(routes)
 	return routes
 }
