@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
 	adaptererr "github.com/portainer/k2d/internal/adapter/errors"
 	"github.com/portainer/k2d/internal/adapter/filters"
 	"github.com/portainer/k2d/internal/adapter/naming"
@@ -63,7 +64,7 @@ func (adapter *KubeDockerAdapter) CreateContainerFromService(ctx context.Context
 		return nil
 	}
 
-	containers, err := adapter.cli.ContainerList(ctx, types.ContainerListOptions{All: true})
+	containers, err := adapter.cli.ContainerList(ctx, container.ListOptions{All: true})
 	if err != nil {
 		return fmt.Errorf("unable to list containers: %w", err)
 	}
@@ -189,7 +190,7 @@ func (adapter *KubeDockerAdapter) ListServices(ctx context.Context, namespace st
 
 func (adapter *KubeDockerAdapter) getContainerFromServiceName(ctx context.Context, serviceName, namespace string) (types.Container, error) {
 	filter := filters.ByService(namespace, serviceName)
-	containers, err := adapter.cli.ContainerList(ctx, types.ContainerListOptions{All: true, Filters: filter})
+	containers, err := adapter.cli.ContainerList(ctx, container.ListOptions{All: true, Filters: filter})
 	if err != nil {
 		return types.Container{}, fmt.Errorf("unable to list containers: %w", err)
 	}
@@ -232,7 +233,7 @@ func (adapter *KubeDockerAdapter) buildServiceFromContainer(container types.Cont
 
 func (adapter *KubeDockerAdapter) listServices(ctx context.Context, namespace string) (core.ServiceList, error) {
 	filter := filters.AllServices(namespace)
-	containers, err := adapter.cli.ContainerList(ctx, types.ContainerListOptions{All: true, Filters: filter})
+	containers, err := adapter.cli.ContainerList(ctx, container.ListOptions{All: true, Filters: filter})
 	if err != nil {
 		return core.ServiceList{}, fmt.Errorf("unable to list containers: %w", err)
 	}

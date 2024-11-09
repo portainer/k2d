@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/errdefs"
 	adaptererr "github.com/portainer/k2d/internal/adapter/errors"
 	"github.com/portainer/k2d/internal/adapter/filters"
@@ -65,7 +66,7 @@ func (adapter *KubeDockerAdapter) CreateNetworkFromNamespace(ctx context.Context
 
 func (adapter *KubeDockerAdapter) DeleteNamespace(ctx context.Context, namespaceName string) error {
 	filter := filters.ByNamespace(namespaceName)
-	containers, err := adapter.cli.ContainerList(ctx, types.ContainerListOptions{All: true, Filters: filter})
+	containers, err := adapter.cli.ContainerList(ctx, container.ListOptions{All: true, Filters: filter})
 	if err != nil {
 		return fmt.Errorf("unable to list containers: %w", err)
 	}

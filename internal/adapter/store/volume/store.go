@@ -7,7 +7,7 @@ import (
 	"io"
 	"path/filepath"
 
-	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/client"
 	"github.com/portainer/k2d/pkg/filesystem"
 	"go.uber.org/zap"
@@ -86,7 +86,7 @@ type VolumeStoreOptions struct {
 // - A pointer to the created VolumeStore instance.
 // - An error if any occurs during the initialization, like failing to pull the copy image.
 func NewVolumeStore(logger *zap.SugaredLogger, opts VolumeStoreOptions) (*VolumeStore, error) {
-	out, err := opts.DockerCli.ImagePull(context.TODO(), opts.CopyImageName, types.ImagePullOptions{})
+	out, err := opts.DockerCli.ImagePull(context.TODO(), opts.CopyImageName, image.PullOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("unable to pull volume copy image: %w", err)
 	}

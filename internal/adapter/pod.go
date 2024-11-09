@@ -6,7 +6,8 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/docker/docker/api/types"
+	containertypes "github.com/docker/docker/api/types/container"
+
 	"github.com/portainer/k2d/internal/k8s"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -45,7 +46,7 @@ func (adapter *KubeDockerAdapter) DeletePod(ctx context.Context, podName string,
 		return fmt.Errorf("unable to find container associated to the pod %s/%s: %w", namespace, podName, err)
 	}
 
-	err = adapter.cli.ContainerRemove(ctx, container.Names[0], types.ContainerRemoveOptions{Force: true})
+	err = adapter.cli.ContainerRemove(ctx, container.Names[0], containertypes.RemoveOptions{Force: true})
 	if err != nil {
 		adapter.logger.Warnf("unable to remove container: %s", err)
 	}
@@ -90,7 +91,7 @@ func (adapter *KubeDockerAdapter) GetPodLogs(ctx context.Context, namespace stri
 		return nil, fmt.Errorf("unable to find container associated to the pod %s/%s: %w", namespace, podName, err)
 	}
 
-	return adapter.cli.ContainerLogs(ctx, container.ID, types.ContainerLogsOptions{
+	return adapter.cli.ContainerLogs(ctx, container.ID, containertypes.LogsOptions{
 		ShowStdout: true,
 		ShowStderr: true,
 		Timestamps: opts.Timestamps,

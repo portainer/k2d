@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/system"
 	"github.com/emicklei/go-restful/v3"
 	"github.com/portainer/k2d/internal/adapter"
 	"github.com/portainer/k2d/internal/api/utils"
@@ -23,7 +24,7 @@ type Diagnostics struct {
 	ServerConfiguration *k2dtypes.K2DServerConfiguration `json:"serverConfiguration"`
 	OS                  string                           `json:"os"`
 	Arch                string                           `json:"arch"`
-	DockerInfo          types.Info                       `json:"dockerInfo"`
+	DockerInfo          system.Info                      `json:"dockerInfo"`
 	DockerVersion       types.Version                    `json:"dockerVersion"`
 }
 
