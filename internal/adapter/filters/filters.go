@@ -26,6 +26,26 @@ func AllDeployments(namespace string) filters.Args {
 	return filter
 }
 
+// AllJobs creates a Docker filter argument for Kubernetes Jobs within a given namespace.
+// The function filters Docker resources based on the Workload and Namespace labels, specifically for Jobs.
+//
+// Parameters:
+//   - namespace: The Kubernetes namespace to filter by.
+//
+// Returns:
+// - filters.Args: A Docker filter object that can be used to filter Docker API calls based on the namespace and Workload type labels.
+//
+// Usage Example:
+//
+//	filter := AllJobs("default")
+//	// Now 'filter' can be used in Docker API calls to filter Job resources in the 'default' Kubernetes namespace.
+func AllJobs(namespace string) filters.Args {
+	filter := filters.NewArgs()
+	filter.Add("label", fmt.Sprintf("%s=%s", types.WorkloadTypeLabelKey, types.JobWorkloadType))
+	filter.Add("label", fmt.Sprintf("%s=%s", types.NamespaceNameLabelKey, namespace))
+	return filter
+}
+
 // AllNamespaces creates a Docker filter argument that targets resources labeled with a Kubernetes namespace.
 // This function uses the types.NamespaceLabelKey constant as the base label key to filter Docker resources.
 //
@@ -78,6 +98,26 @@ func AllServices(namespace string) filters.Args {
 func ByDeployment(namespace, deploymentName string) filters.Args {
 	filter := AllDeployments(namespace)
 	filter.Add("label", fmt.Sprintf("%s=%s", types.WorkloadNameLabelKey, deploymentName))
+	return filter
+}
+
+// ByJob creates a Docker filter argument for a specific Kubernetes Job within a given namespace.
+// The function builds upon the JobsFilter by further narrowing down the filter to match a specific Job name.
+//
+// Parameters:
+//   - namespace: The Kubernetes namespace to filter by.
+//   - jobName: The name of the specific Kubernetes Job to filter by.
+//
+// Returns:
+// - filters.Args: A Docker filter object that can be used to filter Docker API calls based on the namespace and Job name labels.
+//
+// Usage Example:
+//
+//	filter := ByJob("default", "my-job")
+//	// Now 'filter' can be used in Docker API calls to filter resources in the 'default' Kubernetes namespace that are part of 'my-job'.
+func ByJob(namespace, jobName string) filters.Args {
+	filter := AllJobs(namespace)
+	filter.Add("label", fmt.Sprintf("%s=%s", types.WorkloadNameLabelKey, jobName))
 	return filter
 }
 

@@ -35,6 +35,9 @@ const (
 	// StorageTypeLabelKey is the key used to store the storage type in the labels of a system configmap or a Docker volume
 	// It is used to differentiate between persistent volumes and config maps when listing volumes
 	StorageTypeLabelKey = "storage.k2d.io/type"
+
+	// JobLastAppliedConfigLabelKey is the key used to store the job specific last applied configuration in the container labels
+	JobLastAppliedConfigLabelKey = "job.k2d.io/last-applied-configuration"
 )
 
 const (
@@ -58,4 +61,8 @@ const (
 	// DeploymentWorkloadType is the label value used to identify a Deployment workload
 	// It is stored on a container as a label and used to filter containers when listing deployments
 	DeploymentWorkloadType = "deployment"
+
+	// JobWorkloadType is the label value used to identify a Job workload
+	// It is stored on a container as a label and used to filter containers when listing deployments
+	JobWorkloadType = "job"
 )
