@@ -37,6 +37,7 @@ type CertConfig struct {
 	CAFilename   string
 	CertFilename string
 	KeyFilename  string
+	AltNames     []string
 }
 
 // GenerateTLSCertificatesForIPAddr generates a CA certificate, a TLS certificate, and a private key
@@ -106,7 +107,7 @@ func GenerateTLSCertificatesForIPAddr(cfg CertConfig) error {
 			Locality:     []string{cfg.Locality},
 		},
 		IPAddresses:  []net.IP{cfg.IpAddr, net.IPv6loopback},
-		DNSNames:     []string{"kubernetes.default.svc"},
+		DNSNames:     append([]string{"kubernetes.default.svc"}, cfg.AltNames...),
 		NotBefore:    time.Now(),
 		NotAfter:     time.Now().Add(cfg.Validity),
 		SubjectKeyId: []byte{1, 2, 3, 4, 6},

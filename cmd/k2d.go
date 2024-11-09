@@ -96,7 +96,7 @@ func main() {
 		logger.Fatalf("unable to get advertise IP address: %s", err)
 	}
 
-	err = ssl.EnsureTLSCertificatesExist(ctx, cfg.DataPath, ip)
+	err = ssl.EnsureTLSCertificatesExist(ctx, cfg.DataPath, ip, cfg.AltNames)
 	if err != nil {
 		logger.Fatalf("unable to setup TLS certificates: %s", err)
 	}

@@ -58,7 +58,7 @@ func SSLKeyPath(dataPath string) string {
 // The generated certificates have a validity period of 25 years.
 //
 // This function depends on the ssl.GenerateTLSCertificatesForIPAddr and filesystem.CreateDir functions.
-func EnsureTLSCertificatesExist(ctx context.Context, dataPath string, ipAddr net.IP) error {
+func EnsureTLSCertificatesExist(ctx context.Context, dataPath string, ipAddr net.IP, altNames []string) error {
 	certPath := path.Join(dataPath, SSL_FOLDER)
 
 	err := filesystem.CreateDir(certPath)
@@ -77,6 +77,7 @@ func EnsureTLSCertificatesExist(ctx context.Context, dataPath string, ipAddr net
 		CAFilename:   CA_FILENAME,
 		CertFilename: CERT_FILENAME,
 		KeyFilename:  KEY_FILENAME,
+		AltNames:     altNames,
 	}
 
 	tlsFilesExist, err := areTLSCertificatesPresent(cfg)
