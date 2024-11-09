@@ -5,13 +5,14 @@ import (
 	"time"
 
 	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/system"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8stypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/apis/core"
 )
 
-func (converter *DockerAPIConverter) ConvertInfoVersionToNode(info types.Info, version types.Version, startTime time.Time) core.Node {
+func (converter *DockerAPIConverter) ConvertInfoVersionToNode(info system.Info, version types.Version, startTime time.Time) core.Node {
 	return core.Node{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Node",

@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/apis/apps"
 
@@ -51,7 +52,7 @@ func (adapter *KubeDockerAdapter) CreateContainerFromDeployment(ctx context.Cont
 
 func (adapter *KubeDockerAdapter) getContainerFromDeploymentName(ctx context.Context, deploymentName, namespace string) (types.Container, error) {
 	filter := filters.ByDeployment(namespace, deploymentName)
-	containers, err := adapter.cli.ContainerList(ctx, types.ContainerListOptions{All: true, Filters: filter})
+	containers, err := adapter.cli.ContainerList(ctx, container.ListOptions{All: true, Filters: filter})
 	if err != nil {
 		return types.Container{}, fmt.Errorf("unable to list containers: %w", err)
 	}
@@ -150,7 +151,7 @@ func (adapter *KubeDockerAdapter) buildDeploymentFromContainer(container types.C
 
 func (adapter *KubeDockerAdapter) listDeployments(ctx context.Context, namespace string) (apps.DeploymentList, error) {
 	filter := filters.AllDeployments(namespace)
-	containers, err := adapter.cli.ContainerList(ctx, types.ContainerListOptions{All: true, Filters: filter})
+	containers, err := adapter.cli.ContainerList(ctx, container.ListOptions{All: true, Filters: filter})
 	if err != nil {
 		return apps.DeploymentList{}, fmt.Errorf("unable to list containers: %w", err)
 	}

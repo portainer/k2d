@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
 	adaptererr "github.com/portainer/k2d/internal/adapter/errors"
 	"github.com/portainer/k2d/internal/adapter/filters"
 	k2dtypes "github.com/portainer/k2d/internal/adapter/types"
@@ -54,7 +55,7 @@ func (adapter *KubeDockerAdapter) CreateContainerFromJob(ctx context.Context, jo
 
 func (adapter *KubeDockerAdapter) getContainerFromJobName(ctx context.Context, jobName, namespace string) (types.Container, error) {
 	filter := filters.ByJob(namespace, jobName)
-	containers, err := adapter.cli.ContainerList(ctx, types.ContainerListOptions{All: true, Filters: filter})
+	containers, err := adapter.cli.ContainerList(ctx, container.ListOptions{All: true, Filters: filter})
 	if err != nil {
 		return types.Container{}, fmt.Errorf("unable to list containers: %w", err)
 	}
@@ -158,7 +159,7 @@ func (adapter *KubeDockerAdapter) buildJobFromContainer(ctx context.Context, con
 
 func (adapter *KubeDockerAdapter) listJobs(ctx context.Context, namespace string) (batch.JobList, error) {
 	filter := filters.AllJobs(namespace)
-	containers, err := adapter.cli.ContainerList(ctx, types.ContainerListOptions{All: true, Filters: filter})
+	containers, err := adapter.cli.ContainerList(ctx, container.ListOptions{All: true, Filters: filter})
 	if err != nil {
 		return batch.JobList{}, fmt.Errorf("unable to list containers: %w", err)
 	}
