@@ -40,9 +40,9 @@ func (svc StorageService) ListAPIResources(r *restful.Request, w *restful.Respon
 				Kind:         "StorageClass",
 				SingularName: "",
 				Name:         "storageclasses",
-				ShortNames:   []string{"sc"},
 				Verbs:        []string{"list", "get"},
 				Namespaced:   false,
+				ShortNames:   []string{"sc"},
 			},
 		},
 	}
