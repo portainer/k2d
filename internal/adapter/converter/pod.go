@@ -110,6 +110,8 @@ func (converter *DockerAPIConverter) ConvertContainerToPod(container types.Conta
 			},
 		}
 	} else {
+		// TODO: handle exited containers, so Jobs can determine the status
+		// /containers/<container ID>/json ? This will allow getting Exit Code.
 		pod.Status.Phase = core.PodUnknown
 
 		// this is to mark the pod's condition as unknown
