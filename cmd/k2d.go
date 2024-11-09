@@ -56,7 +56,7 @@ func main() {
 	defer logger.Sync()
 
 	if *resetMode {
-		fmt.Println("Are you sure you want to this host? This will remove everything created by or via k2d including workload and data. y/N")
+		fmt.Println("Are you sure you want to reset this host? This will remove everything created by or via k2d - including workload and data. y/N")
 		confirm, err := prompt.AskForConfirmation()
 		if err != nil {
 			logger.Fatalf("unable to ask for confirmation: %s", err)
