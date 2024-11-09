@@ -43,6 +43,7 @@ func (svc BatchService) ListAPIResources(r *restful.Request, w *restful.Response
 				Name:         "jobs",
 				Verbs:        []string{"create", "list", "delete", "get", "patch"},
 				Namespaced:   true,
+				ShortNames:   []string{"job"},
 			},
 		},
 	}
