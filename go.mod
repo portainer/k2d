@@ -1,6 +1,6 @@
 module github.com/portainer/k2d
 
-go 1.20
+go 1.23
 
 require (
 	github.com/docker/distribution v2.8.2+incompatible
