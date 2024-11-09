@@ -219,7 +219,7 @@ func main() {
 		encodedSecret, serverConfiguration.ServerIpAddr, serverConfiguration.ServerPort)
 
 	err = http.ListenAndServeTLS(
-		fmt.Sprintf(":%d", cfg.Port),
+		fmt.Sprintf("%s:%d", ip.String(), cfg.Port),
 		ssl.SSLCertPath(cfg.DataPath),
 		ssl.SSLKeyPath(cfg.DataPath),
 		container)
