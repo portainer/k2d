@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/docker/docker/api/types"
+	containertypes "github.com/docker/docker/api/types/container"
 	"github.com/portainer/k2d/internal/adapter/errors"
 	"github.com/portainer/k2d/internal/adapter/filters"
 	"github.com/portainer/k2d/internal/adapter/naming"
@@ -59,7 +60,7 @@ func (adapter *KubeDockerAdapter) buildPodFromContainer(container types.Containe
 func (adapter *KubeDockerAdapter) findContainerFromPodAndNamespace(ctx context.Context, podName string, namespace string) (*types.Container, error) {
 	var container *types.Container
 
-	listOptions := types.ContainerListOptions{All: true}
+	listOptions := containertypes.ListOptions{All: true}
 	containerName := podName
 
 	if !isDefaultOrEmptyNamespace(namespace) {
@@ -110,7 +111,7 @@ func (adapter *KubeDockerAdapter) findContainerFromPodAndNamespace(ctx context.C
 // - core.PodList: A list of Kubernetes Pods encapsulated in a PodList object, along with Kubernetes metadata.
 // - error: An error object which could contain various types of errors including API call failures, JSON unmarshalling errors, etc.
 func (adapter *KubeDockerAdapter) getPodListFromContainers(ctx context.Context, namespace string) (core.PodList, error) {
-	listOptions := types.ContainerListOptions{All: true}
+	listOptions := containertypes.ListOptions{All: true}
 	if !isDefaultOrEmptyNamespace(namespace) {
 		listOptions.Filters = filters.ByNamespace(namespace)
 	}

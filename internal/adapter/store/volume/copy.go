@@ -10,7 +10,6 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/portainer/k2d/pkg/crypto"
 )
@@ -68,12 +67,12 @@ func (s *VolumeStore) copyDataMapToVolume(volumeName string, dataMap map[string]
 		return fmt.Errorf("unable to close tar writer: %w", err)
 	}
 
-	err = s.cli.CopyToContainer(context.TODO(), containerID, WorkingDirName, &buf, types.CopyToContainerOptions{})
+	err = s.cli.CopyToContainer(context.TODO(), containerID, WorkingDirName, &buf, container.CopyToContainerOptions{})
 	if err != nil {
 		return fmt.Errorf("unable to copy data to temporary volume copy container: %w", err)
 	}
 
-	err = s.cli.ContainerRemove(context.TODO(), containerID, types.ContainerRemoveOptions{
+	err = s.cli.ContainerRemove(context.TODO(), containerID, container.RemoveOptions{
 		Force: true,
 	})
 	if err != nil {
@@ -105,7 +104,7 @@ func (s *VolumeStore) createAndStartCopyContainer(volumeBinds []string, containe
 		return "", err
 	}
 
-	if err = s.cli.ContainerStart(context.TODO(), resp.ID, types.ContainerStartOptions{}); err != nil {
+	if err = s.cli.ContainerStart(context.TODO(), resp.ID, container.StartOptions{}); err != nil {
 		return "", err
 	}
 
@@ -138,7 +137,7 @@ func (store *VolumeStore) getDataMapFromVolume(volumeName string) (map[string]st
 		return nil, err
 	}
 
-	err = store.cli.ContainerRemove(context.TODO(), containerID, types.ContainerRemoveOptions{Force: true})
+	err = store.cli.ContainerRemove(context.TODO(), containerID, container.RemoveOptions{Force: true})
 	if err != nil {
 		return nil, err
 	}
@@ -186,7 +185,7 @@ func (store *VolumeStore) getDataMapsFromVolumes(volumeNames []string) (map[stri
 		result[volumeName] = dataMap
 	}
 
-	err = store.cli.ContainerRemove(context.Background(), containerID, types.ContainerRemoveOptions{Force: true})
+	err = store.cli.ContainerRemove(context.Background(), containerID, container.RemoveOptions{Force: true})
 	if err != nil {
 		return nil, err
 	}

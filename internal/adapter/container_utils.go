@@ -12,6 +12,7 @@ import (
 	"github.com/docker/distribution/reference"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/api/types/registry"
 	"github.com/docker/docker/errdefs"
@@ -81,18 +82,18 @@ func (adapter *KubeDockerAdapter) reCreateContainerWithNewConfiguration(ctx cont
 	)
 	if err != nil {
 		// Attempt to start the old container again in case of failure
-		if startErr := adapter.cli.ContainerStart(ctx, containerID, types.ContainerStartOptions{}); startErr != nil {
+		if startErr := adapter.cli.ContainerStart(ctx, containerID, container.StartOptions{}); startErr != nil {
 			return fmt.Errorf("unable to start the old container after failed new container creation: %w", startErr)
 		}
 		return fmt.Errorf("unable to create container: %w", err)
 	}
 
 	// Start the new container
-	err = adapter.cli.ContainerStart(ctx, containerCreateResponse.ID, types.ContainerStartOptions{})
+	err = adapter.cli.ContainerStart(ctx, containerCreateResponse.ID, container.StartOptions{})
 	if err != nil {
 		// If the new container fails to start, remove the old container and leave the new container in the created state.
 		// This way, the container can be inspected to see what went wrong.
-		removeErr := adapter.cli.ContainerRemove(ctx, containerID, types.ContainerRemoveOptions{})
+		removeErr := adapter.cli.ContainerRemove(ctx, containerID, container.RemoveOptions{})
 		if removeErr != nil {
 			return fmt.Errorf("unable to remove the old container after failed start: %w", removeErr)
 		}
@@ -108,7 +109,7 @@ func (adapter *KubeDockerAdapter) reCreateContainerWithNewConfiguration(ctx cont
 	}
 
 	// If the new container started successfully, remove the old container
-	err = adapter.cli.ContainerRemove(ctx, containerID, types.ContainerRemoveOptions{})
+	err = adapter.cli.ContainerRemove(ctx, containerID, container.RemoveOptions{})
 	if err != nil {
 		return fmt.Errorf("unable to remove old container: %w", err)
 	}
@@ -268,7 +269,7 @@ func (adapter *KubeDockerAdapter) createContainerFromPodSpec(ctx context.Context
 			options.labels[k2dtypes.ServiceLastAppliedConfigLabelKey] = existingContainer.Config.Labels[k2dtypes.ServiceLastAppliedConfigLabelKey]
 		}
 
-		err := adapter.cli.ContainerRemove(ctx, existingContainer.ID, types.ContainerRemoveOptions{Force: true})
+		err := adapter.cli.ContainerRemove(ctx, existingContainer.ID, container.RemoveOptions{Force: true})
 		if err != nil {
 			return fmt.Errorf("unable to remove container: %w", err)
 		}
@@ -279,7 +280,7 @@ func (adapter *KubeDockerAdapter) createContainerFromPodSpec(ctx context.Context
 		return fmt.Errorf("unable to get registry credentials: %w", err)
 	}
 
-	out, err := adapter.cli.ImagePull(ctx, containerCfg.ContainerConfig.Image, types.ImagePullOptions{
+	out, err := adapter.cli.ImagePull(ctx, containerCfg.ContainerConfig.Image, image.PullOptions{
 		RegistryAuth: registryAuth,
 	})
 	if err != nil {
@@ -300,7 +301,7 @@ func (adapter *KubeDockerAdapter) createContainerFromPodSpec(ctx context.Context
 		return fmt.Errorf("unable to create container: %w", err)
 	}
 
-	return adapter.cli.ContainerStart(ctx, containerCreateResponse.ID, types.ContainerStartOptions{})
+	return adapter.cli.ContainerStart(ctx, containerCreateResponse.ID, container.StartOptions{})
 }
 
 // DeleteContainer attempts to remove a Docker container based on its name and associated namespace.
@@ -324,7 +325,7 @@ func (adapter *KubeDockerAdapter) createContainerFromPodSpec(ctx context.Context
 func (adapter *KubeDockerAdapter) DeleteContainer(ctx context.Context, containerName, namespace string) {
 	containerName = naming.BuildContainerName(containerName, namespace)
 
-	err := adapter.cli.ContainerRemove(ctx, containerName, types.ContainerRemoveOptions{Force: true})
+	err := adapter.cli.ContainerRemove(ctx, containerName, container.RemoveOptions{Force: true})
 	if err != nil {
 		adapter.logger.Warnf("unable to remove container: %s", err)
 	}
@@ -419,7 +420,7 @@ func (adapter *KubeDockerAdapter) getRegistryCredentials(podSpec corev1.PodSpec,
 // If a container using the Portainer Agent image does not exist, the function will create and start it,
 // then return nil to indicate that the process was successful.
 func (adapter *KubeDockerAdapter) DeployPortainerEdgeAgent(ctx context.Context, edgeKey, edgeID, agentVersion string) error {
-	containers, err := adapter.cli.ContainerList(ctx, types.ContainerListOptions{All: true})
+	containers, err := adapter.cli.ContainerList(ctx, container.ListOptions{All: true})
 	if err != nil {
 		return fmt.Errorf("unable to list docker containers: %w", err)
 	}
@@ -477,7 +478,7 @@ func (adapter *KubeDockerAdapter) DeployPortainerEdgeAgent(ctx context.Context, 
 		},
 	}
 
-	out, err := adapter.cli.ImagePull(ctx, containerConfig.Image, types.ImagePullOptions{})
+	out, err := adapter.cli.ImagePull(ctx, containerConfig.Image, image.PullOptions{})
 	if err != nil {
 		return fmt.Errorf("unable to pull %s image: %w", containerConfig.Image, err)
 	}
@@ -491,7 +492,7 @@ func (adapter *KubeDockerAdapter) DeployPortainerEdgeAgent(ctx context.Context, 
 		return fmt.Errorf("unable to create portainer agent container: %w", err)
 	}
 
-	err = adapter.cli.ContainerStart(ctx, "portainer-agent", types.ContainerStartOptions{})
+	err = adapter.cli.ContainerStart(ctx, "portainer-agent", container.StartOptions{})
 	if err != nil {
 		return fmt.Errorf("unable to start portainer agent container: %w", err)
 	}
