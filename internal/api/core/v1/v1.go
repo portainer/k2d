@@ -75,6 +75,7 @@ func (svc V1Service) ListAPIResources(r *restful.Request, w *restful.Response) {
 				Name:         "events",
 				Verbs:        []string{"list"},
 				Namespaced:   false,
+				ShortNames:   []string{"ev"},
 			},
 			{
 				Kind:         "Namespace",
@@ -90,6 +91,7 @@ func (svc V1Service) ListAPIResources(r *restful.Request, w *restful.Response) {
 				Name:         "nodes",
 				Verbs:        []string{"list", "get"},
 				Namespaced:   false,
+				ShortNames:   []string{"no"},
 			},
 			{
 				Kind:         "PersistentVolume",
@@ -113,6 +115,7 @@ func (svc V1Service) ListAPIResources(r *restful.Request, w *restful.Response) {
 				Name:         "pods",
 				Verbs:        []string{"create", "list", "delete", "get", "patch"},
 				Namespaced:   true,
+				ShortNames:   []string{"po"},
 			},
 			{
 				Kind:         "Secret",
@@ -120,6 +123,7 @@ func (svc V1Service) ListAPIResources(r *restful.Request, w *restful.Response) {
 				Name:         "secrets",
 				Verbs:        []string{"create", "list", "delete", "get", "patch"},
 				Namespaced:   true,
+				ShortNames:   []string{"sec"},
 			},
 			{
 				Kind:         "Service",

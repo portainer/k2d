@@ -43,6 +43,7 @@ func (svc AppsService) ListAPIResources(r *restful.Request, w *restful.Response)
 				Name:         "deployments",
 				Verbs:        []string{"create", "list", "delete", "get", "patch"},
 				Namespaced:   true,
+				ShortNames:   []string{"deploy"},
 			},
 		},
 	}
