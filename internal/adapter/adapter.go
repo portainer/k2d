@@ -48,6 +48,8 @@ type (
 	//
 	// - Namespace deletion delay: Contains the delay that k2d waits after a namespace is deleted.
 	//
+	// - Node name: Contains the name of the node that the adapter is running on.
+	//
 	// This struct is a comprehensive utility for managing the interactions between Docker and Kubernetes.
 	KubeDockerAdapter struct {
 		cli                    *client.Client
@@ -59,6 +61,7 @@ type (
 		namespaceDeletionDelay time.Duration
 		registrySecretStore    store.SecretStore
 		startTime              time.Time
+		nodeName               string
 		secretStore            store.SecretStore
 	}
 
@@ -107,6 +110,11 @@ func NewKubeDockerAdapter(options *KubeDockerAdapterOptions) (*KubeDockerAdapter
 		return nil, fmt.Errorf("unable to initialize registry secret store: %w", err)
 	}
 
+	info, err := cli.Info(context.Background())
+	if err != nil {
+		return nil, fmt.Errorf("unable to get docker info: %w", err)
+	}
+
 	return &KubeDockerAdapter{
 		cli:                    cli,
 		converter:              converter.NewDockerAPIConverter(configMapStore, secretStore, options.ServerConfiguration),
@@ -118,6 +126,7 @@ func NewKubeDockerAdapter(options *KubeDockerAdapterOptions) (*KubeDockerAdapter
 		registrySecretStore:    registrySecretStore,
 		secretStore:            secretStore,
 		startTime:              time.Now(),
+		nodeName:               info.Name,
 	}, nil
 }
 

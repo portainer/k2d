@@ -33,7 +33,7 @@ import (
 //
 // Returns:
 // - A Kubernetes Pod object derived from the Docker container.
-func (converter *DockerAPIConverter) ConvertContainerToPod(container types.Container) core.Pod {
+func (converter *DockerAPIConverter) ConvertContainerToPod(container types.Container, nodeName string) core.Pod {
 	containerName := container.Labels[k2dtypes.WorkloadNameLabelKey]
 	containerState := container.State
 
@@ -51,6 +51,7 @@ func (converter *DockerAPIConverter) ConvertContainerToPod(container types.Conta
 			},
 		},
 		Spec: core.PodSpec{
+			NodeName: nodeName,
 			Containers: []core.Container{
 				{
 					Name:  containerName,
@@ -67,6 +68,16 @@ func (converter *DockerAPIConverter) ConvertContainerToPod(container types.Conta
 				},
 			},
 		},
+	}
+
+	if container.NetworkSettings != nil && container.NetworkSettings.Networks != nil {
+		if networkSettings, ok := container.NetworkSettings.Networks[container.Labels[k2dtypes.NetworkNameLabelKey]]; ok {
+			pod.Status.PodIPs = []core.PodIP{
+				{
+					IP: networkSettings.IPAddress,
+				},
+			}
+		}
 	}
 
 	if containerState == "running" {
