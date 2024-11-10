@@ -28,7 +28,7 @@ import (
 // - core.Pod: The converted Pod object.
 // - error: An error object if any error occurs during the conversion.
 func (adapter *KubeDockerAdapter) buildPodFromContainer(container types.Container) (core.Pod, error) {
-	pod := adapter.converter.ConvertContainerToPod(container)
+	pod := adapter.converter.ConvertContainerToPod(container, adapter.nodeName)
 
 	if container.Labels[k2dtypes.PodLastAppliedConfigLabelKey] != "" {
 		internalPodSpecData := container.Labels[k2dtypes.PodLastAppliedConfigLabelKey]

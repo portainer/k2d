@@ -12,7 +12,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core"
 )
 
-func (converter *DockerAPIConverter) ConvertInfoVersionToNode(info system.Info, version types.Version, startTime time.Time) core.Node {
+func (converter *DockerAPIConverter) ConvertInfoVersionToNode(info system.Info, version types.Version, startTime time.Time, serverIpAddr string) core.Node {
 	return core.Node{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Node",
@@ -37,6 +37,16 @@ func (converter *DockerAPIConverter) ConvertInfoVersionToNode(info system.Info, 
 			ProviderID: "k2d",
 		},
 		Status: core.NodeStatus{
+			Addresses: []core.NodeAddress{
+				{
+					Type:    core.NodeInternalIP,
+					Address: serverIpAddr,
+				},
+				{
+					Type:    core.NodeExternalIP,
+					Address: serverIpAddr,
+				},
+			},
 			Conditions: []core.NodeCondition{
 				{
 					Type:               "Ready",
@@ -55,6 +65,7 @@ func (converter *DockerAPIConverter) ConvertInfoVersionToNode(info system.Info, 
 				MachineID:               info.ID,
 				OperatingSystem:         info.OSType,
 				SystemUUID:              info.ID,
+				OSImage:                 info.OperatingSystem,
 			},
 			Capacity: core.ResourceList{
 				core.ResourceCPU:    *resource.NewQuantity(int64(info.NCPU), resource.DecimalSI),

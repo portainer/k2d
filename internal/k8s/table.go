@@ -46,7 +46,7 @@ func GenerateTable(obj runtime.Object) (*metav1.Table, error) {
 	tableGenerator := printers.NewTableGenerator()
 	printersinternal.AddHandlers(tableGenerator)
 
-	options := printers.GenerateOptions{}
+	options := printers.GenerateOptions{Wide: true}
 	table, err := tableGenerator.GenerateTable(obj, options)
 	if err != nil {
 		return nil, err
