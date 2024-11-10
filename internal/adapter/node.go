@@ -77,7 +77,7 @@ func (adapter *KubeDockerAdapter) getNode(ctx context.Context, nodeName string) 
 		return nil, fmt.Errorf("unable to retrieve docker server version: %w", err)
 	}
 
-	node := adapter.converter.ConvertInfoVersionToNode(info, version, adapter.startTime)
+	node := adapter.converter.ConvertInfoVersionToNode(info, version, adapter.startTime, adapter.k2dServerConfiguration.ServerIpAddr)
 	return &node, nil
 }
 
@@ -98,7 +98,7 @@ func (adapter *KubeDockerAdapter) listNodes(ctx context.Context) (core.NodeList,
 			APIVersion: "v1",
 		},
 		Items: []core.Node{
-			adapter.converter.ConvertInfoVersionToNode(info, version, adapter.startTime),
+			adapter.converter.ConvertInfoVersionToNode(info, version, adapter.startTime, adapter.k2dServerConfiguration.ServerIpAddr),
 		},
 	}, nil
 }
