@@ -1,5 +1,6 @@
 > [!IMPORTANT]
 > k2d is now archived in favor of [kubesolo](https://www.kubesolo.io)
+> 
 > Please head to https://github.com/portainer/kubesolo for a lightweight Kubernetes alternative.
 
 What is K2D?
