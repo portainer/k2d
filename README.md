@@ -1,3 +1,7 @@
+> [!IMPORTANT]
+> k2d is now archived in favor of [kubesolo](https://www.kubesolo.io)
+> Please head to https://github.com/portainer/kubesolo for a lightweight Kubernetes alternative.
+
 What is K2D?
 
 K2D was created to solve a very specific problem; enabling the use of Kubernetes primitives on the resource-constrained compute devices that underpin Industrial IoT use cases. 
