@@ -10,6 +10,9 @@ type Config struct {
 	// It is expected to be provided through an environment variable named K2D_ADVERTISE_ADDR.
 	AdvertiseAddr string `env:"K2D_ADVERTISE_ADDR"`
 
+	// AltNames represents optional alternative names for the TLS certificate.
+	AltNames []string `env:"K2D_ALT_NAMES"`
+
 	// DataPath represents the path for application data storage.
 	// If not provided through an environment variable named K2D_DATA_PATH,
 	// the default value is set to /var/lib/k2d.
